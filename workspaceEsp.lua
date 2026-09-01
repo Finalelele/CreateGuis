@@ -115,3 +115,5 @@ function createWorkspaceEsp(config)
 
     return api
 end
+
+return createWorkspaceEsp
