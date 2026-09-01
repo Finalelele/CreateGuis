@@ -350,7 +350,6 @@ function createInfoText(config)
             end
         end
     }
-
     return api
 end
 
