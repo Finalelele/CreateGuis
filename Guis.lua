@@ -180,32 +180,42 @@ function createInfoText(config)
     local currentAdornee = nil
     local isActive = false
 
-	local function setText(linesTable)
-		if not container then return end
-		if type(linesTable) ~= "table" then return end
-		
-		for _, lbl in pairs(labels) do
-			lbl:Destroy()
-		end
-		labels = {}
-
-		for order, item in ipairs(linesTable) do
-			local id = tostring(item.id or item.key or order)
-			local text = item.text or ""
-			local color = item.color or Color3.fromRGB(255, 255, 255)
-			local lbl = Instance.new("TextLabel", container)
-			lbl.Name = id
-			lbl.Size = UDim2.new(1, 0, 0, 20)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.SourceSansBold
-			lbl.TextSize = textSize
-			lbl.TextXAlignment = Enum.TextXAlignment.Center
-			lbl.Text = text
-			lbl.TextColor3 = color
-			lbl.LayoutOrder = order
-			labels[id] = lbl
-		end
-	end
+    local function setText(linesTable)
+        if not container then return end
+        if type(linesTable) ~= "table" then return end
+        
+        local processedKeys = {}
+        
+        for order, item in ipairs(linesTable) do
+            local id = tostring(item.id or item.key or order)
+            local text = item.text or ""
+            local color = item.color or Color3.fromRGB(255, 255, 255)
+            local lbl = labels[id]
+            
+            if not lbl then
+                lbl = Instance.new("TextLabel", container)
+                lbl.Name = id
+                lbl.Size = UDim2.new(1, 0, 0, 20)
+                lbl.BackgroundTransparency = 1
+                lbl.Font = Enum.Font.SourceSansBold
+                lbl.TextSize = textSize
+                lbl.TextXAlignment = Enum.TextXAlignment.Center
+                labels[id] = lbl
+            end
+            
+            lbl.Text = text
+            lbl.TextColor3 = color
+            lbl.LayoutOrder = order
+            processedKeys[id] = true
+        end
+        
+        for id, lbl in pairs(labels) do
+            if not processedKeys[id] then
+                lbl:Destroy()
+                labels[id] = nil
+            end
+        end
+    end
 
     local function createBillboard(adornee)
         if billboard then
@@ -225,7 +235,7 @@ function createInfoText(config)
             newAdornee = newAdornee.PrimaryPart or newAdornee:FindFirstChildWhichIsA("BasePart")
         end
         if not newAdornee or not newAdornee:IsA("BasePart") then
-            warn("createWorkspaceEsp: Center must contain a BasePart")
+            warn("createInfoText: Center must contain a BasePart")
             isActive = false
             return
         end
@@ -325,7 +335,6 @@ function createInfoText(config)
 
     return api
 end
-
 return {
     createInfoGui = createInfoGui,
     createInfoText = createInfoText
