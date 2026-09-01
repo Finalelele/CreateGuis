@@ -165,7 +165,7 @@ function createInfoGui(config)
     return window
 end
 
-function createWorkspaceEsp(config)
+function createInfoText(config)
     config = config or {}
     local name = config.Name or "GhostRoomESP"
     local center = config.Center
@@ -328,5 +328,5 @@ end
 
 return {
     createInfoGui = createInfoGui,
-    createWorkspaceEsp = createWorkspaceEsp
+    createInfoText = createInfoText
 }
