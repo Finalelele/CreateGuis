@@ -164,3 +164,5 @@ function createInfoGui(config)
     end
     return window
 end
+
+return createInfoGui
