@@ -184,14 +184,14 @@ function createInfoText(config)
         if not container then return end
         if type(linesTable) ~= "table" then return end
         
-        local processedKeys = {}
-        
         for order, item in ipairs(linesTable) do
+            if type(item) ~= "table" then
+                continue
+            end
             local id = tostring(item.id or item.key or order)
-            local text = item.text or ""
-            local color = item.color or Color3.fromRGB(255, 255, 255)
+            local text = item.text or item.value or ""
+            local color = item.color or item.Color
             local lbl = labels[id]
-            
             if not lbl then
                 lbl = Instance.new("TextLabel", container)
                 lbl.Name = id
@@ -202,17 +202,11 @@ function createInfoText(config)
                 lbl.TextXAlignment = Enum.TextXAlignment.Center
                 labels[id] = lbl
             end
-            
-            lbl.Text = text
-            lbl.TextColor3 = color
-            lbl.LayoutOrder = order
-            processedKeys[id] = true
-        end
-        
-        for id, lbl in pairs(labels) do
-            if not processedKeys[id] then
-                lbl:Destroy()
-                labels[id] = nil
+            lbl.Text = tostring(text)
+            lbl.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+            if not lbl:GetAttribute("InitializedOrder") then
+                lbl.LayoutOrder = order
+                lbl:SetAttribute("InitializedOrder", true)
             end
         end
     end
@@ -302,6 +296,30 @@ function createInfoText(config)
         end,
 
         SetCenter = function(self, newCenter)
+            if not newCenter then
+                if billboard then
+                    billboard:Destroy()
+                    billboard = nil
+                    container = nil
+                    labels = {}
+                    isActive = false
+                end
+                return
+            end
+
+            local newAdornee = newCenter
+            if newAdornee:IsA("Model") then
+                newAdornee = newAdornee.PrimaryPart or newAdornee:FindFirstChildWhichIsA("BasePart")
+            end
+            if not newAdornee or not newAdornee:IsA("BasePart") then
+                warn("createInfoText: Center must contain a BasePart")
+                return
+            end
+
+            if currentAdornee == newAdornee then
+                return
+            end
+
             createBillboard(newCenter)
             if billboard then
                 billboard.Enabled = true
@@ -335,6 +353,7 @@ function createInfoText(config)
 
     return api
 end
+
 return {
     createInfoGui = createInfoGui,
     createInfoText = createInfoText
