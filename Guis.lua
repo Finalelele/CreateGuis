@@ -165,7 +165,7 @@ function createInfoGui(config)
     return window
 end
 
-local function createInfoText(config)
+function createInfoText(config)
     config = config or {}
 
     local name = config.Name or "GhostRoomESP"
