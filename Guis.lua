@@ -165,7 +165,7 @@ function createInfoGui(config)
     return window
 end
 
-function createInfoText(config)
+local function createInfoText(config)
     config = config or {}
 
     local name = config.Name or "GhostRoomESP"
@@ -174,13 +174,29 @@ function createInfoText(config)
     local textSize = config.TextSize or 20
     local lines = config.Lines or {}
     local size = config.Size or UDim2.new(0, 300, 0, 50)
-    local zIndex = config.ZIndex or 0
 
     local billboard = nil
     local container = nil
     local labels = {}
     local currentAdornee = nil
     local isActive = false
+
+    local function resolveAdornee(target)
+        if not target then
+            return nil
+        end
+
+        if target:IsA("Model") then
+            target = target.PrimaryPart
+                or target:FindFirstChildWhichIsA("BasePart")
+        end
+
+        if not target or not target:IsA("BasePart") then
+            return nil
+        end
+
+        return target
+    end
 
     local function setText(linesTable)
         if not container then
@@ -203,14 +219,14 @@ function createInfoText(config)
             local lbl = labels[id]
 
             if not lbl then
-                lbl = Instance.new("TextLabel", container)
+                lbl = Instance.new("TextLabel")
                 lbl.Name = id
                 lbl.Size = UDim2.new(1, 0, 0, 20)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.SourceSansBold
                 lbl.TextSize = textSize
                 lbl.TextXAlignment = Enum.TextXAlignment.Center
-                lbl.ZIndex = zIndex
+                lbl.Parent = container
 
                 labels[id] = lbl
             end
@@ -222,8 +238,6 @@ function createInfoText(config)
                 lbl.LayoutOrder = order
                 lbl:SetAttribute("InitializedOrder", true)
             end
-
-            lbl.ZIndex = zIndex
         end
     end
 
@@ -233,42 +247,29 @@ function createInfoText(config)
             return
         end
 
-        local newAdornee = adornee
-
-        if newAdornee:IsA("Model") then
-            newAdornee = newAdornee.PrimaryPart
-                or newAdornee:FindFirstChildWhichIsA("BasePart")
-        end
-
-        if not newAdornee or not newAdornee:IsA("BasePart") then
-            warn("createInfoText: Center must contain a BasePart")
-            isActive = false
-            return
-        end
-
-        currentAdornee = newAdornee
-        isActive = true
-
         billboard = Instance.new("BillboardGui")
         billboard.Name = name
-        billboard.Adornee = newAdornee
+        billboard.Adornee = adornee
         billboard.Size = size
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
         billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-        billboard.Parent = newAdornee
+        billboard.Parent = adornee
 
         container = Instance.new("Frame")
         container.Name = "MainFrame"
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
-        container.ZIndex = zIndex
         container.Parent = billboard
 
-        local layout = Instance.new("UIListLayout", container)
+        local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
+        layout.Parent = container
+
         labels = {}
+        currentAdornee = adornee
+        isActive = true
 
         if lines and #lines > 0 then
             setText(lines)
@@ -276,12 +277,19 @@ function createInfoText(config)
     end
 
     if center then
-        createBillboard(center)
+        local adornee = resolveAdornee(center)
+
+        if adornee then
+            createBillboard(adornee)
+        else
+            warn("createInfoText: Center must contain a BasePart")
+        end
     end
 
     local api = {
         SetText = function(self, newLines)
-            lines = newLines
+            lines = newLines or {}
+
             if isActive then
                 setText(newLines)
             end
@@ -291,13 +299,17 @@ function createInfoText(config)
             if not container then
                 return
             end
-            
+
             key = tostring(key)
+
             local lbl = labels[key]
+
             if lbl then
                 lbl:Destroy()
                 labels[key] = nil
+
                 local order = 1
+
                 for _, child in ipairs(container:GetChildren()) do
                     if child:IsA("TextLabel") then
                         child.LayoutOrder = order
@@ -307,7 +319,7 @@ function createInfoText(config)
                 end
             end
         end,
-        
+
         Visible = function(self, state)
             if billboard then
                 billboard.Enabled = state
@@ -319,43 +331,40 @@ function createInfoText(config)
                 if billboard then
                     billboard.Enabled = false
                 end
+
                 currentAdornee = nil
                 isActive = false
                 return
             end
 
-            local newAdornee = newCenter
+            local newAdornee = resolveAdornee(newCenter)
 
-            if newAdornee:IsA("Model") then
-                newAdornee = newAdornee.PrimaryPart
-                    or newAdornee:FindFirstChildWhichIsA("BasePart")
-            end
-
-            if not newAdornee or not newAdornee:IsA("BasePart") then
+            if not newAdornee then
                 warn("createInfoText: Center must contain a BasePart")
                 return
             end
 
+            if not billboard then
+                createBillboard(newAdornee)
+                return
+            end
+
             if currentAdornee == newAdornee then
-                if billboard then
-                    billboard.Enabled = true
-                end
+                billboard.Enabled = true
                 isActive = true
                 return
             end
 
-            if billboard then
-                currentAdornee = newAdornee
-                billboard.Adornee = newAdornee
-                billboard.Enabled = true
-                isActive = true
-            else
-                createBillboard(newAdornee)
-            end
+            currentAdornee = newAdornee
+            billboard.Adornee = newAdornee
+            billboard.Parent = newAdornee
+            billboard.Enabled = true
+            isActive = true
         end,
 
         SetOffset = function(self, newOffset)
             offset = newOffset
+
             if billboard then
                 billboard.StudsOffset = newOffset
             end
@@ -363,20 +372,9 @@ function createInfoText(config)
 
         SetSize = function(self, newSize)
             size = newSize
+
             if billboard then
                 billboard.Size = newSize
-            end
-        end,
-        
-        SetZIndex = function(self, newZIndex)
-            zIndex = tonumber(newZIndex) or 0
-            if container then
-                container.ZIndex = zIndex
-                for _, child in ipairs(container:GetDescendants()) do
-                    if child:IsA("GuiObject") then
-                        child.ZIndex = zIndex
-                    end
-                end
             end
         end,
 
@@ -394,6 +392,8 @@ function createInfoText(config)
 
     return api
 end
+
+return createInfoText
 
 return {
     createInfoGui = createInfoGui,
