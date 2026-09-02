@@ -393,8 +393,6 @@ local function createInfoText(config)
     return api
 end
 
-return createInfoText
-
 return {
     createInfoGui = createInfoGui,
     createInfoText = createInfoText
