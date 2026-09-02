@@ -318,9 +318,10 @@ function createInfoText(config)
 
             if currentAdornee == newAdornee then
                 return
+            else
+                createBillboard(newCenter)
             end
-
-            createBillboard(newCenter)
+            
             if billboard then
                 billboard.Enabled = true
             end
