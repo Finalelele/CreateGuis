@@ -95,15 +95,33 @@ function createInfoGui(config)
         if type(lines) ~= "table" then
             return
         end
-        for order, item in ipairs(lines) do
+    
+        local maxOrder = 0
+    
+        for _, child in ipairs(container:GetChildren()) do
+            if child:IsA("TextLabel") then
+                maxOrder = math.max(maxOrder, child.LayoutOrder)
+            end
+        end
+    
+        for _, item in ipairs(lines) do
             if type(item) ~= "table" then
                 continue
             end
-            local id = tostring(item.id or item.key or order)
+    
+            local id = tostring(item.id or item.key)
+            if not id then
+                continue
+            end
+    
             local text = item.text or item.value or ""
             local color = item.color or item.Color
+    
             local lbl = labels[id]
+    
             if not lbl then
+                maxOrder += 1
+    
                 lbl = Instance.new("TextLabel", container)
                 lbl.Name = id
                 lbl.Size = UDim2.new(1, 0, 0, 18)
@@ -111,14 +129,13 @@ function createInfoGui(config)
                 lbl.Font = Enum.Font.SourceSansBold
                 lbl.TextSize = config.TextSize or 14
                 lbl.TextXAlignment = Enum.TextXAlignment.Left
+                lbl.LayoutOrder = maxOrder
+    
                 labels[id] = lbl
             end
+    
             lbl.Text = tostring(text)
             lbl.TextColor3 = color or Color3.fromRGB(255, 255, 255)
-            if not lbl:GetAttribute("InitializedOrder") then
-                lbl.LayoutOrder = order
-                lbl:SetAttribute("InitializedOrder", true)
-            end
         end
     end
 
@@ -199,26 +216,36 @@ function createInfoText(config)
     end
 
     local function setText(linesTable)
-        if not container then
+        if not container or type(linesTable) ~= "table" then
             return
         end
-
-        if type(linesTable) ~= "table" then
-            return
+    
+        local maxOrder = 0
+    
+        for _, child in ipairs(container:GetChildren()) do
+            if child:IsA("TextLabel") then
+                maxOrder = math.max(maxOrder, child.LayoutOrder)
+            end
         end
-
-        for order, item in ipairs(linesTable) do
+    
+        for _, item in ipairs(linesTable) do
             if type(item) ~= "table" then
                 continue
             end
-
-            local id = tostring(item.id or item.key or order)
+    
+            local id = tostring(item.id or item.key)
+            if not id then
+                continue
+            end
+    
             local text = item.text or item.value or ""
             local color = item.color or item.Color
-
+    
             local lbl = labels[id]
-
+    
             if not lbl then
+                maxOrder += 1
+    
                 lbl = Instance.new("TextLabel")
                 lbl.Name = id
                 lbl.Size = UDim2.new(1, 0, 0, 20)
@@ -226,18 +253,14 @@ function createInfoText(config)
                 lbl.Font = Enum.Font.SourceSansBold
                 lbl.TextSize = textSize
                 lbl.TextXAlignment = Enum.TextXAlignment.Center
+                lbl.LayoutOrder = maxOrder
                 lbl.Parent = container
-
+    
                 labels[id] = lbl
             end
-
+    
             lbl.Text = tostring(text)
             lbl.TextColor3 = color or Color3.fromRGB(255, 255, 255)
-
-            if not lbl:GetAttribute("InitializedOrder") then
-                lbl.LayoutOrder = order
-                lbl:SetAttribute("InitializedOrder", true)
-            end
         end
     end
 
