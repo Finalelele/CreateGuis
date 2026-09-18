@@ -271,8 +271,14 @@ function createInfoText(config)
         end
     
         if billboard then
-            local height = math.max(20, lineCount * 20 + math.max(0, lineCount - 1) * 2)
-            billboard.Size = UDim2.new(size.X.Scale, size.X.Offset, 0, height)
+        	local actualLines = 0
+        	for _, child in ipairs(container:GetChildren()) do
+        		if child:IsA("TextLabel") then
+        			actualLines += 1
+        		end
+        	end
+        	local height = math.max(20, actualLines * 20 + math.max(0, actualLines - 1) * 2)
+        	billboard.Size = UDim2.new(size.X.Scale, size.X.Offset, 0, height)
         end
     end
 
