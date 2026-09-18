@@ -2,100 +2,91 @@ function createInfoGui(config)
     config = config or {}
 
     local guiName = config.Name or "CustomWindow"
-    local coreGui = game:GetService("CoreGui")
+    local title = config.Title or "Window"
+    local width = config.Width or 200
+    local scale = config.Scale or 1
+    local position = config.Position or UDim2.new(0.05, 0, 0.15, 0)
+    local textSize = config.TextSize or 14
+    local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
+    local defaultOutlineSize = config.outlineSize
 
-    local screen = Instance.new("ScreenGui", coreGui)
+    local coreGui = game:GetService("CoreGui")
+    local screen = coreGui:FindFirstChild(guiName)
+
+    if screen then
+        screen:Destroy()
+    end
+
+    screen = Instance.new("ScreenGui")
     screen.Name = guiName
     screen.ResetOnSpawn = false
     screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screen.Parent = coreGui
 
-    local frame = Instance.new("Frame", screen)
+    local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, config.Width or 200, 0, 0)
-    frame.Position = config.Position or UDim2.new(0.05, 0, 0.15, 0)
+    frame.Size = UDim2.new(0, width, 0, 0)
+    frame.Position = position
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     frame.BorderSizePixel = 0
     frame.Active = true
     frame.Draggable = true
     frame.AutomaticSize = Enum.AutomaticSize.Y
+    frame.Parent = screen
 
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
 
     local uiScale = Instance.new("UIScale")
-    uiScale.Name = "WindowScale"
-    uiScale.Scale = config.Scale or 1
+    uiScale.Scale = scale
     uiScale.Parent = frame
 
-    local topBar = Instance.new("Frame", frame)
-    topBar.Name = "TopBar"
-    topBar.Size = UDim2.new(1, 0, 0, 35)
-    topBar.BackgroundTransparency = 1
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextSize = textSize + 1
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = frame
 
-    local title = Instance.new("TextLabel", topBar)
-    title.Size = UDim2.new(1, -35, 1, 0)
-    title.Position = UDim2.new(0, 12, 0, 0)
-    title.Text = config.Title or "Window"
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.Font = Enum.Font.SourceSansBold
-    title.TextSize = config.TextSize or 17
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.BackgroundTransparency = 1
+    local titlePadding = Instance.new("UIPadding")
+    titlePadding.PaddingLeft = UDim.new(0, 8)
+    titlePadding.Parent = titleLabel
 
-    local container = Instance.new("Frame", frame)
+    local container = Instance.new("Frame")
     container.Name = "Container"
-    container.Position = UDim2.new(0, 0, 0, 35)
+    container.Position = UDim2.new(0, 0, 0, 30)
     container.Size = UDim2.new(1, 0, 0, 0)
-    container.AutomaticSize = Enum.AutomaticSize.Y
     container.BackgroundTransparency = 1
+    container.AutomaticSize = Enum.AutomaticSize.Y
+    container.Parent = frame
 
-    local padding = Instance.new("UIPadding", container)
-    padding.PaddingLeft = UDim.new(0, 12)
-    padding.PaddingRight = UDim.new(0, 12)
-    padding.PaddingBottom = UDim.new(0, 10)
-
-    local layout = Instance.new("UIListLayout", container)
+    local layout = Instance.new("UIListLayout")
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 4)
-
-    local toggleBtn = Instance.new("TextButton", topBar)
-    toggleBtn.Size = UDim2.new(0, 25, 0, 25)
-    toggleBtn.Position = UDim2.new(1, -28, 0, 5)
-    toggleBtn.Text = "-"
-    toggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    toggleBtn.BackgroundTransparency = 1
-    toggleBtn.Font = Enum.Font.SourceSansBold
-    toggleBtn.TextSize = 18
-
-    toggleBtn.MouseButton1Click:Connect(function()
-        container.Visible = not container.Visible
-        toggleBtn.Text = container.Visible and "-" or "+"
-    end)
-
-    local uiScaleCheck = frame:FindFirstChild("WindowScale")
-    if uiScaleCheck then
-        uiScaleCheck.Scale = config.Scale or 1
-    end
+    layout.Padding = UDim.new(0, 2)
+    layout.Parent = container
 
     local labels = {}
     local lineData = {}
-    local createIndex = 0
+    local creationCounter = 0
 
-    local defaultOutlineColor = config.outlineColor or config.OutlineColor or Color3.fromRGB(255, 255, 255)
-    local defaultOutlineSize = config.outlineSize or config.OutlineSize
+    local function applyOutline(label, data)
+        local stroke = label:FindFirstChild("Outline")
 
-    local function updateStroke(lbl, outlineColor, outlineSize)
-        local stroke = lbl:FindFirstChild("Outline")
-
-        if outlineSize then
+        if data.outlineSize then
             if not stroke then
                 stroke = Instance.new("UIStroke")
                 stroke.Name = "Outline"
                 stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-                stroke.Parent = lbl
+                stroke.Parent = label
             end
 
-            stroke.Color = outlineColor or defaultOutlineColor
-            stroke.Thickness = outlineSize
+            stroke.Color = data.outlineColor or defaultOutlineColor
+            stroke.Thickness = data.outlineSize
             stroke.Transparency = 0
         elseif stroke then
             stroke:Destroy()
@@ -103,30 +94,14 @@ function createInfoGui(config)
     end
 
     local function updateOrder()
-        local entries = {}
-
-        for id, lbl in pairs(labels) do
-            local data = lineData[id]
-
-            if data then
-                table.insert(entries, {
-                    id = id,
-                    label = lbl,
-                    order = data.order,
-                    created = data.created
-                })
-            end
-        end
-
-        local usedOrders = {}
         local explicit = {}
         local withoutOrder = {}
 
-        for _, entry in ipairs(entries) do
-            if entry.order ~= nil then
-                table.insert(explicit, entry)
+        for id, data in pairs(lineData) do
+            if data.order ~= nil then
+                table.insert(explicit, data)
             else
-                table.insert(withoutOrder, entry)
+                table.insert(withoutOrder, data)
             end
         end
 
@@ -138,151 +113,156 @@ function createInfoGui(config)
             return a.order < b.order
         end)
 
-        for _, entry in ipairs(explicit) do
-            local wanted = math.max(1, math.floor(tonumber(entry.order) or 1))
-            local finalOrder = wanted
-
-            while usedOrders[finalOrder] do
-                finalOrder += 1
-            end
-
-            usedOrders[finalOrder] = true
-            entry.label.LayoutOrder = finalOrder
-        end
-
         table.sort(withoutOrder, function(a, b)
             return a.created < b.created
         end)
 
-        local nextOrder = 1
+        local used = {}
 
-        for _, entry in ipairs(withoutOrder) do
-            while usedOrders[nextOrder] do
-                nextOrder += 1
+        for _, data in ipairs(explicit) do
+            local order = math.max(1, math.floor(data.order))
+
+            while used[order] do
+                order = order + 1
             end
 
-            entry.label.LayoutOrder = nextOrder
-            usedOrders[nextOrder] = true
-            nextOrder += 1
+            used[order] = true
+            labels[data.id].LayoutOrder = order
+        end
+
+        local current = 1
+
+        for _, data in ipairs(withoutOrder) do
+            while used[current] do
+                current = current + 1
+            end
+
+            used[current] = true
+            labels[data.id].LayoutOrder = current
+            current = current + 1
         end
     end
 
-    local window = {}
-
-    function window:SetText(lines)
-        if type(lines) ~= "table" then
+    local function setLine(data)
+        if not data or not data.id then
             return
         end
 
-        for _, item in ipairs(lines) do
-            if type(item) ~= "table" then
-                continue
-            end
+        local id = data.id
+        local label = labels[id]
 
-            local id = item.id or item.key
+        if not label then
+            creationCounter = creationCounter + 1
 
-            if not id then
-                continue
-            end
+            label = Instance.new("TextLabel")
+            label.Name = id
+            label.Size = UDim2.new(1, 0, 0, textSize)
+            label.BackgroundTransparency = 1
+            label.Font = Enum.Font.SourceSans
+            label.TextSize = textSize
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Parent = container
 
-            id = tostring(id)
+            local padding = Instance.new("UIPadding")
+            padding.PaddingLeft = UDim.new(0, 8)
+            padding.PaddingRight = UDim.new(0, 8)
+            padding.Parent = label
 
-            local text = item.text or item.value or ""
-            local color = item.color or item.Color
+            labels[id] = label
 
-            local lbl = labels[id]
+            lineData[id] = {
+                id = id,
+                text = "",
+                color = Color3.fromRGB(255, 255, 255),
+                outlineColor = defaultOutlineColor,
+                outlineSize = defaultOutlineSize,
+                order = nil,
+                created = creationCounter
+            }
+        end
 
-            if not lbl then
-                createIndex += 1
+        local saved = lineData[id]
 
-                lbl = Instance.new("TextLabel", container)
-                lbl.Name = id
-                lbl.Size = UDim2.new(1, 0, 0, 18)
-                lbl.BackgroundTransparency = 1
-                lbl.Font = Enum.Font.SourceSansBold
-                lbl.TextSize = config.TextSize or 14
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
+        if data.text ~= nil then
+            saved.text = data.text
+        end
 
-                labels[id] = lbl
+        if data.color ~= nil then
+            saved.color = data.color
+        end
 
-                lineData[id] = {
-                    created = createIndex,
-                    order = nil
-                }
-            end
+        if data.outlineColor ~= nil then
+            saved.outlineColor = data.outlineColor
+        end
 
-            if item.order ~= nil then
-                if item.order == false then
-                    lineData[id].order = nil
-                else
-                    lineData[id].order = tonumber(item.order)
-                end
-            end
+        if data.outlineSize ~= nil then
+            saved.outlineSize = data.outlineSize == false and nil or data.outlineSize
+        end
 
-            lbl.Text = tostring(text)
-            lbl.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+        if data.order ~= nil then
+            saved.order = data.order == false and nil or data.order
+        end
 
-            local outlineSize = item.outlineSize
-            if outlineSize == nil then
-                outlineSize = item.OutlineSize
-            end
+        label.Text = saved.text
+        label.TextColor3 = saved.color
 
-            local outlineColor = item.outlineColor
-            if outlineColor == nil then
-                outlineColor = item.OutlineColor
-            end
+        applyOutline(label, saved)
+    end
 
-            if outlineColor == nil then
-                outlineColor = defaultOutlineColor
-            end
+    local function setText(lines)
+        if not lines then
+            return
+        end
 
-            updateStroke(lbl, outlineColor, outlineSize ~= nil and tonumber(outlineSize) or defaultOutlineSize)
+        for _, data in ipairs(lines) do
+            setLine(data)
         end
 
         updateOrder()
     end
 
-    function window:RemoveLine(key)
-        key = tostring(key)
+    for _, data in ipairs(config.Lines or {}) do
+        setLine(data)
+    end
 
-        local lbl = labels[key]
+    updateOrder()
 
-        if lbl and lbl.Parent == container then
-            lbl:Destroy()
-            labels[key] = nil
-            lineData[key] = nil
+    local api = {}
+
+    function api:SetText(lines)
+        setText(lines)
+    end
+
+    function api:RemoveLine(id)
+        local label = labels[id]
+
+        if label then
+            label:Destroy()
+            labels[id] = nil
+            lineData[id] = nil
             updateOrder()
         end
     end
 
-    function window:Visible(state)
-        if screen then
-            screen.Enabled = state
+    function api:Visible(state)
+        screen.Enabled = state
+    end
+
+    function api:SetScale(value)
+        uiScale.Scale = value or 1
+    end
+
+    function api:SetPosition(value)
+        if value then
+            frame.Position = value
         end
     end
 
-    function window:SetScale(scale)
-        scale = tonumber(scale) or 1
-        scale = math.max(scale, 0.1)
-
-        local currentScale = frame:FindFirstChild("WindowScale")
-
-        if currentScale then
-            currentScale.Scale = scale
-        end
+    function api:Remove()
+        screen:Destroy()
     end
 
-    function window:Remove()
-        if screen then
-            screen:Destroy()
-        end
-    end
-
-    if config.Lines then
-        window:SetText(config.Lines)
-    end
-
-    return window
+    return api
 end
 
 function createInfoText(config)
@@ -292,19 +272,17 @@ function createInfoText(config)
     local center = config.Center
     local offset = config.Offset or Vector3.new(0, 3, 0)
     local textSize = config.TextSize or 20
-    local lines = config.Lines or {}
     local size = config.Size or UDim2.new(0, 300, 0, 50)
+    local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
+    local defaultOutlineSize = config.outlineSize
 
-    local billboard = nil
-    local container = nil
+    local billboard
+    local container
     local labels = {}
     local lineData = {}
-    local currentAdornee = nil
+    local creationCounter = 0
+    local currentAdornee
     local isActive = false
-    local createIndex = 0
-
-    local defaultOutlineColor = config.outlineColor or config.OutlineColor or Color3.fromRGB(255, 255, 255)
-    local defaultOutlineSize = config.outlineSize or config.OutlineSize
 
     local function resolveAdornee(target)
         if not target then
@@ -312,8 +290,7 @@ function createInfoText(config)
         end
 
         if target:IsA("Model") then
-            target = target.PrimaryPart
-                or target:FindFirstChildWhichIsA("BasePart")
+            target = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
         end
 
         if not target or not target:IsA("BasePart") then
@@ -323,19 +300,19 @@ function createInfoText(config)
         return target
     end
 
-    local function updateStroke(lbl, outlineColor, outlineSize)
-        local stroke = lbl:FindFirstChild("Outline")
+    local function applyOutline(label, data)
+        local stroke = label:FindFirstChild("Outline")
 
-        if outlineSize then
+        if data.outlineSize then
             if not stroke then
                 stroke = Instance.new("UIStroke")
                 stroke.Name = "Outline"
                 stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-                stroke.Parent = lbl
+                stroke.Parent = label
             end
 
-            stroke.Color = outlineColor or defaultOutlineColor
-            stroke.Thickness = outlineSize
+            stroke.Color = data.outlineColor or defaultOutlineColor
+            stroke.Thickness = data.outlineSize
             stroke.Transparency = 0
         elseif stroke then
             stroke:Destroy()
@@ -343,30 +320,14 @@ function createInfoText(config)
     end
 
     local function updateOrder()
-        local entries = {}
-
-        for id, lbl in pairs(labels) do
-            local data = lineData[id]
-
-            if data then
-                table.insert(entries, {
-                    id = id,
-                    label = lbl,
-                    order = data.order,
-                    created = data.created
-                })
-            end
-        end
-
-        local usedOrders = {}
         local explicit = {}
         local withoutOrder = {}
 
-        for _, entry in ipairs(entries) do
-            if entry.order ~= nil then
-                table.insert(explicit, entry)
+        for id, data in pairs(lineData) do
+            if data.order ~= nil then
+                table.insert(explicit, data)
             else
-                table.insert(withoutOrder, entry)
+                table.insert(withoutOrder, data)
             end
         end
 
@@ -378,127 +339,64 @@ function createInfoText(config)
             return a.order < b.order
         end)
 
-        for _, entry in ipairs(explicit) do
-            local wanted = math.max(1, math.floor(tonumber(entry.order) or 1))
-            local finalOrder = wanted
-
-            while usedOrders[finalOrder] do
-                finalOrder += 1
-            end
-
-            usedOrders[finalOrder] = true
-            entry.label.LayoutOrder = finalOrder
-        end
-
         table.sort(withoutOrder, function(a, b)
             return a.created < b.created
         end)
 
-        local nextOrder = 1
+        local used = {}
 
-        for _, entry in ipairs(withoutOrder) do
-            while usedOrders[nextOrder] do
-                nextOrder += 1
+        for _, data in ipairs(explicit) do
+            local order = math.max(1, math.floor(data.order))
+
+            while used[order] do
+                order = order + 1
             end
 
-            entry.label.LayoutOrder = nextOrder
-            usedOrders[nextOrder] = true
-            nextOrder += 1
+            used[order] = true
+            labels[data.id].LayoutOrder = order
+        end
+
+        local current = 1
+
+        for _, data in ipairs(withoutOrder) do
+            while used[current] do
+                current = current + 1
+            end
+
+            used[current] = true
+            labels[data.id].LayoutOrder = current
+            current = current + 1
         end
     end
 
-    local function setText(linesTable)
-        if not container or type(linesTable) ~= "table" then
-            return
+    local function updateSize()
+        local count = 0
+
+        for _ in pairs(labels) do
+            count = count + 1
         end
 
-        for _, item in ipairs(linesTable) do
-            if type(item) ~= "table" then
-                continue
-            end
+        local height = math.max(
+            20,
+            count * textSize + math.max(0, count - 1) * 2
+        )
 
-            local id = item.id or item.key
-
-            if not id then
-                continue
-            end
-
-            id = tostring(id)
-
-            local text = item.text or item.value or ""
-            local color = item.color or item.Color
-
-            local lbl = labels[id]
-
-            if not lbl then
-                createIndex += 1
-
-                lbl = Instance.new("TextLabel")
-                lbl.Name = id
-                lbl.Size = UDim2.new(1, 0, 0, 20)
-                lbl.BackgroundTransparency = 1
-                lbl.Font = Enum.Font.SourceSansBold
-                lbl.TextSize = textSize
-                lbl.TextXAlignment = Enum.TextXAlignment.Center
-                lbl.Parent = container
-
-                labels[id] = lbl
-
-                lineData[id] = {
-                    created = createIndex,
-                    order = nil
-                }
-            end
-
-            if item.order ~= nil then
-                if item.order == false then
-                    lineData[id].order = nil
-                else
-                    lineData[id].order = tonumber(item.order)
-                end
-            end
-
-            lbl.Text = tostring(text)
-            lbl.TextColor3 = color or Color3.fromRGB(255, 255, 255)
-
-            local outlineSize = item.outlineSize
-            if outlineSize == nil then
-                outlineSize = item.OutlineSize
-            end
-
-            local outlineColor = item.outlineColor
-            if outlineColor == nil then
-                outlineColor = item.OutlineColor
-            end
-
-            if outlineColor == nil then
-                outlineColor = defaultOutlineColor
-            end
-
-            updateStroke(lbl, outlineColor, outlineSize ~= nil and tonumber(outlineSize) or defaultOutlineSize)
-        end
-
-        updateOrder()
-
-        if billboard then
-            local actualLines = 0
-
-            for _, child in ipairs(container:GetChildren()) do
-                if child:IsA("TextLabel") then
-                    actualLines += 1
-                end
-            end
-
-            local height = math.max(20, actualLines * 20 + math.max(0, actualLines - 1) * 2)
-            billboard.Size = UDim2.new(size.X.Scale, size.X.Offset, 0, height)
-        end
+        billboard.Size = UDim2.new(
+            size.X.Scale,
+            size.X.Offset,
+            0,
+            height
+        )
     end
 
-    local function createBillboard(adornee)
+    local function createBillboard()
+        local adornee = resolveAdornee(center)
+
         if not adornee then
-            isActive = false
             return
         end
+
+        currentAdornee = adornee
 
         billboard = Instance.new("BillboardGui")
         billboard.Name = name
@@ -506,11 +404,11 @@ function createInfoText(config)
         billboard.Size = size
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
-        billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        billboard.Enabled = isActive
         billboard.Parent = adornee
 
         container = Instance.new("Frame")
-        container.Name = "MainFrame"
+        container.Name = "Container"
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
         container.Parent = billboard
@@ -519,137 +417,174 @@ function createInfoText(config)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
         layout.Parent = container
+    end
+
+    local function setLine(data)
+        if not data or not data.id then
+            return
+        end
+
+        if not billboard or not billboard.Parent then
+            createBillboard()
+
+            if not billboard then
+                return
+            end
+        end
+
+        local id = data.id
+        local label = labels[id]
+
+        if not label then
+            creationCounter = creationCounter + 1
+
+            label = Instance.new("TextLabel")
+            label.Name = id
+            label.Size = UDim2.new(1, 0, 0, textSize)
+            label.BackgroundTransparency = 1
+            label.Font = Enum.Font.SourceSans
+            label.TextSize = textSize
+            label.TextXAlignment = Enum.TextXAlignment.Center
+            label.Parent = container
+
+            labels[id] = label
+
+            lineData[id] = {
+                id = id,
+                text = "",
+                color = Color3.fromRGB(255, 255, 255),
+                outlineColor = defaultOutlineColor,
+                outlineSize = defaultOutlineSize,
+                order = nil,
+                created = creationCounter
+            }
+        end
+
+        local saved = lineData[id]
+
+        if data.text ~= nil then
+            saved.text = data.text
+        end
+
+        if data.color ~= nil then
+            saved.color = data.color
+        end
+
+        if data.outlineColor ~= nil then
+            saved.outlineColor = data.outlineColor
+        end
+
+        if data.outlineSize ~= nil then
+            saved.outlineSize = data.outlineSize == false and nil or data.outlineSize
+        end
+
+        if data.order ~= nil then
+            saved.order = data.order == false and nil or data.order
+        end
+
+        label.Text = saved.text
+        label.TextColor3 = saved.color
+
+        applyOutline(label, saved)
+    end
+
+    local function setText(lines)
+        if not lines then
+            return
+        end
+
+        for _, data in ipairs(lines) do
+            setLine(data)
+        end
+
+        updateOrder()
+        updateSize()
+    end
+
+    for _, data in ipairs(config.Lines or {}) do
+        setLine(data)
+    end
+
+    if billboard then
+        updateOrder()
+        updateSize()
+    end
+
+    local api = {}
+
+    function api:SetText(lines)
+        setText(lines)
+    end
+
+    function api:RemoveLine(id)
+        local label = labels[id]
+
+        if label then
+            label:Destroy()
+            labels[id] = nil
+            lineData[id] = nil
+            updateOrder()
+            updateSize()
+        end
+    end
+
+    function api:Visible(state)
+        isActive = state
+
+        if billboard then
+            billboard.Enabled = state
+        end
+    end
+
+    function api:SetCenter(newCenter)
+        local adornee = resolveAdornee(newCenter)
+
+        if not adornee then
+            return
+        end
+
+        center = newCenter
+        currentAdornee = adornee
+
+        if billboard then
+            billboard.Adornee = adornee
+            billboard.Parent = adornee
+        end
+    end
+
+    function api:SetOffset(newOffset)
+        if not newOffset then
+            return
+        end
+
+        offset = newOffset
+
+        if billboard then
+            billboard.StudsOffset = newOffset
+        end
+    end
+
+    function api:SetSize(newSize)
+        if not newSize then
+            return
+        end
+
+        size = newSize
+
+        if billboard then
+            updateSize()
+        end
+    end
+
+    function api:Remove()
+        if billboard then
+            billboard:Destroy()
+            billboard = nil
+        end
 
         labels = {}
         lineData = {}
-        currentAdornee = adornee
-        isActive = true
-
-        if lines and #lines > 0 then
-            setText(lines)
-        end
     end
-
-    if center then
-        local adornee = resolveAdornee(center)
-
-        if adornee then
-            createBillboard(adornee)
-        else
-            warn("createInfoText: Center must contain a BasePart")
-        end
-    end
-
-    local api = {
-        SetText = function(self, newLines)
-            lines = newLines or {}
-
-            if isActive then
-                setText(newLines)
-            end
-        end,
-
-        RemoveLine = function(self, key)
-            if not container then
-                return
-            end
-
-            key = tostring(key)
-
-            local lbl = labels[key]
-
-            if lbl then
-                lbl:Destroy()
-                labels[key] = nil
-                lineData[key] = nil
-
-                updateOrder()
-
-                if billboard then
-                    local lineCount = 0
-
-                    for _, child in ipairs(container:GetChildren()) do
-                        if child:IsA("TextLabel") then
-                            lineCount += 1
-                        end
-                    end
-
-                    local height = math.max(20, lineCount * 20 + math.max(0, lineCount - 1) * 2)
-                    billboard.Size = UDim2.new(size.X.Scale, size.X.Offset, 0, height)
-                end
-            end
-        end,
-
-        Visible = function(self, state)
-            if billboard then
-                billboard.Enabled = state
-            end
-        end,
-
-        SetCenter = function(self, newCenter)
-            if not newCenter then
-                if billboard then
-                    billboard.Enabled = false
-                end
-
-                currentAdornee = nil
-                isActive = false
-                return
-            end
-
-            local newAdornee = resolveAdornee(newCenter)
-
-            if not newAdornee then
-                warn("createInfoText: Center must contain a BasePart")
-                return
-            end
-
-            if not billboard then
-                createBillboard(newAdornee)
-                return
-            end
-
-            if currentAdornee == newAdornee then
-                billboard.Enabled = true
-                isActive = true
-                return
-            end
-
-            currentAdornee = newAdornee
-            billboard.Adornee = newAdornee
-            billboard.Parent = newAdornee
-            billboard.Enabled = true
-            isActive = true
-        end,
-
-        SetOffset = function(self, newOffset)
-            offset = newOffset
-
-            if billboard then
-                billboard.StudsOffset = newOffset
-            end
-        end,
-
-        SetSize = function(self, newSize)
-            size = newSize
-
-            if billboard then
-                billboard.Size = newSize
-            end
-        end,
-
-        Remove = function(self)
-            if billboard then
-                billboard:Destroy()
-                billboard = nil
-                container = nil
-                labels = {}
-                lineData = {}
-                currentAdornee = nil
-                isActive = false
-            end
-        end
-    }
 
     return api
 end
