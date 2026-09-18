@@ -331,28 +331,28 @@ function createInfoText(config)
         end,
 
         RemoveLine = function(self, key)
-            if not container then
-                return
-            end
-
-            key = tostring(key)
-
-            local lbl = labels[key]
-
-            if lbl then
-                lbl:Destroy()
-                labels[key] = nil
-
-                local order = 1
-
-                for _, child in ipairs(container:GetChildren()) do
-                    if child:IsA("TextLabel") then
-                        child.LayoutOrder = order
-                        child:SetAttribute("InitializedOrder", true)
-                        order = order + 1
-                    end
-                end
-            end
+        	if not container then return end
+        	key = tostring(key)
+        	local lbl = labels[key]
+        	if lbl then
+        		lbl:Destroy()
+        		labels[key] = nil
+        
+        		local order = 1
+        		local lineCount = 0
+        		for _, child in ipairs(container:GetChildren()) do
+        			if child:IsA("TextLabel") then
+        				child.LayoutOrder = order
+        				order += 1
+        				lineCount += 1
+        			end
+        		end
+        
+        		if billboard then
+        			local height = math.max(20, lineCount * 20 + math.max(0, lineCount - 1) * 2)
+        			billboard.Size = UDim2.new(size.X.Scale, size.X.Offset, 0, height)
+        		end
+        	end
         end,
 
         Visible = function(self, state)
