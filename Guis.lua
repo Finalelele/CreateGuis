@@ -87,52 +87,57 @@ function createInfoGui(config)
         if type(lines) ~= "table" then
             return
         end
-
+    
         local maxOrder = 0
-
+        local lineCount = 0
+    
         for _, child in ipairs(container:GetChildren()) do
             if child:IsA("TextLabel") then
                 maxOrder = math.max(maxOrder, child.LayoutOrder)
             end
         end
-
+    
         for _, item in ipairs(lines) do
             if type(item) ~= "table" then
                 continue
             end
-        
+    
             local id = item.id or item.key
-        
+    
             if not id then
                 continue
             end
-        
+    
             id = tostring(id)
-        
+    
             local text = item.text or item.value or ""
             local color = item.color or item.Color
-        
+    
             local lbl = labels[id]
-        
+    
             if not lbl then
                 maxOrder += 1
-        
-                lbl = Instance.new("TextLabel")
+    
+                lbl = Instance.new("TextLabel", container)
                 lbl.Name = id
-                lbl.Size = UDim2.new(1, 0, 0, 20)
+                lbl.Size = UDim2.new(1, 0, 0, 18)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.SourceSansBold
-                lbl.TextSize = textSize
-                lbl.TextXAlignment = Enum.TextXAlignment.Center
+                lbl.TextSize = config.TextSize or 14
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
                 lbl.LayoutOrder = maxOrder
-                lbl.Parent = container
-        
+    
                 labels[id] = lbl
             end
-        
+    
             lbl.Text = tostring(text)
             lbl.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+    
+            lineCount += 1
         end
+    
+        local height = lineCount * 18 + math.max(0, lineCount - 1) * 4
+        container.Size = UDim2.new(1, 0, 0, height)
     end
 
     function window:RemoveLine(key)
