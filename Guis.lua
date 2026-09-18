@@ -215,36 +215,37 @@ function createInfoText(config)
         if not container or type(linesTable) ~= "table" then
             return
         end
-
+    
         local maxOrder = 0
-
+        local lineCount = 0
+    
         for _, child in ipairs(container:GetChildren()) do
             if child:IsA("TextLabel") then
                 maxOrder = math.max(maxOrder, child.LayoutOrder)
             end
         end
-
+    
         for _, item in ipairs(linesTable) do
             if type(item) ~= "table" then
                 continue
             end
-        
+    
             local id = item.id or item.key
-        
+    
             if not id then
                 continue
             end
-        
+    
             id = tostring(id)
-        
+    
             local text = item.text or item.value or ""
             local color = item.color or item.Color
-        
+    
             local lbl = labels[id]
-        
+    
             if not lbl then
                 maxOrder += 1
-        
+    
                 lbl = Instance.new("TextLabel")
                 lbl.Name = id
                 lbl.Size = UDim2.new(1, 0, 0, 20)
@@ -254,12 +255,19 @@ function createInfoText(config)
                 lbl.TextXAlignment = Enum.TextXAlignment.Center
                 lbl.LayoutOrder = maxOrder
                 lbl.Parent = container
-        
+    
                 labels[id] = lbl
             end
-        
+    
             lbl.Text = tostring(text)
             lbl.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+    
+            lineCount += 1
+        end
+    
+        if billboard then
+            local height = math.max(20, lineCount * 20 + math.max(0, lineCount - 1) * 2)
+            billboard.Size = UDim2.new(size.X.Scale, size.X.Offset, 0, height)
         end
     end
 
