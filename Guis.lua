@@ -96,36 +96,40 @@ function createInfoGui(config)
             end
         end
 
-        for _, item in ipairs(lines) do
+        for _, item in ipairs(linesTable) do
             if type(item) ~= "table" then
                 continue
             end
-
-            local id = tostring(item.id or item.key)
+        
+            local id = item.id or item.key
+        
             if not id then
                 continue
             end
-
+        
+            id = tostring(id)
+        
             local text = item.text or item.value or ""
             local color = item.color or item.Color
-
+        
             local lbl = labels[id]
-
+        
             if not lbl then
                 maxOrder += 1
-
-                lbl = Instance.new("TextLabel", container)
+        
+                lbl = Instance.new("TextLabel")
                 lbl.Name = id
-                lbl.Size = UDim2.new(1, 0, 0, 18)
+                lbl.Size = UDim2.new(1, 0, 0, 20)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.SourceSansBold
-                lbl.TextSize = config.TextSize or 14
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
+                lbl.TextSize = textSize
+                lbl.TextXAlignment = Enum.TextXAlignment.Center
                 lbl.LayoutOrder = maxOrder
-
+                lbl.Parent = container
+        
                 labels[id] = lbl
             end
-
+        
             lbl.Text = tostring(text)
             lbl.TextColor3 = color or Color3.fromRGB(255, 255, 255)
         end
