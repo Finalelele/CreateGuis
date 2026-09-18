@@ -97,7 +97,7 @@ function createInfoGui(config)
         local explicit = {}
         local withoutOrder = {}
 
-        for id, data in pairs(lineData) do
+        for _, data in pairs(lineData) do
             if data.order ~= nil then
                 table.insert(explicit, data)
             else
@@ -259,7 +259,9 @@ function createInfoGui(config)
     end
 
     function api:Remove()
-        screen:Destroy()
+        if screen then
+            screen:Destroy()
+        end
     end
 
     return api
@@ -282,7 +284,7 @@ function createInfoText(config)
     local lineData = {}
     local creationCounter = 0
     local currentAdornee
-    local isActive = false
+    local isActive = true
 
     local function resolveAdornee(target)
         if not target then
@@ -323,7 +325,7 @@ function createInfoText(config)
         local explicit = {}
         local withoutOrder = {}
 
-        for id, data in pairs(lineData) do
+        for _, data in pairs(lineData) do
             if data.order ~= nil then
                 table.insert(explicit, data)
             else
@@ -370,6 +372,10 @@ function createInfoText(config)
     end
 
     local function updateSize()
+        if not billboard then
+            return
+        end
+
         local count = 0
 
         for _ in pairs(labels) do
@@ -393,7 +399,7 @@ function createInfoText(config)
         local adornee = resolveAdornee(center)
 
         if not adornee then
-            return
+            return false
         end
 
         currentAdornee = adornee
@@ -417,6 +423,8 @@ function createInfoText(config)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
         layout.Parent = container
+
+        return true
     end
 
     local function setLine(data)
@@ -425,9 +433,7 @@ function createInfoText(config)
         end
 
         if not billboard or not billboard.Parent then
-            createBillboard()
-
-            if not billboard then
+            if not createBillboard() then
                 return
             end
         end
@@ -523,6 +529,7 @@ function createInfoText(config)
             label:Destroy()
             labels[id] = nil
             lineData[id] = nil
+
             updateOrder()
             updateSize()
         end
@@ -549,6 +556,9 @@ function createInfoText(config)
         if billboard then
             billboard.Adornee = adornee
             billboard.Parent = adornee
+            billboard.Enabled = isActive
+        else
+            createBillboard()
         end
     end
 
@@ -580,6 +590,7 @@ function createInfoText(config)
         if billboard then
             billboard:Destroy()
             billboard = nil
+            container = nil
         end
 
         labels = {}
