@@ -96,7 +96,7 @@ function createInfoGui(config)
             end
         end
 
-        for _, item in ipairs(linesTable) do
+        for _, item in ipairs(lines) do
             if type(item) ~= "table" then
                 continue
             end
