@@ -284,6 +284,7 @@ function createInfoText(config)
     local lineData = {}
     local creationCounter = 0
     local currentAdornee
+    local pivotPart
     local isActive = true
 
     local function resolveAdornee(target)
@@ -292,10 +293,27 @@ function createInfoText(config)
         end
 
         if target:IsA("Model") then
-            target = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+            local pivot = target:GetPivot()
+
+            if not pivotPart then
+                pivotPart = Instance.new("Part")
+                pivotPart.Name = name .. "_Pivot"
+                pivotPart.Size = Vector3.new(0.1, 0.1, 0.1)
+                pivotPart.Transparency = 1
+                pivotPart.Anchored = true
+                pivotPart.CanCollide = false
+                pivotPart.CanTouch = false
+                pivotPart.CanQuery = false
+                pivotPart.CastShadow = false
+            end
+
+            pivotPart.CFrame = pivot
+            pivotPart.Parent = target
+
+            return pivotPart
         end
 
-        if not target or not target:IsA("BasePart") then
+        if not target:IsA("BasePart") then
             return nil
         end
 
@@ -591,6 +609,11 @@ function createInfoText(config)
             billboard:Destroy()
             billboard = nil
             container = nil
+        end
+
+        if pivotPart then
+            pivotPart:Destroy()
+            pivotPart = nil
         end
 
         labels = {}
