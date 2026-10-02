@@ -606,6 +606,7 @@ local function createRadar(config)
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local CoreGui = game:GetService("CoreGui")
+    local UserInputService = game:GetService("UserInputService") -- Добавлено для перетаскивания
 
     local Name = config.Name or "CustomRadar"
     local Title = config.Title or "Radar"
@@ -613,7 +614,6 @@ local function createRadar(config)
 
     local Size = config.Size or 100
     local Scale = config.Scale or 1
-    -- ИЗМЕНЕНИЕ: Теперь Range делится на 2 сразу при создании
     local Range = (config.Range or 100) / 2 
 
     local Center = config.Center or Players.LocalPlayer
@@ -625,9 +625,8 @@ local function createRadar(config)
     local enabled = true
     local targets = {}
 
-    -- ИЗМЕНЕНИЕ: Увеличена высота окна, чтобы круг не вылазил за края
     local WINDOW_SIZE = 220
-    local WINDOW_HEIGHT = 260 -- Было 220, стало 260
+    local WINDOW_HEIGHT = 260 
     local RADAR_SIZE = 200
     local BORDER_SIZE = 3
 
@@ -643,7 +642,6 @@ local function createRadar(config)
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    -- ИЗМЕНЕНИЕ: Используем новую высоту
     frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_HEIGHT) 
     frame.Position = Position
     frame.BackgroundColor3 = BackgroundColor
@@ -671,10 +669,50 @@ local function createRadar(config)
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = frame
 
+    -- =========================================================
+    -- НАЧАЛО БЛОКА ПЕРЕТАСКИВАНИЯ
+    -- =========================================================
+    local dragging = false
+    local dragInput, dragStart, startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    -- Слушаем клики по заголовку (title)
+    title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+    -- =========================================================
+    -- КОНЕЦ БЛОКА ПЕРЕТАСКИВАНИЯ
+    -- =========================================================
+
     local radar = Instance.new("Frame")
     radar.Name = "Radar"
     radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
-    -- Позиция 40 (отступ сверху) + 200 (размер круга) = 240. Окно 260, значит снизу остается 20px отступа.
     radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 40) 
     radar.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
     radar.BorderSizePixel = 0
@@ -879,7 +917,6 @@ local function createRadar(config)
         local offset = targetRoot.Position - centerPosition
         local distance = offset.Magnitude
 
-        -- ИЗМЕНЕНИЕ: Range здесь уже уменьшен в 2 раза (см. начало скрипта)
         if distance > Range then
             object.point.Visible = false
             return
@@ -920,10 +957,6 @@ local function createRadar(config)
         local x = offset:Dot(right)
         local y = offset:Dot(forward)
 
-        -- ИЗМЕНЕНИЕ: Логика нормализации осталась прежней, но теперь она корректно работает с новым Range.
-        -- Size = 100. Range (внутренний) = 50. 
-        -- Если distance = 50, normalizedDistance = 50/100 = 0.5. 
-        -- Это значит точка сместится на половину радиуса круга (ровно к краю визуального круга).
         local normalizedDistance = distance / Size
 
         local maxDistance = 1
@@ -995,7 +1028,6 @@ local function createRadar(config)
     end
 
     function api:SetRange(value)
-        -- ИЗМЕНЕНИЕ: При обновлении Range тоже делим на 2
         Range = (tonumber(value) or (Range * 2)) / 2
     end
 
