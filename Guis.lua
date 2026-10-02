@@ -612,10 +612,15 @@ local function createRadar(config)
     local Title = config.Title or "Radar"
     local Position = config.Position or UDim2.new(0.03, 0, 0.3, 0)
 
-    local Size = config.Size or 100
-    local Scale = config.Scale or 1
-    -- ИЗМЕНЕНИЕ: убрано деление на 2, Range используется как есть
-    local Range = config.Range or 100
+    -- Size = zoom радара:
+    -- сколько studs от центра до края
+    local Size = math.max(tonumber(config.Size) or 100, 0.01)
+
+    -- Scale = физический размер всего меню
+    local Scale = tonumber(config.Scale) or 1
+
+    -- Range = максимальная дальность отображения точек
+    local Range = math.max(tonumber(config.Range) or 100, 0)
 
     local Center = config.Center or Players.LocalPlayer
     local CenterOffset = config.CenterOffset or Vector3.zero
@@ -628,8 +633,12 @@ local function createRadar(config)
 
     local WINDOW_SIZE = 220
     local WINDOW_HEIGHT = 260
-    local RADAR_SIZE = 200
-    local BORDER_SIZE = 3
+
+    -- Круг немного меньше главного окна
+    local RADAR_SIZE = 190
+
+    -- Более толстая обводка главного окна
+    local BORDER_SIZE = 4
 
     local gui = Instance.new("ScreenGui")
     gui.Name = Name
@@ -672,15 +681,25 @@ local function createRadar(config)
 
     -- Перетаскивание за заголовок
     local dragging = false
-    local dragInput, dragStart, startPos
+    local dragInput
+    local dragStart
+    local startPos
 
     local function update(input)
         local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
     end
 
     title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
@@ -694,7 +713,9 @@ local function createRadar(config)
     end)
 
     title.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+
             dragInput = input
         end
     end)
@@ -708,7 +729,12 @@ local function createRadar(config)
     local radar = Instance.new("Frame")
     radar.Name = "Radar"
     radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
-    radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 40)
+    radar.Position = UDim2.new(
+        0.5,
+        -RADAR_SIZE / 2,
+        0,
+        42
+    )
     radar.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
     radar.BorderSizePixel = 0
     radar.ClipsDescendants = true
@@ -799,7 +825,10 @@ local function createRadar(config)
         point.AnchorPoint = Vector2.new(0.5, 0.5)
         point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
         point.BorderSizePixel = 0
-        point.Size = UDim2.fromOffset(data.size or 8, data.size or 8)
+        point.Size = UDim2.fromOffset(
+            data.size or 8,
+            data.size or 8
+        )
         point.Parent = radar
 
         local corner = Instance.new("UICorner")
@@ -849,10 +878,15 @@ local function createRadar(config)
             saved[key] = value
         end
 
-        old.point.BackgroundColor3 = saved.color or Color3.new(1, 1, 1)
+        old.point.BackgroundColor3 =
+            saved.color or Color3.new(1, 1, 1)
 
         local pointSize = saved.size or 8
-        old.point.Size = UDim2.fromOffset(pointSize, pointSize)
+
+        old.point.Size = UDim2.fromOffset(
+            pointSize,
+            pointSize
+        )
 
         if saved.text ~= nil then
             if not old.text then
@@ -869,7 +903,8 @@ local function createRadar(config)
             end
 
             old.text.Text = tostring(saved.text)
-            old.text.TextColor3 = saved.color or Color3.new(1, 1, 1)
+            old.text.TextColor3 =
+                saved.color or Color3.new(1, 1, 1)
         end
 
         targets[data.id] = saved
@@ -904,7 +939,10 @@ local function createRadar(config)
         local targetRoot = getRoot(data.target)
         local centerPosition = getCenterPosition()
 
-        if not targetRoot or not centerPosition or data.visible == false then
+        if not targetRoot
+            or not centerPosition
+            or data.visible == false then
+
             object.point.Visible = false
             return
         end
@@ -912,7 +950,8 @@ local function createRadar(config)
         local offset = targetRoot.Position - centerPosition
         local distance = offset.Magnitude
 
-        -- ИЗМЕНЕНИЕ: Range теперь используется напрямую
+        -- Range отвечает ТОЛЬКО за дальность существования точки.
+        -- Он НЕ влияет на её положение внутри радара.
         if distance > Range then
             object.point.Visible = false
             return
@@ -921,7 +960,12 @@ local function createRadar(config)
         object.point.Visible = true
 
         if distance < 0.01 then
-            object.point.Position = UDim2.new(0.5, 0, 0.5, 0)
+            object.point.Position = UDim2.new(
+                0.5,
+                0,
+                0.5,
+                0
+            )
             return
         end
 
@@ -943,7 +987,8 @@ local function createRadar(config)
             camera.CFrame.RightVector.Z
         )
 
-        if forward.Magnitude < 0.001 or right.Magnitude < 0.001 then
+        if forward.Magnitude < 0.001
+            or right.Magnitude < 0.001 then
             return
         end
 
@@ -953,20 +998,24 @@ local function createRadar(config)
         local x = offset:Dot(right)
         local y = offset:Dot(forward)
 
-        -- ИЗМЕНЕНИЕ: normalizedDistance теперь делится на Range, а не на Size
-        -- Это нужно чтобы точка на краю Range оказывалась ровно на краю круга
-        local normalizedDistance = distance / Range
+        -- Size отвечает ТОЛЬКО за zoom.
+        --
+        -- Size = 100:
+        -- 100 studs = край радара
+        --
+        -- Всё, что дальше Size, остаётся на краю,
+        -- пока не превышен Range.
+        local normalizedDistance = distance / Size
 
-        local maxDistance = 1
-
-        if normalizedDistance > maxDistance then
-            normalizedDistance = maxDistance
+        if normalizedDistance > 1 then
+            normalizedDistance = 1
         end
 
         local direction = Vector2.new(x, y)
 
         if direction.Magnitude > 0 then
-            direction = direction.Unit * normalizedDistance
+            direction =
+                direction.Unit * normalizedDistance
         end
 
         object.point.Position = UDim2.new(
@@ -995,11 +1044,19 @@ local function createRadar(config)
 
     local api = {}
 
-    function api:Set(listOrId, target, text, color, pointSize, visible)
+    function api:Set(
+        listOrId,
+        target,
+        text,
+        color,
+        pointSize,
+        visible
+    )
         if type(listOrId) == "table" then
             for _, data in ipairs(listOrId) do
                 setTarget(data)
             end
+
             return
         end
 
@@ -1026,12 +1083,17 @@ local function createRadar(config)
     end
 
     function api:SetRange(value)
-        -- ИЗМЕНЕНИЕ: убрано деление на 2
-        Range = tonumber(value) or Range
+        Range = math.max(
+            tonumber(value) or Range,
+            0
+        )
     end
 
     function api:SetSize(value)
-        Size = math.max(tonumber(value) or Size, 0.01)
+        Size = math.max(
+            tonumber(value) or Size,
+            0.01
+        )
     end
 
     function api:RemoveTarget(id)
