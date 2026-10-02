@@ -615,7 +615,6 @@ function createRadar(config)
 
     local backgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
     local borderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
-    local centerColor = config.CenterColor or Color3.fromRGB(255, 255, 255)
 
     local coreGui = game:GetService("CoreGui")
     local Players = game:GetService("Players")
@@ -753,20 +752,6 @@ function createRadar(config)
     horizontal.BorderSizePixel = 0
     horizontal.ZIndex = 2
     horizontal.Parent = radar
-
-    local centerDot = Instance.new("Frame")
-    centerDot.Name = "Center"
-    centerDot.AnchorPoint = Vector2.new(0.5, 0.5)
-    centerDot.Size = UDim2.new(0, 8, 0, 8)
-    centerDot.Position = UDim2.new(0.5, 0, 0.5, 0)
-    centerDot.BackgroundColor3 = centerColor
-    centerDot.BorderSizePixel = 0
-    centerDot.ZIndex = 10
-    centerDot.Parent = radar
-
-    local centerCorner = Instance.new("UICorner")
-    centerCorner.CornerRadius = UDim.new(1, 0)
-    centerCorner.Parent = centerDot
 
     local targets = {}
 
