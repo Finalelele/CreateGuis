@@ -610,6 +610,9 @@ function createRadar(config)
     local scale = config.Scale or 1
     local range = config.Range or 100
 
+    local center = config.Center
+    local centerOffset = config.CenterOffset or Vector3.zero
+
     local backgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
     local borderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
     local centerColor = config.CenterColor or Color3.fromRGB(255, 255, 255)
@@ -622,7 +625,12 @@ function createRadar(config)
 
     local parent = (gethui and gethui()) or coreGui
 
+    if not center then
+        center = localPlayer
+    end
+
     local old = parent:FindFirstChild(guiName)
+
     if old then
         old:Destroy()
     end
@@ -648,11 +656,11 @@ function createRadar(config)
     frameCorner.CornerRadius = UDim.new(0, 10)
     frameCorner.Parent = frame
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = borderColor
-    stroke.Thickness = 1
-    stroke.Transparency = 0.2
-    stroke.Parent = frame
+    local frameStroke = Instance.new("UIStroke")
+    frameStroke.Color = borderColor
+    frameStroke.Thickness = 1
+    frameStroke.Transparency = 0.2
+    frameStroke.Parent = frame
 
     local uiScale = Instance.new("UIScale")
     uiScale.Scale = scale
@@ -695,8 +703,6 @@ function createRadar(config)
     local centerX = size / 2
     local centerY = size / 2
 
-    -- Круги дистанции
-
     local function createCircle(scaleValue)
         local circle = Instance.new("Frame")
         circle.Name = "RangeCircle"
@@ -728,8 +734,6 @@ function createRadar(config)
     createCircle(0.5)
     createCircle(0.75)
 
-    -- Центральный крест
-
     local vertical = Instance.new("Frame")
     vertical.Name = "Vertical"
     vertical.Size = UDim2.new(0, 1, 0, size)
@@ -750,12 +754,11 @@ function createRadar(config)
     horizontal.ZIndex = 2
     horizontal.Parent = radar
 
-    -- Центральная точка игрока
-
     local centerDot = Instance.new("Frame")
-    centerDot.Name = "LocalPlayer"
+    centerDot.Name = "Center"
+    centerDot.AnchorPoint = Vector2.new(0.5, 0.5)
     centerDot.Size = UDim2.new(0, 8, 0, 8)
-    centerDot.Position = UDim2.new(0.5, -4, 0.5, -4)
+    centerDot.Position = UDim2.new(0.5, 0, 0.5, 0)
     centerDot.BackgroundColor3 = centerColor
     centerDot.BorderSizePixel = 0
     centerDot.ZIndex = 10
@@ -780,14 +783,17 @@ function createRadar(config)
                     return nil
                 end
 
-                local root = character:FindFirstChild("HumanoidRootPart")
+                local root =
+                    character:FindFirstChild("HumanoidRootPart")
                     or character.PrimaryPart
+                    or character:FindFirstChildWhichIsA("BasePart")
 
                 return root and root.Position or nil
             end
 
             if target:IsA("Model") then
-                local root = target.PrimaryPart
+                local root =
+                    target.PrimaryPart
                     or target:FindFirstChild("HumanoidRootPart")
                     or target:FindFirstChildWhichIsA("BasePart")
 
@@ -816,25 +822,27 @@ function createRadar(config)
         corner.CornerRadius = UDim.new(1, 0)
         corner.Parent = dot
 
-        local label
+        local textLabel
 
-        if config.ShowDistance then
-            label = Instance.new("TextLabel")
-            label.Name = "Distance"
-            label.AnchorPoint = Vector2.new(0.5, 1)
-            label.Position = UDim2.new(0.5, 0, 0, -3)
-            label.Size = UDim2.new(0, 60, 0, 14)
-            label.BackgroundTransparency = 1
-            label.TextColor3 = data.color or Color3.fromRGB(255, 255, 255)
-            label.Font = Enum.Font.SourceSansBold
-            label.TextSize = 11
-            label.Text = ""
-            label.ZIndex = 9
-            label.Parent = dot
+        if data.text ~= nil then
+            textLabel = Instance.new("TextLabel")
+            textLabel.Name = "Text"
+            textLabel.AnchorPoint = Vector2.new(0.5, 1)
+            textLabel.Position = UDim2.new(0.5, 0, 0, -4)
+            textLabel.Size = UDim2.new(0, 140, 0, 18)
+            textLabel.BackgroundTransparency = 1
+            textLabel.Text = tostring(data.text)
+            textLabel.TextColor3 = data.color or Color3.fromRGB(255, 255, 255)
+            textLabel.Font = Enum.Font.SourceSansBold
+            textLabel.TextSize = 13
+            textLabel.TextXAlignment = Enum.TextXAlignment.Center
+            textLabel.TextYAlignment = Enum.TextYAlignment.Center
+            textLabel.ZIndex = 9
+            textLabel.Parent = dot
         end
 
         data.dot = dot
-        data.label = label
+        data.textLabel = textLabel
 
         targets[data.id] = data
     end
@@ -852,28 +860,16 @@ function createRadar(config)
         end
 
         local targetPosition = resolvePosition(data.target)
+        local centerPosition = resolvePosition(center)
 
-        if not targetPosition then
+        if not targetPosition or not centerPosition then
             dot.Visible = false
             return
         end
 
-        local character = localPlayer.Character
+        centerPosition = centerPosition + centerOffset
 
-        if not character then
-            dot.Visible = false
-            return
-        end
-
-        local root = character:FindFirstChild("HumanoidRootPart")
-
-        if not root then
-            dot.Visible = false
-            return
-        end
-
-        local localPosition = root.Position
-        local difference = targetPosition - localPosition
+        local difference = targetPosition - centerPosition
 
         local flatDifference = Vector3.new(
             difference.X,
@@ -889,8 +885,6 @@ function createRadar(config)
             return
         end
 
-        -- Направление камеры по горизонтали
-
         local camera = workspace.CurrentCamera
 
         if not camera then
@@ -901,8 +895,17 @@ function createRadar(config)
         local look = camera.CFrame.LookVector
         local right = camera.CFrame.RightVector
 
-        local flatLook = Vector3.new(look.X, 0, look.Z)
-        local flatRight = Vector3.new(right.X, 0, right.Z)
+        local flatLook = Vector3.new(
+            look.X,
+            0,
+            look.Z
+        )
+
+        local flatRight = Vector3.new(
+            right.X,
+            0,
+            right.Z
+        )
 
         if flatLook.Magnitude < 0.01 or flatRight.Magnitude < 0.01 then
             dot.Visible = false
@@ -914,9 +917,6 @@ function createRadar(config)
 
         local direction = flatDifference.Unit
 
-        -- X = влево/вправо
-        -- Y = вперёд/назад
-
         local x = direction:Dot(flatRight)
         local y = direction:Dot(flatLook)
 
@@ -924,8 +924,13 @@ function createRadar(config)
 
         local radius = size * 0.5 - 10
 
-        local screenX = centerX + x * radius * normalizedDistance
-        local screenY = centerY - y * radius * normalizedDistance
+        local screenX =
+            centerX
+            + x * radius * normalizedDistance
+
+        local screenY =
+            centerY
+            - y * radius * normalizedDistance
 
         dot.Position = UDim2.new(
             0,
@@ -935,10 +940,6 @@ function createRadar(config)
         )
 
         dot.Visible = true
-
-        if data.label then
-            data.label.Text = string.format("%dm", math.floor(distance))
-        end
     end
 
     local function setTarget(data)
@@ -953,29 +954,62 @@ function createRadar(config)
             saved = {
                 id = id,
                 target = data.target,
+                text = data.text,
                 color = data.color or Color3.fromRGB(255, 80, 80),
                 size = data.size or 8,
                 visible = data.visible ~= false,
             }
 
             createTarget(saved)
-        else
-            if data.target ~= nil then
-                saved.target = data.target
-            end
 
-            if data.color ~= nil then
-                saved.color = data.color
+            return
+        end
+
+        if data.target ~= nil then
+            saved.target = data.target
+        end
+
+        if data.text ~= nil then
+            saved.text = data.text
+
+            if saved.textLabel then
+                saved.textLabel.Text = tostring(data.text)
+            elseif saved.dot then
+                local textLabel = Instance.new("TextLabel")
+                textLabel.Name = "Text"
+                textLabel.AnchorPoint = Vector2.new(0.5, 1)
+                textLabel.Position = UDim2.new(0.5, 0, 0, -4)
+                textLabel.Size = UDim2.new(0, 140, 0, 18)
+                textLabel.BackgroundTransparency = 1
+                textLabel.Text = tostring(data.text)
+                textLabel.TextColor3 = saved.color
+                textLabel.Font = Enum.Font.SourceSansBold
+                textLabel.TextSize = 13
+                textLabel.TextXAlignment = Enum.TextXAlignment.Center
+                textLabel.TextYAlignment = Enum.TextYAlignment.Center
+                textLabel.ZIndex = 9
+                textLabel.Parent = saved.dot
+
+                saved.textLabel = textLabel
+            end
+        end
+
+        if data.color ~= nil then
+            saved.color = data.color
+
+            if saved.dot then
                 saved.dot.BackgroundColor3 = data.color
-
-                if saved.label then
-                    saved.label.TextColor3 = data.color
-                end
             end
 
-            if data.size ~= nil then
-                saved.size = data.size
+            if saved.textLabel then
+                saved.textLabel.TextColor3 = data.color
+            end
+        end
 
+        if data.size ~= nil then
+            saved.size = data.size
+
+            if saved.dot then
                 saved.dot.Size = UDim2.new(
                     0,
                     data.size,
@@ -983,20 +1017,10 @@ function createRadar(config)
                     data.size
                 )
             end
-
-            if data.visible ~= nil then
-                saved.visible = data.visible
-            end
         end
 
-        if saved.dot then
-            saved.dot.BackgroundColor3 = saved.color
-            saved.dot.Size = UDim2.new(
-                0,
-                saved.size,
-                0,
-                saved.size
-            )
+        if data.visible ~= nil then
+            saved.visible = data.visible
         end
     end
 
@@ -1034,6 +1058,31 @@ function createRadar(config)
         setTargets(list)
     end
 
+    function api:SetTitle(newTitle)
+        if newTitle ~= nil then
+            title = tostring(newTitle)
+            titleLabel.Text = title
+        end
+    end
+
+    function api:SetCenter(newCenter)
+        if newCenter ~= nil then
+            center = newCenter
+        end
+    end
+
+    function api:SetCenterOffset(newOffset)
+        if typeof(newOffset) == "Vector3" then
+            centerOffset = newOffset
+        end
+    end
+
+    function api:SetRange(value)
+        if value then
+            range = value
+        end
+    end
+
     function api:RemoveTarget(id)
         local data = targets[id]
 
@@ -1069,12 +1118,6 @@ function createRadar(config)
     function api:SetPosition(value)
         if value then
             frame.Position = value
-        end
-    end
-
-    function api:SetRange(value)
-        if value then
-            range = value
         end
     end
 
