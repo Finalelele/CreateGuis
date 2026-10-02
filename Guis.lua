@@ -600,92 +600,78 @@ function createInfoText(config)
     return api
 end
 
-function createRadar(config)
+local function createRadar(config)
     config = config or {}
 
-    local guiName = config.Name or "CustomRadar"
-    local title = config.Title or "Radar"
-    local position = config.Position or UDim2.new(0.03, 0, 0.3, 0)
-    local size = config.Size or 220
-    local scale = config.Scale or 1
-    local range = config.Range or 100
-
-    local center = config.Center
-    local centerOffset = config.CenterOffset or Vector3.zero
-
-    local backgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
-    local borderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
-
-    local coreGui = game:GetService("CoreGui")
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
+    local CoreGui = game:GetService("CoreGui")
 
-    local localPlayer = Players.LocalPlayer
+    local Name = config.Name or "CustomRadar"
+    local Title = config.Title or "Radar"
+    local Position = config.Position or UDim2.new(0.03, 0, 0.3, 0)
 
-    local parent = (gethui and gethui()) or coreGui
+    local Size = config.Size or 100
+    local Scale = config.Scale or 1
+    local Range = config.Range or 100
 
-    if not center then
-        center = localPlayer
-    end
+    local Center = config.Center or Players.LocalPlayer
+    local CenterOffset = config.CenterOffset or Vector3.zero
 
-    local old = parent:FindFirstChild(guiName)
+    local BackgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
+    local BorderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
 
-    if old then
-        old:Destroy()
-    end
+    local enabled = true
+    local targets = {}
 
-    local screen = Instance.new("ScreenGui")
-    screen.Name = guiName
-    screen.ResetOnSpawn = false
-    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screen.Parent = parent
+    local WINDOW_SIZE = 220
+    local RADAR_SIZE = 200
+    local BORDER_SIZE = 3
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = Name
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.Parent = (gethui and gethui()) or CoreGui
+
+    local scaleObject = Instance.new("UIScale")
+    scaleObject.Scale = Scale
+    scaleObject.Parent = gui
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, size, 0, size + 32)
-    frame.Position = position
-    frame.BackgroundColor3 = backgroundColor
-    frame.BackgroundTransparency = 0.08
+    frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_SIZE)
+    frame.Position = Position
+    frame.BackgroundColor3 = BackgroundColor
     frame.BorderSizePixel = 0
-    frame.Active = true
-    frame.Draggable = true
-    frame.Parent = screen
+    frame.Parent = gui
 
     local frameCorner = Instance.new("UICorner")
-    frameCorner.CornerRadius = UDim.new(0, 10)
+    frameCorner.CornerRadius = UDim.new(0, 16)
     frameCorner.Parent = frame
 
     local frameStroke = Instance.new("UIStroke")
-    frameStroke.Color = borderColor
-    frameStroke.Thickness = 1
-    frameStroke.Transparency = 0.2
+    frameStroke.Color = BorderColor
+    frameStroke.Thickness = BORDER_SIZE
     frameStroke.Parent = frame
 
-    local uiScale = Instance.new("UIScale")
-    uiScale.Scale = scale
-    uiScale.Parent = frame
-
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Name = "Title"
-    titleLabel.Size = UDim2.new(1, 0, 0, 30)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.Font = Enum.Font.SourceSansBold
-    titleLabel.TextSize = 15
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = frame
-
-    local titlePadding = Instance.new("UIPadding")
-    titlePadding.PaddingLeft = UDim.new(0, 8)
-    titlePadding.Parent = titleLabel
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.BackgroundTransparency = 1
+    title.Position = UDim2.fromOffset(12, 4)
+    title.Size = UDim2.new(1, -24, 0, 28)
+    title.Font = Enum.Font.GothamBold
+    title.Text = Title
+    title.TextColor3 = Color3.fromRGB(235, 235, 235)
+    title.TextSize = 17
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = frame
 
     local radar = Instance.new("Frame")
     radar.Name = "Radar"
-    radar.Size = UDim2.new(0, size, 0, size)
-    radar.Position = UDim2.new(0, 0, 0, 32)
+    radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
+    radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 40)
     radar.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
-    radar.BackgroundTransparency = 0.15
     radar.BorderSizePixel = 0
     radar.ClipsDescendants = true
     radar.Parent = frame
@@ -695,236 +681,115 @@ function createRadar(config)
     radarCorner.Parent = radar
 
     local radarStroke = Instance.new("UIStroke")
-    radarStroke.Color = borderColor
-    radarStroke.Thickness = 2
+    radarStroke.Color = BorderColor
+    radarStroke.Thickness = 3
     radarStroke.Parent = radar
 
-    local centerX = size / 2
-    local centerY = size / 2
-
-    local function createCircle(scaleValue)
+    local function createCircle(size, transparency)
         local circle = Instance.new("Frame")
-        circle.Name = "RangeCircle"
-        circle.Size = UDim2.new(scaleValue, 0, scaleValue, 0)
-        circle.Position = UDim2.new(
-            (1 - scaleValue) / 2,
-            0,
-            (1 - scaleValue) / 2,
-            0
-        )
         circle.BackgroundTransparency = 1
-        circle.BorderSizePixel = 0
-        circle.ZIndex = 1
+        circle.Size = UDim2.new(size, 0, size, 0)
+        circle.Position = UDim2.new(0.5, 0, 0.5, 0)
+        circle.AnchorPoint = Vector2.new(0.5, 0.5)
         circle.Parent = radar
-
-        local circleStroke = Instance.new("UIStroke")
-        circleStroke.Color = Color3.fromRGB(70, 70, 80)
-        circleStroke.Thickness = 1
-        circleStroke.Transparency = 0.65
-        circleStroke.Parent = circle
 
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(1, 0)
         corner.Parent = circle
 
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(70, 70, 80)
+        stroke.Thickness = 1
+        stroke.Transparency = transparency or 0
+        stroke.Parent = circle
+
         return circle
     end
 
-    createCircle(0.5)
-    createCircle(0.75)
+    createCircle(0.66, 0)
+    createCircle(0.42, 0)
 
-    local vertical = Instance.new("Frame")
-    vertical.Name = "Vertical"
-    vertical.Size = UDim2.new(0, 1, 0, size)
-    vertical.Position = UDim2.new(0.5, 0, 0, 0)
-    vertical.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-    vertical.BackgroundTransparency = 0.6
-    vertical.BorderSizePixel = 0
-    vertical.ZIndex = 2
-    vertical.Parent = radar
+    local horizontalLine = Instance.new("Frame")
+    horizontalLine.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    horizontalLine.BackgroundTransparency = 0.35
+    horizontalLine.BorderSizePixel = 0
+    horizontalLine.AnchorPoint = Vector2.new(0, 0.5)
+    horizontalLine.Position = UDim2.new(0, 0, 0.5, 0)
+    horizontalLine.Size = UDim2.new(1, 0, 0, 1)
+    horizontalLine.Parent = radar
 
-    local horizontal = Instance.new("Frame")
-    horizontal.Name = "Horizontal"
-    horizontal.Size = UDim2.new(1, 0, 0, 1)
-    horizontal.Position = UDim2.new(0, 0, 0.5, 0)
-    horizontal.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-    horizontal.BackgroundTransparency = 0.6
-    horizontal.BorderSizePixel = 0
-    horizontal.ZIndex = 2
-    horizontal.Parent = radar
+    local verticalLine = Instance.new("Frame")
+    verticalLine.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    verticalLine.BackgroundTransparency = 0.35
+    verticalLine.BorderSizePixel = 0
+    verticalLine.AnchorPoint = Vector2.new(0.5, 0)
+    verticalLine.Position = UDim2.new(0.5, 0, 0, 0)
+    verticalLine.Size = UDim2.new(0, 1, 1, 0)
+    verticalLine.Parent = radar
 
-    local targets = {}
+    local targetObjects = {}
 
-    local function resolvePosition(target)
+    local function getRoot(target)
         if not target then
             return nil
         end
 
-        if typeof(target) == "Instance" then
-            if target:IsA("Player") then
-                local character = target.Character
+        if target:IsA("Player") then
+            return target.Character
+                and (
+                    target.Character:FindFirstChild("HumanoidRootPart")
+                    or target.Character.PrimaryPart
+                )
+        end
 
-                if not character then
-                    return nil
-                end
+        if target:IsA("Model") then
+            return target:FindFirstChild("HumanoidRootPart")
+                or target.PrimaryPart
+                or target:FindFirstChildWhichIsA("BasePart")
+        end
 
-                local root =
-                    character:FindFirstChild("HumanoidRootPart")
-                    or character.PrimaryPart
-                    or character:FindFirstChildWhichIsA("BasePart")
-
-                return root and root.Position or nil
-            end
-
-            if target:IsA("Model") then
-                local root =
-                    target.PrimaryPart
-                    or target:FindFirstChild("HumanoidRootPart")
-                    or target:FindFirstChildWhichIsA("BasePart")
-
-                return root and root.Position or nil
-            end
-
-            if target:IsA("BasePart") then
-                return target.Position
-            end
+        if target:IsA("BasePart") then
+            return target
         end
 
         return nil
     end
 
     local function createTarget(data)
-        local dot = Instance.new("Frame")
-        dot.Name = data.id
-        dot.AnchorPoint = Vector2.new(0.5, 0.5)
-        dot.Size = UDim2.new(0, data.size or 8, 0, data.size or 8)
-        dot.BackgroundColor3 = data.color or Color3.fromRGB(255, 80, 80)
-        dot.BorderSizePixel = 0
-        dot.ZIndex = 8
-        dot.Parent = radar
+        local point = Instance.new("Frame")
+        point.Name = tostring(data.id)
+        point.AnchorPoint = Vector2.new(0.5, 0.5)
+        point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
+        point.BorderSizePixel = 0
+        point.Size = UDim2.fromOffset(data.size or 8, data.size or 8)
+        point.Parent = radar
 
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(1, 0)
-        corner.Parent = dot
+        corner.Parent = point
 
         local textLabel
 
         if data.text ~= nil then
             textLabel = Instance.new("TextLabel")
             textLabel.Name = "Text"
+            textLabel.BackgroundTransparency = 1
             textLabel.AnchorPoint = Vector2.new(0.5, 1)
             textLabel.Position = UDim2.new(0.5, 0, 0, -4)
-            textLabel.Size = UDim2.new(0, 140, 0, 18)
-            textLabel.BackgroundTransparency = 1
+            textLabel.Size = UDim2.fromOffset(140, 18)
+            textLabel.Font = Enum.Font.Gotham
             textLabel.Text = tostring(data.text)
-            textLabel.TextColor3 = data.color or Color3.fromRGB(255, 255, 255)
-            textLabel.Font = Enum.Font.SourceSansBold
+            textLabel.TextColor3 = data.color or Color3.new(1, 1, 1)
             textLabel.TextSize = 13
             textLabel.TextXAlignment = Enum.TextXAlignment.Center
-            textLabel.TextYAlignment = Enum.TextYAlignment.Center
-            textLabel.ZIndex = 9
-            textLabel.Parent = dot
+            textLabel.Parent = point
         end
 
-        data.dot = dot
-        data.textLabel = textLabel
-
-        targets[data.id] = data
-    end
-
-    local function updateTarget(data)
-        local dot = data.dot
-
-        if not dot then
-            return
-        end
-
-        if data.visible == false then
-            dot.Visible = false
-            return
-        end
-
-        local targetPosition = resolvePosition(data.target)
-        local centerPosition = resolvePosition(center)
-
-        if not targetPosition or not centerPosition then
-            dot.Visible = false
-            return
-        end
-
-        centerPosition = centerPosition + centerOffset
-
-        local difference = targetPosition - centerPosition
-
-        local flatDifference = Vector3.new(
-            difference.X,
-            0,
-            difference.Z
-        )
-
-        local distance = flatDifference.Magnitude
-
-        if distance < 0.01 then
-            dot.Position = UDim2.new(0.5, 0, 0.5, 0)
-            dot.Visible = true
-            return
-        end
-
-        local camera = workspace.CurrentCamera
-
-        if not camera then
-            dot.Visible = false
-            return
-        end
-
-        local look = camera.CFrame.LookVector
-        local right = camera.CFrame.RightVector
-
-        local flatLook = Vector3.new(
-            look.X,
-            0,
-            look.Z
-        )
-
-        local flatRight = Vector3.new(
-            right.X,
-            0,
-            right.Z
-        )
-
-        if flatLook.Magnitude < 0.01 or flatRight.Magnitude < 0.01 then
-            dot.Visible = false
-            return
-        end
-
-        flatLook = flatLook.Unit
-        flatRight = flatRight.Unit
-
-        local direction = flatDifference.Unit
-
-        local x = direction:Dot(flatRight)
-        local y = direction:Dot(flatLook)
-
-        local normalizedDistance = math.min(distance / range, 1)
-
-        local radius = size * 0.5 - 10
-
-        local screenX =
-            centerX
-            + x * radius * normalizedDistance
-
-        local screenY =
-            centerY
-            - y * radius * normalizedDistance
-
-        dot.Position = UDim2.new(
-            0,
-            screenX,
-            0,
-            screenY
-        )
-
-        dot.Visible = true
+        targetObjects[data.id] = {
+            point = point,
+            text = textLabel,
+            data = data,
+        }
     end
 
     local function setTarget(data)
@@ -932,188 +797,238 @@ function createRadar(config)
             return
         end
 
-        local id = data.id
-        local saved = targets[id]
+        local old = targetObjects[data.id]
 
-        if not saved then
-            saved = {
-                id = id,
-                target = data.target,
-                text = data.text,
-                color = data.color or Color3.fromRGB(255, 80, 80),
-                size = data.size or 8,
-                visible = data.visible ~= false,
-            }
-
-            createTarget(saved)
-
+        if not old then
+            targets[data.id] = data
+            createTarget(data)
             return
         end
 
-        if data.target ~= nil then
-            saved.target = data.target
+        local saved = old.data
+
+        for key, value in pairs(data) do
+            saved[key] = value
         end
 
-        if data.text ~= nil then
-            saved.text = data.text
+        old.point.BackgroundColor3 = saved.color or Color3.new(1, 1, 1)
 
-            if saved.textLabel then
-                saved.textLabel.Text = tostring(data.text)
-            elseif saved.dot then
-                local textLabel = Instance.new("TextLabel")
-                textLabel.Name = "Text"
-                textLabel.AnchorPoint = Vector2.new(0.5, 1)
-                textLabel.Position = UDim2.new(0.5, 0, 0, -4)
-                textLabel.Size = UDim2.new(0, 140, 0, 18)
-                textLabel.BackgroundTransparency = 1
-                textLabel.Text = tostring(data.text)
-                textLabel.TextColor3 = saved.color
-                textLabel.Font = Enum.Font.SourceSansBold
-                textLabel.TextSize = 13
-                textLabel.TextXAlignment = Enum.TextXAlignment.Center
-                textLabel.TextYAlignment = Enum.TextYAlignment.Center
-                textLabel.ZIndex = 9
-                textLabel.Parent = saved.dot
+        local pointSize = saved.size or 8
+        old.point.Size = UDim2.fromOffset(pointSize, pointSize)
 
-                saved.textLabel = textLabel
-            end
-        end
-
-        if data.color ~= nil then
-            saved.color = data.color
-
-            if saved.dot then
-                saved.dot.BackgroundColor3 = data.color
+        if saved.text ~= nil then
+            if not old.text then
+                old.text = Instance.new("TextLabel")
+                old.text.Name = "Text"
+                old.text.BackgroundTransparency = 1
+                old.text.AnchorPoint = Vector2.new(0.5, 1)
+                old.text.Position = UDim2.new(0.5, 0, 0, -4)
+                old.text.Size = UDim2.fromOffset(140, 18)
+                old.text.Font = Enum.Font.Gotham
+                old.text.TextSize = 13
+                old.text.TextXAlignment = Enum.TextXAlignment.Center
+                old.text.Parent = old.point
             end
 
-            if saved.textLabel then
-                saved.textLabel.TextColor3 = data.color
-            end
+            old.text.Text = tostring(saved.text)
+            old.text.TextColor3 = saved.color or Color3.new(1, 1, 1)
         end
 
-        if data.size ~= nil then
-            saved.size = data.size
-
-            if saved.dot then
-                saved.dot.Size = UDim2.new(
-                    0,
-                    data.size,
-                    0,
-                    data.size
-                )
-            end
-        end
-
-        if data.visible ~= nil then
-            saved.visible = data.visible
-        end
+        targets[data.id] = saved
     end
 
-    local function setTargets(list)
-        if not list then
-            return
-        end
-
-        for _, data in ipairs(list) do
+    if config.Targets then
+        for _, data in ipairs(config.Targets) do
             setTarget(data)
         end
     end
 
-    setTargets(config.Targets)
+    local function getCenterPosition()
+        local root = getRoot(Center)
 
-    local bindName = "RadarUpdate_" .. guiName
+        if root then
+            return root.Position + CenterOffset
+        end
+
+        if typeof(Center) == "Vector3" then
+            return Center + CenterOffset
+        end
+
+        if typeof(Center) == "CFrame" then
+            return Center.Position + CenterOffset
+        end
+
+        return nil
+    end
+
+    local function updateTarget(id, object)
+        local data = object.data
+        local targetRoot = getRoot(data.target)
+        local centerPosition = getCenterPosition()
+
+        if not targetRoot or not centerPosition or data.visible == false then
+            object.point.Visible = false
+            return
+        end
+
+        local offset = targetRoot.Position - centerPosition
+        local distance = offset.Magnitude
+
+        if distance > Range then
+            object.point.Visible = false
+            return
+        end
+
+        object.point.Visible = true
+
+        if distance < 0.01 then
+            object.point.Position = UDim2.new(0.5, 0, 0.5, 0)
+            return
+        end
+
+        local camera = workspace.CurrentCamera
+
+        if not camera then
+            return
+        end
+
+        local forward = Vector3.new(
+            camera.CFrame.LookVector.X,
+            0,
+            camera.CFrame.LookVector.Z
+        )
+
+        local right = Vector3.new(
+            camera.CFrame.RightVector.X,
+            0,
+            camera.CFrame.RightVector.Z
+        )
+
+        if forward.Magnitude < 0.001 or right.Magnitude < 0.001 then
+            return
+        end
+
+        forward = forward.Unit
+        right = right.Unit
+
+        local x = offset:Dot(right)
+        local y = offset:Dot(forward)
+
+        local normalizedDistance = distance / Size
+
+        local maxDistance = 1
+
+        if normalizedDistance > maxDistance then
+            normalizedDistance = maxDistance
+        end
+
+        local direction = Vector2.new(x, y)
+
+        if direction.Magnitude > 0 then
+            direction = direction.Unit * normalizedDistance
+        end
+
+        object.point.Position = UDim2.new(
+            0.5 + direction.X * 0.5,
+            0,
+            0.5 - direction.Y * 0.5,
+            0
+        )
+    end
+
+    local renderName = Name .. "_RadarUpdate"
 
     RunService:BindToRenderStep(
-        bindName,
+        renderName,
         Enum.RenderPriority.Camera.Value + 1,
         function()
-            if not screen.Enabled then
+            if not enabled then
                 return
             end
 
-            for _, data in pairs(targets) do
-                updateTarget(data)
+            for id, object in pairs(targetObjects) do
+                updateTarget(id, object)
             end
         end
     )
 
     local api = {}
 
-    function api:Set(list)
-        setTargets(list)
-    end
-
-    function api:SetTitle(newTitle)
-        if newTitle ~= nil then
-            title = tostring(newTitle)
-            titleLabel.Text = title
-        end
-    end
-
-    function api:SetCenter(newCenter)
-        if newCenter ~= nil then
-            center = newCenter
-        end
-    end
-
-    function api:SetCenterOffset(newOffset)
-        if typeof(newOffset) == "Vector3" then
-            centerOffset = newOffset
-        end
-    end
-
-    function api:SetRange(value)
-        if value then
-            range = value
-        end
-    end
-
-    function api:RemoveTarget(id)
-        local data = targets[id]
-
-        if not data then
+    function api:Set(listOrId, target, text, color, pointSize, visible)
+        if type(listOrId) == "table" then
+            for _, data in ipairs(listOrId) do
+                setTarget(data)
+            end
             return
         end
 
-        if data.dot then
-            data.dot:Destroy()
-        end
+        setTarget({
+            id = listOrId,
+            target = target,
+            text = text,
+            color = color,
+            size = pointSize,
+            visible = visible,
+        })
+    end
 
+    function api:SetTitle(newTitle)
+        title.Text = tostring(newTitle)
+    end
+
+    function api:SetCenter(newCenter)
+        Center = newCenter
+    end
+
+    function api:SetCenterOffset(newOffset)
+        CenterOffset = newOffset or Vector3.zero
+    end
+
+    function api:SetRange(value)
+        Range = tonumber(value) or Range
+    end
+
+    function api:SetSize(value)
+        Size = math.max(tonumber(value) or Size, 0.01)
+    end
+
+    function api:RemoveTarget(id)
         targets[id] = nil
+
+        local object = targetObjects[id]
+
+        if object then
+            object.point:Destroy()
+            targetObjects[id] = nil
+        end
     end
 
     function api:Clear()
-        for id, data in pairs(targets) do
-            if data.dot then
-                data.dot:Destroy()
-            end
-
+        for id, object in pairs(targetObjects) do
+            object.point:Destroy()
+            targetObjects[id] = nil
             targets[id] = nil
         end
     end
 
     function api:Visible(state)
-        screen.Enabled = state
+        enabled = state ~= false
+        gui.Enabled = enabled
     end
 
     function api:SetScale(value)
-        uiScale.Scale = value or 1
+        Scale = tonumber(value) or Scale
+        scaleObject.Scale = Scale
     end
 
     function api:SetPosition(value)
-        if value then
-            frame.Position = value
-        end
+        Position = value
+        frame.Position = value
     end
 
     function api:Remove()
-        RunService:UnbindFromRenderStep(bindName)
-
-        if screen then
-            screen:Destroy()
-        end
-
-        targets = {}
+        RunService:UnbindFromRenderStep(renderName)
+        gui:Destroy()
     end
 
     return api
