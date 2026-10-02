@@ -606,7 +606,7 @@ local function createRadar(config)
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local CoreGui = game:GetService("CoreGui")
-    local UserInputService = game:GetService("UserInputService") -- Добавлено для перетаскивания
+    local UserInputService = game:GetService("UserInputService")
 
     local Name = config.Name or "CustomRadar"
     local Title = config.Title or "Radar"
@@ -614,7 +614,8 @@ local function createRadar(config)
 
     local Size = config.Size or 100
     local Scale = config.Scale or 1
-    local Range = (config.Range or 100) / 2 
+    -- ИЗМЕНЕНИЕ: убрано деление на 2, Range используется как есть
+    local Range = config.Range or 100
 
     local Center = config.Center or Players.LocalPlayer
     local CenterOffset = config.CenterOffset or Vector3.zero
@@ -626,7 +627,7 @@ local function createRadar(config)
     local targets = {}
 
     local WINDOW_SIZE = 220
-    local WINDOW_HEIGHT = 260 
+    local WINDOW_HEIGHT = 260
     local RADAR_SIZE = 200
     local BORDER_SIZE = 3
 
@@ -642,7 +643,7 @@ local function createRadar(config)
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_HEIGHT) 
+    frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_HEIGHT)
     frame.Position = Position
     frame.BackgroundColor3 = BackgroundColor
     frame.BorderSizePixel = 0
@@ -669,9 +670,7 @@ local function createRadar(config)
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = frame
 
-    -- =========================================================
-    -- НАЧАЛО БЛОКА ПЕРЕТАСКИВАНИЯ
-    -- =========================================================
+    -- Перетаскивание за заголовок
     local dragging = false
     local dragInput, dragStart, startPos
 
@@ -680,13 +679,12 @@ local function createRadar(config)
         frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 
-    -- Слушаем клики по заголовку (title)
     title.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
-            
+
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -706,14 +704,11 @@ local function createRadar(config)
             update(input)
         end
     end)
-    -- =========================================================
-    -- КОНЕЦ БЛОКА ПЕРЕТАСКИВАНИЯ
-    -- =========================================================
 
     local radar = Instance.new("Frame")
     radar.Name = "Radar"
     radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
-    radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 40) 
+    radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 40)
     radar.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
     radar.BorderSizePixel = 0
     radar.ClipsDescendants = true
@@ -917,6 +912,7 @@ local function createRadar(config)
         local offset = targetRoot.Position - centerPosition
         local distance = offset.Magnitude
 
+        -- ИЗМЕНЕНИЕ: Range теперь используется напрямую
         if distance > Range then
             object.point.Visible = false
             return
@@ -957,7 +953,9 @@ local function createRadar(config)
         local x = offset:Dot(right)
         local y = offset:Dot(forward)
 
-        local normalizedDistance = distance / Size
+        -- ИЗМЕНЕНИЕ: normalizedDistance теперь делится на Range, а не на Size
+        -- Это нужно чтобы точка на краю Range оказывалась ровно на краю круга
+        local normalizedDistance = distance / Range
 
         local maxDistance = 1
 
@@ -1028,7 +1026,8 @@ local function createRadar(config)
     end
 
     function api:SetRange(value)
-        Range = (tonumber(value) or (Range * 2)) / 2
+        -- ИЗМЕНЕНИЕ: убрано деление на 2
+        Range = tonumber(value) or Range
     end
 
     function api:SetSize(value)
