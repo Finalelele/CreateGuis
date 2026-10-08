@@ -165,15 +165,13 @@ function createInfoGui(config)
     local activeTween
     local contentHeight = 0
 
+    -- Исправлено: теперь высота берется из UIListLayout, что позволяет учитывать перенос строк
     local function getContentHeight()
-        local count = 0
-        for _ in pairs(labels) do
-            count = count + 1
-        end
-        if count <= 0 then
+        local layout = container:FindFirstChildOfClass("UIListLayout")
+        if not layout then
             return 0
         end
-        return count * textSize + math.max(0, count - 1) * linePadding
+        return layout.AbsoluteContentSize.Y
     end
 
     local function getExpandedHeight()
@@ -226,6 +224,13 @@ function createInfoGui(config)
             frame.Size = UDim2.new(0, width, 0, targetHeight)
         end
     end
+
+    -- Автоматическое обновление размера окна при изменении высоты контента (из-за переноса строк)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if not collapsed then
+            updateFrameSize(true)
+        end
+    end)
 
     local function applyOutline(label, data)
         local stroke = label:FindFirstChild("Outline")
@@ -309,18 +314,23 @@ function createInfoGui(config)
 
             label = Instance.new("TextLabel")
             label.Name = id
-            label.Size = UDim2.new(1, 0, 0, textSize)
+            -- Исправлено: высота теперь автоматическая (0), чтобы TextWrapped работал корректно
+            label.Size = UDim2.new(1, 0, 0, 0)
+            label.AutomaticSize = Enum.AutomaticSize.Y
+            label.TextWrapped = true
             label.BackgroundTransparency = 1
             label.Font = Enum.Font.GothamMedium
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Left
-            label.TextYAlignment = Enum.TextYAlignment.Center
+            label.TextYAlignment = Enum.TextYAlignment.Top
             label.TextTransparency = 1
             label.Parent = container
 
             local padding = Instance.new("UIPadding")
             padding.PaddingLeft = UDim.new(0, 8)
             padding.PaddingRight = UDim.new(0, 8)
+            padding.PaddingTop = UDim.new(0, 2)
+            padding.PaddingBottom = UDim.new(0, 2)
             padding.Parent = label
 
             labels[id] = label
@@ -572,6 +582,7 @@ function createInfoText(config)
     local baseTextSize = config.TextSize or 20
     local textSize = baseTextSize
     local size = config.Size or UDim2.new(0, 300, 0, 0)
+    local baseSize = size -- Сохраняем базовый размер для масштабирования
     local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize = config.outlineSize
 
@@ -710,16 +721,15 @@ function createInfoText(config)
             return
         end
 
-        local count = 0
-        for _ in pairs(labels) do
-            count = count + 1
-        end
+        -- Исправлено: высота берется из UIListLayout
+        local layout = container and container:FindFirstChildOfClass("UIListLayout")
+        local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
 
         local extra = showWindow and (windowPadding * 2) or 0
 
         local autoHeight = math.max(
             textSize + extra,
-            count * textSize + math.max(0, count - 1) * 2 + extra
+            layoutHeight + extra
         )
 
         local targetHeight
@@ -806,6 +816,11 @@ function createInfoText(config)
         layout.Padding = UDim.new(0, 2)
         layout.Parent = container
 
+        -- Автоматическое обновление размера при изменении контента
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            updateSize(true)
+        end)
+
         applyWindowLayout()
 
         return true
@@ -856,12 +871,15 @@ function createInfoText(config)
 
             label = Instance.new("TextLabel")
             label.Name = id
-            label.Size = UDim2.new(1, 0, 0, textSize)
+            -- Исправлено: автоматическая высота и перенос строк
+            label.Size = UDim2.new(1, 0, 0, 0)
+            label.AutomaticSize = Enum.AutomaticSize.Y
+            label.TextWrapped = true
             label.BackgroundTransparency = 1
             label.Font = Enum.Font.GothamMedium
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Center
-            label.TextYAlignment = Enum.TextYAlignment.Center
+            label.TextYAlignment = Enum.TextYAlignment.Top
             label.Parent = container
 
             labels[id] = label
@@ -991,8 +1009,8 @@ function createInfoText(config)
     end
 
     -- SetSize:
-    --   число  -> множитель текста (1 = дефолт)
-    --   UDim2  -> размер окна билборда
+    --   число  -> множитель текста и размера окна (1 = дефолт)
+    --   UDim2  -> размер окна билборда (при этом текст масштабируется пропорционально ширине)
     function api:SetSize(newSize)
         if newSize == nil then
             return
@@ -1002,13 +1020,45 @@ function createInfoText(config)
             local scale = math.max(newSize, 0.1)
             textSize = baseTextSize * scale
 
+            if not baseSize then
+                baseSize = size
+            end
+
+            size = UDim2.new(
+                baseSize.X.Scale,
+                baseSize.X.Offset * scale,
+                baseSize.Y.Scale,
+                baseSize.Y.Offset * scale
+            )
+
             for _, label in pairs(labels) do
                 label.TextSize = textSize
-                label.Size = UDim2.new(1, 0, 0, textSize)
+                label.Size = UDim2.new(1, 0, 0, 0)
             end
 
             updateSize(true)
         elseif typeof(newSize) == "UDim2" then
+            -- Вычисляем коэффициент масштабирования текста на основе изменения ширины
+            if size.X.Offset > 0 and newSize.X.Offset > 0 then
+                local ratio = newSize.X.Offset / size.X.Offset
+                textSize = textSize * ratio
+                baseTextSize = baseTextSize * ratio
+
+                for _, label in pairs(labels) do
+                    label.TextSize = textSize
+                    label.Size = UDim2.new(1, 0, 0, 0)
+                end
+            elseif size.X.Scale > 0 and newSize.X.Scale > 0 then
+                local ratio = newSize.X.Scale / size.X.Scale
+                textSize = textSize * ratio
+                baseTextSize = baseTextSize * ratio
+
+                for _, label in pairs(labels) do
+                    label.TextSize = textSize
+                    label.Size = UDim2.new(1, 0, 0, 0)
+                end
+            end
+
             size = newSize
 
             if billboard then
