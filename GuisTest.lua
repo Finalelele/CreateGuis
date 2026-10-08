@@ -1,28 +1,28 @@
 function createInfoGui(config)
     config = config or {}
 
-    local TweenService       = game:GetService("TweenService")
-    local UserInputService   = game:GetService("UserInputService")
-    local CoreGui            = game:GetService("CoreGui")
+    local TweenService = game:GetService("TweenService")
+    local UserInputService = game:GetService("UserInputService")
+    local CoreGui = game:GetService("CoreGui")
 
     local guiName = config.Name or "CustomWindow"
-    local title   = config.Title or "Window"
-    local width   = config.Width or 200
-    local scale   = config.Scale or 1
-    local position= config.Position or UDim2.new(0.05, 0, 0.15, 0)
-    local textSize= config.TextSize or 14
+    local title = config.Title or "Window"
+    local width = config.Width or 200
+    local scale = config.Scale or 1
+    local position = config.Position or UDim2.new(0.05, 0, 0.15, 0)
+    local textSize = config.TextSize or 14
 
     local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
-    local defaultOutlineSize  = config.outlineSize
+    local defaultOutlineSize = config.outlineSize
 
-    local headerHeight  = 32
+    local headerHeight = 32
     local bottomPadding = 7
-    local linePadding   = 2
+    local linePadding = 2
 
     local expandedBackground = Color3.fromRGB(30, 30, 35)
-    local headerBackground   = Color3.fromRGB(35, 35, 42)
-    local borderColor        = Color3.fromRGB(65, 65, 75)
-    local accentColor        = config.AccentColor or Color3.fromRGB(90, 145, 255)
+    local headerBackground = Color3.fromRGB(35, 35, 42)
+    local borderColor = Color3.fromRGB(65, 65, 75)
+    local accentColor = config.AccentColor or Color3.fromRGB(90, 145, 255)
 
     local tweenInfo = TweenInfo.new(
         config.TweenTime or 0.22,
@@ -30,11 +30,14 @@ function createInfoGui(config)
         Enum.EasingDirection.Out
     )
 
-    -- Отдельный tween для плавного появления строк
+    -- отдельный tween для fade-in новых строк
     local lineFadeInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
     local screen = CoreGui:FindFirstChild(guiName)
-    if screen then screen:Destroy() end
+
+    if screen then
+        screen:Destroy()
+    end
 
     screen = Instance.new("ScreenGui")
     screen.Name = guiName
@@ -116,7 +119,7 @@ function createInfoGui(config)
     titleLabel.Text = title
     titleLabel.TextColor3 = Color3.fromRGB(245, 245, 248)
     titleLabel.Font = Enum.Font.GothamSemibold
-    titleLabel.TextSize = textSize + 1
+    titleLabel.TextSize = textSize + 2          -- было textSize + 1
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
     titleLabel.ZIndex = 3
@@ -142,7 +145,7 @@ function createInfoGui(config)
     toggleCorner.CornerRadius = UDim.new(0, 6)
     toggleCorner.Parent = toggle
 
-    -- ⬇⬇⬇ ФИКС: правильный размер контейнера + не обрезаем содержимое
+    -- FIX: контейнер занимает область под хедером и не обрезает контент
     local container = Instance.new("Frame")
     container.Name = "Container"
     container.Position = UDim2.new(0, 0, 0, headerHeight)
@@ -156,9 +159,9 @@ function createInfoGui(config)
     layout.Padding = UDim.new(0, linePadding)
     layout.Parent = container
 
-    local labels         = {}
-    local lineData       = {}
-    local creationCounter= 0
+    local labels = {}
+    local lineData = {}
+    local creationCounter = 0
 
     local collapsed = config.Collapsed == true
     local activeTween
@@ -166,8 +169,12 @@ function createInfoGui(config)
 
     local function getContentHeight()
         local count = 0
-        for _ in pairs(labels) do count = count + 1 end
-        if count <= 0 then return 0 end
+        for _ in pairs(labels) do
+            count = count + 1
+        end
+        if count <= 0 then
+            return 0
+        end
         return count * textSize + math.max(0, count - 1) * linePadding
     end
 
@@ -186,6 +193,7 @@ function createInfoGui(config)
             end
 
             local stroke = label:FindFirstChild("Outline")
+
             if stroke then
                 if instant then
                     stroke.Transparency = transparency
@@ -200,6 +208,7 @@ function createInfoGui(config)
 
     local function updateFrameSize(animate)
         contentHeight = getContentHeight()
+
         local targetHeight = collapsed and headerHeight or getExpandedHeight()
 
         if activeTween then
@@ -211,8 +220,11 @@ function createInfoGui(config)
             activeTween = TweenService:Create(
                 frame,
                 tweenInfo,
-                { Size = UDim2.new(0, width, 0, targetHeight) }
+                {
+                    Size = UDim2.new(0, width, 0, targetHeight)
+                }
             )
+
             activeTween:Play()
         else
             frame.Size = UDim2.new(0, width, 0, targetHeight)
@@ -232,7 +244,6 @@ function createInfoGui(config)
 
             stroke.Color = data.outlineColor or defaultOutlineColor
             stroke.Thickness = data.outlineSize
-            -- если строка только что создана — прозрачность выставим вручную при fade-in
             stroke.Transparency = collapsed and 1 or 0
         elseif stroke then
             stroke:Destroy()
@@ -240,8 +251,8 @@ function createInfoGui(config)
     end
 
     local function updateOrder()
-        local explicit      = {}
-        local withoutOrder  = {}
+        local explicit = {}
+        local withoutOrder = {}
 
         for _, data in pairs(lineData) do
             if data.order ~= nil then
@@ -252,7 +263,10 @@ function createInfoGui(config)
         end
 
         table.sort(explicit, function(a, b)
-            if a.order == b.order then return a.created < b.created end
+            if a.order == b.order then
+                return a.created < b.created
+            end
+
             return a.order < b.order
         end)
 
@@ -264,14 +278,22 @@ function createInfoGui(config)
 
         for _, data in ipairs(explicit) do
             local order = math.max(1, math.floor(data.order))
-            while used[order] do order = order + 1 end
+
+            while used[order] do
+                order = order + 1
+            end
+
             used[order] = true
             labels[data.id].LayoutOrder = order
         end
 
         local current = 1
+
         for _, data in ipairs(withoutOrder) do
-            while used[current] do current = current + 1 end
+            while used[current] do
+                current = current + 1
+            end
+
             used[current] = true
             labels[data.id].LayoutOrder = current
             current = current + 1
@@ -279,7 +301,9 @@ function createInfoGui(config)
     end
 
     local function setLine(data)
-        if not data or not data.id then return end
+        if not data or not data.id then
+            return
+        end
 
         local id = data.id
         local label = labels[id]
@@ -292,15 +316,15 @@ function createInfoGui(config)
             label.Name = id
             label.Size = UDim2.new(1, 0, 0, textSize)
             label.BackgroundTransparency = 1
-            label.Font = Enum.Font.SourceSans
+            label.Font = Enum.Font.GothamMedium          -- было SourceSans
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.TextYAlignment = Enum.TextYAlignment.Center
-            label.TextTransparency = 1  -- стартуем невидимыми → потом fade-in
+            label.TextTransparency = 1
             label.Parent = container
 
             local padding = Instance.new("UIPadding")
-            padding.PaddingLeft  = UDim.new(0, 8)
+            padding.PaddingLeft = UDim.new(0, 8)
             padding.PaddingRight = UDim.new(0, 8)
             padding.Parent = label
 
@@ -319,45 +343,71 @@ function createInfoGui(config)
 
         local saved = lineData[id]
 
-        if data.text         ~= nil then saved.text = data.text end
-        if data.color        ~= nil then saved.color = data.color end
-        if data.outlineColor ~= nil then saved.outlineColor = data.outlineColor end
-        if data.outlineSize  ~= nil then
+        if data.text ~= nil then
+            saved.text = data.text
+        end
+
+        if data.color ~= nil then
+            saved.color = data.color
+        end
+
+        if data.outlineColor ~= nil then
+            saved.outlineColor = data.outlineColor
+        end
+
+        if data.outlineSize ~= nil then
             saved.outlineSize = data.outlineSize == false and nil or data.outlineSize
         end
-        if data.order        ~= nil then
+
+        if data.order ~= nil then
             saved.order = data.order == false and nil or data.order
         end
 
         label.Text = saved.text
         label.TextColor3 = saved.color
+
         applyOutline(label, saved)
 
-        -- ⬇⬇⬇ FADE-IN для новой строки
+        -- плавное появление новой строки
         if isNew and not collapsed then
             local stroke = label:FindFirstChild("Outline")
-            if stroke then stroke.Transparency = 1 end
 
-            TweenService:Create(label, lineFadeInfo, { TextTransparency = 0 }):Play()
             if stroke then
-                TweenService:Create(stroke, lineFadeInfo, { Transparency = 0 }):Play()
+                stroke.Transparency = 1
+            end
+
+            TweenService:Create(label, lineFadeInfo, {
+                TextTransparency = 0
+            }):Play()
+
+            if stroke then
+                TweenService:Create(stroke, lineFadeInfo, {
+                    Transparency = 0
+                }):Play()
             end
         end
     end
 
     local function setText(lines)
-        if not lines then return end
+        if not lines then
+            return
+        end
 
         for _, data in ipairs(lines) do
             setLine(data)
         end
 
         updateOrder()
-        updateFrameSize(true)  -- плавное изменение размера окна
+        updateFrameSize(true)
+
+        if not collapsed then
+            setContentTransparency(0, false)
+        end
     end
 
     local function setCollapsed(state, animate)
         collapsed = state == true
+
         toggle.Text = collapsed and "⌄" or "⌃"
 
         if collapsed then
@@ -384,24 +434,34 @@ function createInfoGui(config)
 
     updateFrameSize(false)
 
-    -- ==== drag ====
-    local dragging, dragInput, dragStart, startPos
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
 
     local function updateDrag(input)
-        if not dragging or not dragStart or not startPos then return end
+        if not dragging or not dragStart or not startPos then
+            return
+        end
+
         local delta = input.Position - dragStart
+
         frame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
         )
     end
 
     header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging  = true
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = true
             dragStart = input.Position
-            startPos  = frame.Position
+            startPos = frame.Position
+
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -412,13 +472,16 @@ function createInfoGui(config)
 
     header.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
+            or input.UserInputType == Enum.UserInputType.Touch then
+
             dragInput = input
         end
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput then updateDrag(input) end
+        if input == dragInput then
+            updateDrag(input)
+        end
     end)
 
     toggle.MouseEnter:Connect(function()
@@ -441,30 +504,64 @@ function createInfoGui(config)
 
     local api = {}
 
-    function api:SetText(lines) setText(lines) end
+    function api:SetText(lines)
+        setText(lines)
+    end
 
     function api:RemoveLine(id)
         local label = labels[id]
+
         if label then
             label:Destroy()
             labels[id] = nil
             lineData[id] = nil
+
             updateOrder()
             updateFrameSize(true)
         end
     end
 
-    function api:Visible(state) screen.Enabled = state end
-    function api:SetScale(value) uiScale.Scale = value or 1 end
-    function api:SetPosition(value) if value then frame.Position = value end end
-    function api:SetTitle(newTitle) title = tostring(newTitle); titleLabel.Text = title end
-    function api:Collapse(state) setCollapsed(state, true) end
-    function api:Toggle() setCollapsed(not collapsed, true) end
-    function api:IsCollapsed() return collapsed end
+    function api:Visible(state)
+        screen.Enabled = state
+    end
+
+    function api:SetScale(value)
+        uiScale.Scale = value or 1
+    end
+
+    function api:SetPosition(value)
+        if value then
+            frame.Position = value
+        end
+    end
+
+    function api:SetTitle(newTitle)
+        title = tostring(newTitle)
+        titleLabel.Text = title
+    end
+
+    function api:Collapse(state)
+        setCollapsed(state, true)
+    end
+
+    function api:Toggle()
+        setCollapsed(not collapsed, true)
+    end
+
+    function api:IsCollapsed()
+        return collapsed
+    end
 
     function api:Remove()
-        if activeTween then activeTween:Cancel(); activeTween = nil end
-        if screen then screen:Destroy(); screen = nil end
+        if activeTween then
+            activeTween:Cancel()
+            activeTween = nil
+        end
+
+        if screen then
+            screen:Destroy()
+            screen = nil
+        end
     end
 
     return api
@@ -472,6 +569,8 @@ end
 
 function createInfoText(config)
     config = config or {}
+
+    local TweenService = game:GetService("TweenService")
 
     local name = config.Name or "GhostRoomESP"
     local center = config.Center
@@ -481,6 +580,12 @@ function createInfoText(config)
     local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize = config.outlineSize
 
+    local sizeTweenInfo = TweenInfo.new(
+        config.TweenTime or 0.22,
+        Enum.EasingStyle.Quint,
+        Enum.EasingDirection.Out
+    )
+
     local billboard
     local container
     local labels = {}
@@ -488,17 +593,25 @@ function createInfoText(config)
     local creationCounter = 0
     local currentAdornee
     local isActive = true
+    local activeSizeTween
 
-    -- Строки, которые ещё не удалось отрисовать (нет валидного adornee)
-    local pendingOrder = {}   -- массив id в порядке поступления
-    local pendingData  = {}   -- id -> data
+    -- Строки, которые не удалось отрисовать (нет валидного adornee) — ждут в очереди
+    local pendingOrder = {}
+    local pendingData = {}
 
     local function resolveAdornee(target)
-        if not target then return nil end
+        if not target then
+            return nil
+        end
+
         if target:IsA("Model") then
             target = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
         end
-        if not target or not target:IsA("BasePart") then return nil end
+
+        if not target or not target:IsA("BasePart") then
+            return nil
+        end
+
         return target
     end
 
@@ -522,7 +635,7 @@ function createInfoText(config)
     end
 
     local function updateOrder()
-        local explicit     = {}
+        local explicit = {}
         local withoutOrder = {}
 
         for _, data in pairs(lineData) do
@@ -534,7 +647,10 @@ function createInfoText(config)
         end
 
         table.sort(explicit, function(a, b)
-            if a.order == b.order then return a.created < b.created end
+            if a.order == b.order then
+                return a.created < b.created
+            end
+
             return a.order < b.order
         end)
 
@@ -546,42 +662,74 @@ function createInfoText(config)
 
         for _, data in ipairs(explicit) do
             local order = math.max(1, math.floor(data.order))
-            while used[order] do order = order + 1 end
+
+            while used[order] do
+                order = order + 1
+            end
+
             used[order] = true
             labels[data.id].LayoutOrder = order
         end
 
         local current = 1
+
         for _, data in ipairs(withoutOrder) do
-            while used[current] do current = current + 1 end
+            while used[current] do
+                current = current + 1
+            end
+
             used[current] = true
             labels[data.id].LayoutOrder = current
             current = current + 1
         end
     end
 
-    local function updateSize()
-        if not billboard then return end
+    -- FIX: плавное изменение размера билборда
+    local function updateSize(animate)
+        if not billboard then
+            return
+        end
 
         local count = 0
-        for _ in pairs(labels) do count = count + 1 end
+        for _ in pairs(labels) do
+            count = count + 1
+        end
 
         local height = math.max(
             20,
             count * textSize + math.max(0, count - 1) * 2
         )
 
-        billboard.Size = UDim2.new(
+        local targetSize = UDim2.new(
             size.X.Scale,
             size.X.Offset,
             0,
             height
         )
+
+        if activeSizeTween then
+            activeSizeTween:Cancel()
+            activeSizeTween = nil
+        end
+
+        if animate then
+            activeSizeTween = TweenService:Create(
+                billboard,
+                sizeTweenInfo,
+                { Size = targetSize }
+            )
+            activeSizeTween:Play()
+        else
+            billboard.Size = targetSize
+        end
     end
 
     local function createBillboard()
         local adornee = resolveAdornee(center)
-        if not adornee then return false end
+
+        if not adornee then
+            return false
+        end
 
         currentAdornee = adornee
 
@@ -608,15 +756,17 @@ function createInfoText(config)
         return true
     end
 
-    local setLine  -- forward declaration
+    local setLine
 
     local function flushPending()
-        if #pendingOrder == 0 then return end
+        if #pendingOrder == 0 then
+            return
+        end
 
         local savedOrder = pendingOrder
-        local savedData  = pendingData
+        local savedData = pendingData
         pendingOrder = {}
-        pendingData  = {}
+        pendingData = {}
 
         for _, id in ipairs(savedOrder) do
             local data = savedData[id]
@@ -627,11 +777,12 @@ function createInfoText(config)
     end
 
     setLine = function(data)
-        if not data or not data.id then return end
+        if not data or not data.id then
+            return
+        end
 
         if not billboard or not billboard.Parent then
             if not createBillboard() then
-                -- Откладываем — отрисуем, когда появится валидный adornee
                 if not pendingData[data.id] then
                     table.insert(pendingOrder, data.id)
                 end
@@ -639,7 +790,6 @@ function createInfoText(config)
                 return
             end
 
-            -- Только что создали билборд — проливаем то, что накопилось
             flushPending()
         end
 
@@ -653,10 +803,9 @@ function createInfoText(config)
             label.Name = id
             label.Size = UDim2.new(1, 0, 0, textSize)
             label.BackgroundTransparency = 1
-            label.Font = Enum.Font.SourceSans
+            label.Font = Enum.Font.GothamMedium          -- было SourceSans
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Center
-            label.TextYAlignment = Enum.TextYAlignment.Center
             label.Parent = container
 
             labels[id] = label
@@ -674,13 +823,23 @@ function createInfoText(config)
 
         local saved = lineData[id]
 
-        if data.text         ~= nil then saved.text = data.text end
-        if data.color        ~= nil then saved.color = data.color end
-        if data.outlineColor ~= nil then saved.outlineColor = data.outlineColor end
-        if data.outlineSize  ~= nil then
+        if data.text ~= nil then
+            saved.text = data.text
+        end
+
+        if data.color ~= nil then
+            saved.color = data.color
+        end
+
+        if data.outlineColor ~= nil then
+            saved.outlineColor = data.outlineColor
+        end
+
+        if data.outlineSize ~= nil then
             saved.outlineSize = data.outlineSize == false and nil or data.outlineSize
         end
-        if data.order        ~= nil then
+
+        if data.order ~= nil then
             saved.order = data.order == false and nil or data.order
         end
 
@@ -691,14 +850,16 @@ function createInfoText(config)
     end
 
     local function setText(lines)
-        if not lines then return end
+        if not lines then
+            return
+        end
 
         for _, data in ipairs(lines) do
             setLine(data)
         end
 
         updateOrder()
-        updateSize()
+        updateSize(true)          -- плавное изменение размера билборда
     end
 
     for _, data in ipairs(config.Lines or {}) do
@@ -707,7 +868,7 @@ function createInfoText(config)
 
     if billboard then
         updateOrder()
-        updateSize()
+        updateSize(false)         -- без анимации при первичном создании
     end
 
     local api = {}
@@ -720,18 +881,20 @@ function createInfoText(config)
         pendingData[id] = nil
 
         local label = labels[id]
+
         if label then
             label:Destroy()
             labels[id] = nil
             lineData[id] = nil
 
             updateOrder()
-            updateSize()
+            updateSize(true)      -- плавное сжатие
         end
     end
 
     function api:Visible(state)
         isActive = state
+
         if billboard then
             billboard.Enabled = state
         end
@@ -739,7 +902,10 @@ function createInfoText(config)
 
     function api:SetCenter(newCenter)
         local adornee = resolveAdornee(newCenter)
-        if not adornee then return end
+
+        if not adornee then
+            return
+        end
 
         center = newCenter
         currentAdornee = adornee
@@ -752,27 +918,40 @@ function createInfoText(config)
             createBillboard()
             flushPending()
             updateOrder()
-            updateSize()
+            updateSize(false)
         end
     end
 
     function api:SetOffset(newOffset)
-        if not newOffset then return end
+        if not newOffset then
+            return
+        end
+
         offset = newOffset
+
         if billboard then
             billboard.StudsOffset = newOffset
         end
     end
 
     function api:SetSize(newSize)
-        if not newSize then return end
+        if not newSize then
+            return
+        end
+
         size = newSize
+
         if billboard then
-            updateSize()
+            updateSize(true)      -- плавно
         end
     end
 
     function api:Remove()
+        if activeSizeTween then
+            activeSizeTween:Cancel()
+            activeSizeTween = nil
+        end
+
         if billboard then
             billboard:Destroy()
             billboard = nil
@@ -788,27 +967,27 @@ function createInfoText(config)
     return api
 end
 
-function createRadar(config)
+local function createRadar(config)
     config = config or {}
 
-    local Players          = game:GetService("Players")
-    local RunService       = game:GetService("RunService")
-    local CoreGui          = game:GetService("CoreGui")
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local CoreGui = game:GetService("CoreGui")
     local UserInputService = game:GetService("UserInputService")
 
-    local Name     = config.Name or "CustomRadar"
-    local Title    = config.Title or "Radar"
+    local Name = config.Name or "CustomRadar"
+    local Title = config.Title or "Radar"
     local Position = config.Position or UDim2.new(0.03, 0, 0.3, 0)
 
-    local Size  = math.max(tonumber(config.Size)  or 100, 0.01)
+    local Size = math.max(tonumber(config.Size) or 100, 0.01)
     local Scale = tonumber(config.Scale) or 1
     local Range = math.max(tonumber(config.Range) or 100, 0)
 
-    local Center       = config.Center or Players.LocalPlayer
+    local Center = config.Center or Players.LocalPlayer
     local CenterOffset = config.CenterOffset or Vector3.zero
 
     local BackgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
-    local BorderColor     = config.BorderColor or Color3.fromRGB(80, 80, 90)
+    local BorderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
 
     local enabled = true
     local targets = {}
@@ -857,22 +1036,29 @@ function createRadar(config)
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = frame
 
-    local dragging, dragInput, dragStart, startPos
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
 
     local function update(input)
         local delta = input.Position - dragStart
+
         frame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
         )
     end
 
     title.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging  = true
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = true
             dragStart = input.Position
-            startPos  = frame.Position
+            startPos = frame.Position
 
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
@@ -884,7 +1070,8 @@ function createRadar(config)
 
     title.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
+            or input.UserInputType == Enum.UserInputType.Touch then
+
             dragInput = input
         end
     end)
@@ -898,7 +1085,12 @@ function createRadar(config)
     local radar = Instance.new("Frame")
     radar.Name = "Radar"
     radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
-    radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 42)
+    radar.Position = UDim2.new(
+        0.5,
+        -RADAR_SIZE / 2,
+        0,
+        42
+    )
     radar.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
     radar.BorderSizePixel = 0
     radar.ClipsDescendants = true
@@ -958,13 +1150,16 @@ function createRadar(config)
     local targetObjects = {}
 
     local function getRoot(target)
-        if not target then return nil end
+        if not target then
+            return nil
+        end
 
         if target:IsA("Player") then
-            return target.Character and (
-                target.Character:FindFirstChild("HumanoidRootPart")
-                or target.Character.PrimaryPart
-            )
+            return target.Character
+                and (
+                    target.Character:FindFirstChild("HumanoidRootPart")
+                    or target.Character.PrimaryPart
+                )
         end
 
         if target:IsA("Model") then
@@ -973,13 +1168,17 @@ function createRadar(config)
                 or target:FindFirstChildWhichIsA("BasePart")
         end
 
-        if target:IsA("BasePart") then return target end
+        if target:IsA("BasePart") then
+            return target
+        end
 
         return nil
     end
 
     local function ensureText(old)
-        if old.text then return old.text end
+        if old.text then
+            return old.text
+        end
 
         old.text = Instance.new("TextLabel")
         old.text.Name = "Text"
@@ -1001,7 +1200,10 @@ function createRadar(config)
         point.AnchorPoint = Vector2.new(0.5, 0.5)
         point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
         point.BorderSizePixel = 0
-        point.Size = UDim2.fromOffset(data.size or 8, data.size or 8)
+        point.Size = UDim2.fromOffset(
+            data.size or 8,
+            data.size or 8
+        )
         point.Parent = radar
 
         local corner = Instance.new("UICorner")
@@ -1024,7 +1226,9 @@ function createRadar(config)
     end
 
     local function setTarget(data)
-        if not data or not data.id then return end
+        if not data or not data.id then
+            return
+        end
 
         local old = targetObjects[data.id]
 
@@ -1040,20 +1244,27 @@ function createRadar(config)
             saved[key] = value
         end
 
-        old.point.BackgroundColor3 = saved.color or Color3.new(1, 1, 1)
-        old.point.Size = UDim2.fromOffset(saved.size or 8, saved.size or 8)
+        old.point.BackgroundColor3 =
+            saved.color or Color3.new(1, 1, 1)
 
-        -- Обновляем подпись, если её вообще задали
+        local pointSize = saved.size or 8
+
+        old.point.Size = UDim2.fromOffset(
+            pointSize,
+            pointSize
+        )
+
         if saved.text ~= nil then
             local tl = ensureText(old)
             tl.Text = tostring(saved.text)
             tl.TextColor3 = saved.color or Color3.new(1, 1, 1)
         end
 
-        -- прячем весь объект, если visible = false
         if saved.visible == false then
             old.point.Visible = false
         end
+
+        targets[data.id] = saved
     end
 
     if config.Targets then
@@ -1064,28 +1275,37 @@ function createRadar(config)
 
     local function getCenterPosition()
         local root = getRoot(Center)
-        if root then return root.Position + CenterOffset end
 
-        if typeof(Center) == "Vector3" then return Center + CenterOffset end
-        if typeof(Center) == "CFrame"  then return Center.Position + CenterOffset end
+        if root then
+            return root.Position + CenterOffset
+        end
+
+        if typeof(Center) == "Vector3" then
+            return Center + CenterOffset
+        end
+
+        if typeof(Center) == "CFrame" then
+            return Center.Position + CenterOffset
+        end
 
         return nil
     end
 
     local function updateTarget(id, object)
-        local data          = object.data
-        local targetRoot    = getRoot(data.target)
+        local data = object.data
+        local targetRoot = getRoot(data.target)
         local centerPosition = getCenterPosition()
 
         if not targetRoot
-        or not centerPosition
-        or data.visible == false then
+            or not centerPosition
+            or data.visible == false then
+
             object.point.Visible = false
             if object.text then object.text.Visible = false end
             return
         end
 
-        local offset   = targetRoot.Position - centerPosition
+        local offset = targetRoot.Position - centerPosition
         local distance = offset.Magnitude
 
         if distance > Range then
@@ -1098,23 +1318,35 @@ function createRadar(config)
         if object.text then object.text.Visible = true end
 
         if distance < 0.01 then
-            object.point.Position = UDim2.new(0.5, 0, 0.5, 0)
+            object.point.Position = UDim2.new(
+                0.5,
+                0,
+                0.5,
+                0
+            )
             return
         end
 
         local camera = workspace.CurrentCamera
-        if not camera then return end
+
+        if not camera then
+            return
+        end
 
         local forward = Vector3.new(
-            camera.CFrame.LookVector.X, 0,
+            camera.CFrame.LookVector.X,
+            0,
             camera.CFrame.LookVector.Z
         )
+
         local right = Vector3.new(
-            camera.CFrame.RightVector.X, 0,
+            camera.CFrame.RightVector.X,
+            0,
             camera.CFrame.RightVector.Z
         )
 
-        if forward.Magnitude < 0.001 or right.Magnitude < 0.001 then
+        if forward.Magnitude < 0.001
+            or right.Magnitude < 0.001 then
             return
         end
 
@@ -1125,11 +1357,16 @@ function createRadar(config)
         local y = offset:Dot(forward)
 
         local normalizedDistance = distance / Size
-        if normalizedDistance > 1 then normalizedDistance = 1 end
+
+        if normalizedDistance > 1 then
+            normalizedDistance = 1
+        end
 
         local direction = Vector2.new(x, y)
+
         if direction.Magnitude > 0 then
-            direction = direction.Unit * normalizedDistance
+            direction =
+                direction.Unit * normalizedDistance
         end
 
         object.point.Position = UDim2.new(
@@ -1146,7 +1383,10 @@ function createRadar(config)
         renderName,
         Enum.RenderPriority.Camera.Value + 1,
         function()
-            if not enabled then return end
+            if not enabled then
+                return
+            end
+
             for id, object in pairs(targetObjects) do
                 updateTarget(id, object)
             end
@@ -1155,11 +1395,19 @@ function createRadar(config)
 
     local api = {}
 
-    function api:Set(listOrId, target, text, color, pointSize, visible)
+    function api:Set(
+        listOrId,
+        target,
+        text,
+        color,
+        pointSize,
+        visible
+    )
         if type(listOrId) == "table" then
             for _, data in ipairs(listOrId) do
                 setTarget(data)
             end
+
             return
         end
 
@@ -1186,16 +1434,24 @@ function createRadar(config)
     end
 
     function api:SetRange(value)
-        Range = math.max(tonumber(value) or Range, 0)
+        Range = math.max(
+            tonumber(value) or Range,
+            0
+        )
     end
 
     function api:SetSize(value)
-        Size = math.max(tonumber(value) or Size, 0.01)
+        Size = math.max(
+            tonumber(value) or Size,
+            0.01
+        )
     end
 
     function api:RemoveTarget(id)
         targets[id] = nil
+
         local object = targetObjects[id]
+
         if object then
             object.point:Destroy()
             targetObjects[id] = nil
