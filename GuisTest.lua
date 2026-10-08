@@ -575,15 +575,17 @@ function createInfoText(config)
     local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize = config.outlineSize
 
-    -- ShowWindow: рисует фон/обводку под текстом
+    -- ShowWindow: рисует фон под текстом
     local showWindow = config.ShowWindow == true
-    local windowColor = config.WindowColor or Color3.fromRGB(15, 15, 20)
-    local windowTransparency = config.WindowTransparency or 0.25
-    local windowBorderColor = config.WindowBorderColor or Color3.fromRGB(255, 255, 255)
-    local windowBorderThickness = config.WindowBorderThickness or 1
-    local windowBorderTransparency = config.WindowBorderTransparency or 0.3
-    local windowPadding = config.WindowPadding or 6
-    local windowCorner = config.WindowCorner or 6
+
+    -- Стиль окна — захардкожен так же, как в createInfoGui
+    local windowBackground          = Color3.fromRGB(30, 30, 35)
+    local windowBorderColor         = Color3.fromRGB(65, 65, 75)
+    local windowBorderThickness     = 1
+    local windowBorderTransparency  = 0.15
+    local windowBackgroundTransparency = 0.15
+    local windowPadding             = 8
+    local windowCorner              = 8
 
     local sizeTweenInfo = TweenInfo.new(
         config.TweenTime or 0.22,
@@ -688,7 +690,6 @@ function createInfoText(config)
         end
     end
 
-    -- Перекладывает Container внутрь окна (паддинги) и включает/выключает фон
     local function applyWindowLayout()
         if not container then
             return
@@ -770,13 +771,13 @@ function createInfoText(config)
         billboard.Enabled = isActive
         billboard.Parent = adornee
 
-        -- Фон/обводка окна
+        -- Фон/обводка окна (тот же стиль, что и у createInfoGui)
         windowFrame = Instance.new("Frame")
         windowFrame.Name = "Window"
         windowFrame.Size = UDim2.new(1, 0, 1, 0)
         windowFrame.Position = UDim2.new(0, 0, 0, 0)
-        windowFrame.BackgroundColor3 = windowColor
-        windowFrame.BackgroundTransparency = windowTransparency
+        windowFrame.BackgroundColor3 = windowBackground
+        windowFrame.BackgroundTransparency = windowBackgroundTransparency
         windowFrame.BorderSizePixel = 0
         windowFrame.Visible = showWindow
         windowFrame.ZIndex = 0
@@ -793,7 +794,6 @@ function createInfoText(config)
         ws.Transparency = windowBorderTransparency
         ws.Parent = windowFrame
 
-        -- Container с текстом (поверх окна)
         container = Instance.new("Frame")
         container.Name = "Container"
         container.Size = UDim2.new(1, 0, 1, 0)
@@ -1017,7 +1017,6 @@ function createInfoText(config)
         end
     end
 
-    -- FIX: новое — динамическое включение/выключение фонового окна
     function api:ShowWindow(state)
         showWindow = state == true
 
@@ -1075,7 +1074,7 @@ local function createRadar(config)
     local BackgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
     local BorderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
 
-    local EDGE_TEXT_HIDE_THRESHOLD = tonumber(config.TextHideThreshold) or 0.9
+    local EDGE_TEXT_HIDE_THRESHOLD = tonumber(config.TextHideThreshold) or 0.95
 
     local enabled = true
     local targets = {}
