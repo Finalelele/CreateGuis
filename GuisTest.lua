@@ -30,7 +30,6 @@ function createInfoGui(config)
         Enum.EasingDirection.Out
     )
 
-    -- отдельный tween для fade-in новых строк
     local lineFadeInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
     local screen = CoreGui:FindFirstChild(guiName)
@@ -119,7 +118,7 @@ function createInfoGui(config)
     titleLabel.Text = title
     titleLabel.TextColor3 = Color3.fromRGB(245, 245, 248)
     titleLabel.Font = Enum.Font.GothamSemibold
-    titleLabel.TextSize = textSize + 2          -- было textSize + 1
+    titleLabel.TextSize = textSize + 2
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
     titleLabel.ZIndex = 3
@@ -145,7 +144,6 @@ function createInfoGui(config)
     toggleCorner.CornerRadius = UDim.new(0, 6)
     toggleCorner.Parent = toggle
 
-    -- FIX: контейнер занимает область под хедером и не обрезает контент
     local container = Instance.new("Frame")
     container.Name = "Container"
     container.Position = UDim2.new(0, 0, 0, headerHeight)
@@ -220,9 +218,7 @@ function createInfoGui(config)
             activeTween = TweenService:Create(
                 frame,
                 tweenInfo,
-                {
-                    Size = UDim2.new(0, width, 0, targetHeight)
-                }
+                { Size = UDim2.new(0, width, 0, targetHeight) }
             )
 
             activeTween:Play()
@@ -266,7 +262,6 @@ function createInfoGui(config)
             if a.order == b.order then
                 return a.created < b.created
             end
-
             return a.order < b.order
         end)
 
@@ -316,7 +311,7 @@ function createInfoGui(config)
             label.Name = id
             label.Size = UDim2.new(1, 0, 0, textSize)
             label.BackgroundTransparency = 1
-            label.Font = Enum.Font.GothamMedium          -- было SourceSans
+            label.Font = Enum.Font.GothamMedium
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.TextYAlignment = Enum.TextYAlignment.Center
@@ -368,7 +363,6 @@ function createInfoGui(config)
 
         applyOutline(label, saved)
 
-        -- плавное появление новой строки
         if isNew and not collapsed then
             local stroke = label:FindFirstChild("Outline")
 
@@ -576,7 +570,8 @@ function createInfoText(config)
     local center = config.Center
     local offset = config.Offset or Vector3.new(0, 3, 0)
     local textSize = config.TextSize or 20
-    local size = config.Size or UDim2.new(0, 300, 0, 50)
+    -- FIX: Y=0 означает "авто-высота", Y>0 — фиксированная высота
+    local size = config.Size or UDim2.new(0, 300, 0, 0)
     local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize = config.outlineSize
 
@@ -595,7 +590,6 @@ function createInfoText(config)
     local isActive = true
     local activeSizeTween
 
-    -- Строки, которые не удалось отрисовать (нет валидного adornee) — ждут в очереди
     local pendingOrder = {}
     local pendingData = {}
 
@@ -650,7 +644,6 @@ function createInfoText(config)
             if a.order == b.order then
                 return a.created < b.created
             end
-
             return a.order < b.order
         end)
 
@@ -684,7 +677,8 @@ function createInfoText(config)
         end
     end
 
-    -- FIX: плавное изменение размера билборда
+    -- FIX: теперь size.Y.Offset используется как фиксированная высота,
+    -- если он > 0. Иначе высота считается автоматически.
     local function updateSize(animate)
         if not billboard then
             return
@@ -695,16 +689,23 @@ function createInfoText(config)
             count = count + 1
         end
 
-        local height = math.max(
+        local autoHeight = math.max(
             20,
             count * textSize + math.max(0, count - 1) * 2
         )
+
+        local targetHeight
+        if size.Y.Offset and size.Y.Offset > 0 then
+            targetHeight = size.Y.Offset
+        else
+            targetHeight = autoHeight
+        end
 
         local targetSize = UDim2.new(
             size.X.Scale,
             size.X.Offset,
             0,
-            height
+            targetHeight
         )
 
         if activeSizeTween then
@@ -803,7 +804,7 @@ function createInfoText(config)
             label.Name = id
             label.Size = UDim2.new(1, 0, 0, textSize)
             label.BackgroundTransparency = 1
-            label.Font = Enum.Font.GothamMedium          -- было SourceSans
+            label.Font = Enum.Font.GothamMedium
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Center
             label.Parent = container
@@ -859,7 +860,7 @@ function createInfoText(config)
         end
 
         updateOrder()
-        updateSize(true)          -- плавное изменение размера билборда
+        updateSize(true)
     end
 
     for _, data in ipairs(config.Lines or {}) do
@@ -868,7 +869,7 @@ function createInfoText(config)
 
     if billboard then
         updateOrder()
-        updateSize(false)         -- без анимации при первичном создании
+        updateSize(false)
     end
 
     local api = {}
@@ -888,7 +889,7 @@ function createInfoText(config)
             lineData[id] = nil
 
             updateOrder()
-            updateSize(true)      -- плавное сжатие
+            updateSize(true)
         end
     end
 
@@ -942,7 +943,7 @@ function createInfoText(config)
         size = newSize
 
         if billboard then
-            updateSize(true)      -- плавно
+            updateSize(true)
         end
     end
 
@@ -988,6 +989,10 @@ local function createRadar(config)
 
     local BackgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
     local BorderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
+
+    -- Порог, после которого подпись точки скрывается (0..1):
+    -- 0.9 = подпись видна пока точка не прижалась к краю круга
+    local EDGE_TEXT_HIDE_THRESHOLD = tonumber(config.TextHideThreshold) or 0.9
 
     local enabled = true
     local targets = {}
@@ -1315,15 +1320,12 @@ local function createRadar(config)
         end
 
         object.point.Visible = true
-        if object.text then object.text.Visible = true end
 
         if distance < 0.01 then
-            object.point.Position = UDim2.new(
-                0.5,
-                0,
-                0.5,
-                0
-            )
+            object.point.Position = UDim2.new(0.5, 0, 0.5, 0)
+
+            -- в самом центре текст точно видим (точка не на краю)
+            if object.text then object.text.Visible = true end
             return
         end
 
@@ -1375,6 +1377,16 @@ local function createRadar(config)
             0.5 - direction.Y * 0.5,
             0
         )
+
+        -- FIX: скрываем текст, когда точка прижалась к краю круга.
+        -- Не важно, в каком углу — сверху, снизу, сбоку или по диагонали.
+        if object.text then
+            if normalizedDistance >= EDGE_TEXT_HIDE_THRESHOLD then
+                object.text.Visible = false
+            else
+                object.text.Visible = true
+            end
+        end
     end
 
     local renderName = Name .. "_RadarUpdate"
