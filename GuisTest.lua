@@ -569,11 +569,21 @@ function createInfoText(config)
     local name = config.Name or "GhostRoomESP"
     local center = config.Center
     local offset = config.Offset or Vector3.new(0, 3, 0)
-    local textSize = config.TextSize or 20
-    -- FIX: Y=0 означает "авто-высота", Y>0 — фиксированная высота
+    local baseTextSize = config.TextSize or 20
+    local textSize = baseTextSize
     local size = config.Size or UDim2.new(0, 300, 0, 0)
     local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize = config.outlineSize
+
+    -- ShowWindow: рисует фон/обводку под текстом
+    local showWindow = config.ShowWindow == true
+    local windowColor = config.WindowColor or Color3.fromRGB(15, 15, 20)
+    local windowTransparency = config.WindowTransparency or 0.25
+    local windowBorderColor = config.WindowBorderColor or Color3.fromRGB(255, 255, 255)
+    local windowBorderThickness = config.WindowBorderThickness or 1
+    local windowBorderTransparency = config.WindowBorderTransparency or 0.3
+    local windowPadding = config.WindowPadding or 6
+    local windowCorner = config.WindowCorner or 6
 
     local sizeTweenInfo = TweenInfo.new(
         config.TweenTime or 0.22,
@@ -583,6 +593,7 @@ function createInfoText(config)
 
     local billboard
     local container
+    local windowFrame
     local labels = {}
     local lineData = {}
     local creationCounter = 0
@@ -677,8 +688,22 @@ function createInfoText(config)
         end
     end
 
-    -- FIX: теперь size.Y.Offset используется как фиксированная высота,
-    -- если он > 0. Иначе высота считается автоматически.
+    -- Перекладывает Container внутрь окна (паддинги) и включает/выключает фон
+    local function applyWindowLayout()
+        if not container then
+            return
+        end
+
+        local p = showWindow and windowPadding or 0
+
+        container.Position = UDim2.new(0, p, 0, p)
+        container.Size = UDim2.new(1, -p * 2, 1, -p * 2)
+
+        if windowFrame then
+            windowFrame.Visible = showWindow
+        end
+    end
+
     local function updateSize(animate)
         if not billboard then
             return
@@ -689,9 +714,11 @@ function createInfoText(config)
             count = count + 1
         end
 
+        local extra = showWindow and (windowPadding * 2) or 0
+
         local autoHeight = math.max(
-            20,
-            count * textSize + math.max(0, count - 1) * 2
+            textSize + extra,
+            count * textSize + math.max(0, count - 1) * 2 + extra
         )
 
         local targetHeight
@@ -743,16 +770,43 @@ function createInfoText(config)
         billboard.Enabled = isActive
         billboard.Parent = adornee
 
+        -- Фон/обводка окна
+        windowFrame = Instance.new("Frame")
+        windowFrame.Name = "Window"
+        windowFrame.Size = UDim2.new(1, 0, 1, 0)
+        windowFrame.Position = UDim2.new(0, 0, 0, 0)
+        windowFrame.BackgroundColor3 = windowColor
+        windowFrame.BackgroundTransparency = windowTransparency
+        windowFrame.BorderSizePixel = 0
+        windowFrame.Visible = showWindow
+        windowFrame.ZIndex = 0
+        windowFrame.Parent = billboard
+
+        local wc = Instance.new("UICorner")
+        wc.CornerRadius = UDim.new(0, windowCorner)
+        wc.Parent = windowFrame
+
+        local ws = Instance.new("UIStroke")
+        ws.Name = "Border"
+        ws.Color = windowBorderColor
+        ws.Thickness = windowBorderThickness
+        ws.Transparency = windowBorderTransparency
+        ws.Parent = windowFrame
+
+        -- Container с текстом (поверх окна)
         container = Instance.new("Frame")
         container.Name = "Container"
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
+        container.ZIndex = 1
         container.Parent = billboard
 
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
         layout.Parent = container
+
+        applyWindowLayout()
 
         return true
     end
@@ -807,6 +861,7 @@ function createInfoText(config)
             label.Font = Enum.Font.GothamMedium
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Center
+            label.TextYAlignment = Enum.TextYAlignment.Center
             label.Parent = container
 
             labels[id] = label
@@ -935,16 +990,45 @@ function createInfoText(config)
         end
     end
 
+    -- SetSize:
+    --   число  -> множитель текста (1 = дефолт)
+    --   UDim2  -> размер окна билборда
     function api:SetSize(newSize)
-        if not newSize then
+        if newSize == nil then
             return
         end
 
-        size = newSize
+        if type(newSize) == "number" then
+            local scale = math.max(newSize, 0.1)
+            textSize = baseTextSize * scale
+
+            for _, label in pairs(labels) do
+                label.TextSize = textSize
+                label.Size = UDim2.new(1, 0, 0, textSize)
+            end
+
+            updateSize(true)
+        elseif typeof(newSize) == "UDim2" then
+            size = newSize
+
+            if billboard then
+                updateSize(true)
+            end
+        end
+    end
+
+    -- FIX: новое — динамическое включение/выключение фонового окна
+    function api:ShowWindow(state)
+        showWindow = state == true
 
         if billboard then
+            applyWindowLayout()
             updateSize(true)
         end
+    end
+
+    function api:IsWindowShown()
+        return showWindow
     end
 
     function api:Remove()
@@ -957,6 +1041,7 @@ function createInfoText(config)
             billboard:Destroy()
             billboard = nil
             container = nil
+            windowFrame = nil
         end
 
         labels = {}
@@ -990,8 +1075,6 @@ local function createRadar(config)
     local BackgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
     local BorderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
 
-    -- Порог, после которого подпись точки скрывается (0..1):
-    -- 0.9 = подпись видна пока точка не прижалась к краю круга
     local EDGE_TEXT_HIDE_THRESHOLD = tonumber(config.TextHideThreshold) or 0.9
 
     local enabled = true
@@ -1194,6 +1277,7 @@ local function createRadar(config)
         old.text.Font = Enum.Font.Gotham
         old.text.TextSize = 13
         old.text.TextXAlignment = Enum.TextXAlignment.Center
+        old.text.ZIndex = 11                       -- поверх точки и обводки круга
         old.text.Parent = old.point
 
         return old.text
@@ -1205,6 +1289,7 @@ local function createRadar(config)
         point.AnchorPoint = Vector2.new(0.5, 0.5)
         point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
         point.BorderSizePixel = 0
+        point.ZIndex = 10                          -- поверх обводки круга
         point.Size = UDim2.fromOffset(
             data.size or 8,
             data.size or 8
@@ -1324,7 +1409,6 @@ local function createRadar(config)
         if distance < 0.01 then
             object.point.Position = UDim2.new(0.5, 0, 0.5, 0)
 
-            -- в самом центре текст точно видим (точка не на краю)
             if object.text then object.text.Visible = true end
             return
         end
@@ -1378,14 +1462,8 @@ local function createRadar(config)
             0
         )
 
-        -- FIX: скрываем текст, когда точка прижалась к краю круга.
-        -- Не важно, в каком углу — сверху, снизу, сбоку или по диагонали.
         if object.text then
-            if normalizedDistance >= EDGE_TEXT_HIDE_THRESHOLD then
-                object.text.Visible = false
-            else
-                object.text.Visible = true
-            end
+            object.text.Visible = normalizedDistance < EDGE_TEXT_HIDE_THRESHOLD
         end
     end
 
