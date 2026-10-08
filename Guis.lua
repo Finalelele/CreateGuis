@@ -1,36 +1,17 @@
 function createInfoGui(config)
     config = config or {}
 
-    local TweenService = game:GetService("TweenService")
-    local UserInputService = game:GetService("UserInputService")
-    local CoreGui = game:GetService("CoreGui")
-
     local guiName = config.Name or "CustomWindow"
     local title = config.Title or "Window"
     local width = config.Width or 200
     local scale = config.Scale or 1
     local position = config.Position or UDim2.new(0.05, 0, 0.15, 0)
     local textSize = config.TextSize or 14
-
     local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize = config.outlineSize
 
-    local headerHeight = 32
-    local bottomPadding = 7
-    local linePadding = 2
-
-    local expandedBackground = Color3.fromRGB(30, 30, 35)
-    local headerBackground = Color3.fromRGB(35, 35, 42)
-    local borderColor = Color3.fromRGB(65, 65, 75)
-    local accentColor = config.AccentColor or Color3.fromRGB(90, 145, 255)
-
-    local tweenInfo = TweenInfo.new(
-        config.TweenTime or 0.22,
-        Enum.EasingStyle.Quint,
-        Enum.EasingDirection.Out
-    )
-
-    local screen = CoreGui:FindFirstChild(guiName)
+    local coreGui = game:GetService("CoreGui")
+    local screen = coreGui:FindFirstChild(guiName)
 
     if screen then
         screen:Destroy()
@@ -40,195 +21,58 @@ function createInfoGui(config)
     screen.Name = guiName
     screen.ResetOnSpawn = false
     screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screen.Parent = CoreGui
+    screen.Parent = coreGui
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, width, 0, headerHeight)
+    frame.Size = UDim2.new(0, width, 0, 0)
     frame.Position = position
-    frame.BackgroundColor3 = expandedBackground
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     frame.BorderSizePixel = 0
     frame.Active = true
-    frame.ClipsDescendants = true
+    frame.Draggable = true
+    frame.AutomaticSize = Enum.AutomaticSize.Y
     frame.Parent = screen
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = frame
 
-    local frameStroke = Instance.new("UIStroke")
-    frameStroke.Name = "Border"
-    frameStroke.Color = borderColor
-    frameStroke.Thickness = 1
-    frameStroke.Transparency = 0.15
-    frameStroke.Parent = frame
-
     local uiScale = Instance.new("UIScale")
     uiScale.Scale = scale
     uiScale.Parent = frame
 
-    local shadow = Instance.new("Frame")
-    shadow.Name = "Shadow"
-    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-    shadow.Position = UDim2.new(0.5, 0, 0.5, 2)
-    shadow.Size = UDim2.new(1, 6, 1, 6)
-    shadow.BackgroundColor3 = Color3.new(0, 0, 0)
-    shadow.BackgroundTransparency = 0.65
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = -1
-    shadow.Parent = frame
-
-    local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, 9)
-    shadowCorner.Parent = shadow
-
-    local header = Instance.new("Frame")
-    header.Name = "Header"
-    header.Size = UDim2.new(1, 0, 0, headerHeight)
-    header.BackgroundColor3 = headerBackground
-    header.BorderSizePixel = 0
-    header.Active = true
-    header.ZIndex = 2
-    header.Parent = frame
-
-    local headerCorner = Instance.new("UICorner")
-    headerCorner.CornerRadius = UDim.new(0, 8)
-    headerCorner.Parent = header
-
-    local accent = Instance.new("Frame")
-    accent.Name = "Accent"
-    accent.Position = UDim2.new(0, 7, 0.5, -7)
-    accent.Size = UDim2.fromOffset(3, 14)
-    accent.BackgroundColor3 = accentColor
-    accent.BorderSizePixel = 0
-    accent.ZIndex = 3
-    accent.Parent = header
-
-    local accentCorner = Instance.new("UICorner")
-    accentCorner.CornerRadius = UDim.new(1, 0)
-    accentCorner.Parent = accent
-
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Name = "Title"
-    titleLabel.Position = UDim2.new(0, 17, 0, 0)
-    titleLabel.Size = UDim2.new(1, -51, 1, 0)
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
-    titleLabel.TextColor3 = Color3.fromRGB(245, 245, 248)
-    titleLabel.Font = Enum.Font.GothamSemibold
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.Font = Enum.Font.SourceSansBold
     titleLabel.TextSize = textSize + 1
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.TextYAlignment = Enum.TextYAlignment.Center
-    titleLabel.ZIndex = 3
-    titleLabel.Parent = header
+    titleLabel.Parent = frame
 
-    local toggle = Instance.new("TextButton")
-    toggle.Name = "Toggle"
-    toggle.AnchorPoint = Vector2.new(1, 0.5)
-    toggle.Position = UDim2.new(1, -7, 0.5, 0)
-    toggle.Size = UDim2.fromOffset(24, 24)
-    toggle.BackgroundColor3 = Color3.fromRGB(48, 48, 58)
-    toggle.BackgroundTransparency = 0.15
-    toggle.BorderSizePixel = 0
-    toggle.AutoButtonColor = false
-    toggle.Text = "⌃"
-    toggle.TextColor3 = Color3.fromRGB(210, 210, 220)
-    toggle.Font = Enum.Font.GothamBold
-    toggle.TextSize = 15
-    toggle.ZIndex = 4
-    toggle.Parent = header
-
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 6)
-    toggleCorner.Parent = toggle
+    local titlePadding = Instance.new("UIPadding")
+    titlePadding.PaddingLeft = UDim.new(0, 8)
+    titlePadding.Parent = titleLabel
 
     local container = Instance.new("Frame")
     container.Name = "Container"
-    container.Position = UDim2.new(0, 0, 0, headerHeight)
+    container.Position = UDim2.new(0, 0, 0, 30)
     container.Size = UDim2.new(1, 0, 0, 0)
     container.BackgroundTransparency = 1
-    container.ClipsDescendants = true
+    container.AutomaticSize = Enum.AutomaticSize.Y
     container.Parent = frame
 
     local layout = Instance.new("UIListLayout")
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, linePadding)
+    layout.Padding = UDim.new(0, 2)
     layout.Parent = container
 
     local labels = {}
     local lineData = {}
     local creationCounter = 0
-
-    local collapsed = config.Collapsed == true
-    local activeTween
-    local contentHeight = 0
-
-    local function getContentHeight()
-        local count = 0
-
-        for _ in pairs(labels) do
-            count = count + 1
-        end
-
-        if count <= 0 then
-            return 0
-        end
-
-        return count * textSize + math.max(0, count - 1) * linePadding
-    end
-
-    local function getExpandedHeight()
-        return headerHeight + contentHeight + bottomPadding
-    end
-
-    local function setContentTransparency(transparency, instant)
-        for _, label in pairs(labels) do
-            if instant then
-                label.TextTransparency = transparency
-            else
-                TweenService:Create(label, tweenInfo, {
-                    TextTransparency = transparency
-                }):Play()
-            end
-
-            local stroke = label:FindFirstChild("Outline")
-
-            if stroke then
-                if instant then
-                    stroke.Transparency = transparency
-                else
-                    TweenService:Create(stroke, tweenInfo, {
-                        Transparency = transparency
-                    }):Play()
-                end
-            end
-        end
-    end
-
-    local function updateFrameSize(animate)
-        contentHeight = getContentHeight()
-
-        local targetHeight = collapsed and headerHeight or getExpandedHeight()
-
-        if activeTween then
-            activeTween:Cancel()
-            activeTween = nil
-        end
-
-        if animate then
-            activeTween = TweenService:Create(
-                frame,
-                tweenInfo,
-                {
-                    Size = UDim2.new(0, width, 0, targetHeight)
-                }
-            )
-
-            activeTween:Play()
-        else
-            frame.Size = UDim2.new(0, width, 0, targetHeight)
-        end
-    end
 
     local function applyOutline(label, data)
         local stroke = label:FindFirstChild("Outline")
@@ -243,7 +87,7 @@ function createInfoGui(config)
 
             stroke.Color = data.outlineColor or defaultOutlineColor
             stroke.Thickness = data.outlineSize
-            stroke.Transparency = collapsed and 1 or 0
+            stroke.Transparency = 0
         elseif stroke then
             stroke:Destroy()
         end
@@ -317,8 +161,6 @@ function createInfoGui(config)
             label.Font = Enum.Font.SourceSans
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Left
-            label.TextYAlignment = Enum.TextYAlignment.Center
-            label.TextTransparency = collapsed and 1 or 0
             label.Parent = container
 
             local padding = Instance.new("UIPadding")
@@ -377,27 +219,6 @@ function createInfoGui(config)
         end
 
         updateOrder()
-        updateFrameSize(true)
-
-        if not collapsed then
-            setContentTransparency(0, false)
-        end
-    end
-
-    local function setCollapsed(state, animate)
-        collapsed = state == true
-
-        toggle.Text = collapsed and "⌄" or "⌃"
-
-        if collapsed then
-            setContentTransparency(1, not animate)
-        end
-
-        updateFrameSize(animate)
-
-        if not collapsed then
-            setContentTransparency(0, not animate)
-        end
     end
 
     for _, data in ipairs(config.Lines or {}) do
@@ -405,81 +226,6 @@ function createInfoGui(config)
     end
 
     updateOrder()
-    contentHeight = getContentHeight()
-
-    if collapsed then
-        setContentTransparency(1, true)
-    end
-
-    updateFrameSize(false)
-
-    local dragging = false
-    local dragInput
-    local dragStart
-    local startPos
-
-    local function updateDrag(input)
-        if not dragging or not dragStart or not startPos then
-            return
-        end
-
-        local delta = input.Position - dragStart
-
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-
-    header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-
-    header.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput then
-            updateDrag(input)
-        end
-    end)
-
-    toggle.MouseEnter:Connect(function()
-        TweenService:Create(toggle, TweenInfo.new(0.12), {
-            BackgroundColor3 = accentColor,
-            TextColor3 = Color3.new(1, 1, 1)
-        }):Play()
-    end)
-
-    toggle.MouseLeave:Connect(function()
-        TweenService:Create(toggle, TweenInfo.new(0.12), {
-            BackgroundColor3 = Color3.fromRGB(48, 48, 58),
-            TextColor3 = Color3.fromRGB(210, 210, 220)
-        }):Play()
-    end)
-
-    toggle.MouseButton1Click:Connect(function()
-        setCollapsed(not collapsed, true)
-    end)
 
     local api = {}
 
@@ -494,9 +240,7 @@ function createInfoGui(config)
             label:Destroy()
             labels[id] = nil
             lineData[id] = nil
-
             updateOrder()
-            updateFrameSize(true)
         end
     end
 
@@ -514,32 +258,9 @@ function createInfoGui(config)
         end
     end
 
-    function api:SetTitle(newTitle)
-        title = tostring(newTitle)
-        titleLabel.Text = title
-    end
-
-    function api:Collapse(state)
-        setCollapsed(state, true)
-    end
-
-    function api:Toggle()
-        setCollapsed(not collapsed, true)
-    end
-
-    function api:IsCollapsed()
-        return collapsed
-    end
-
     function api:Remove()
-        if activeTween then
-            activeTween:Cancel()
-            activeTween = nil
-        end
-
         if screen then
             screen:Destroy()
-            screen = nil
         end
     end
 
@@ -891,6 +612,10 @@ local function createRadar(config)
     local Title = config.Title or "Radar"
     local Position = config.Position or UDim2.new(0.03, 0, 0.3, 0)
 
+    local Size = config.Size or 100
+    local Scale = config.Scale or 1
+    -- ИЗМЕНЕНИЕ: убрано деление на 2, Range используется как есть
+    local Range = config.Range or 100
     -- Size = zoom радара:
     -- сколько studs от центра до края
     local Size = math.max(tonumber(config.Size) or 100, 0.01)
@@ -912,6 +637,8 @@ local function createRadar(config)
 
     local WINDOW_SIZE = 220
     local WINDOW_HEIGHT = 260
+    local RADAR_SIZE = 200
+    local BORDER_SIZE = 3
 
     -- Круг немного меньше главного окна
     local RADAR_SIZE = 190
@@ -960,12 +687,14 @@ local function createRadar(config)
 
     -- Перетаскивание за заголовок
     local dragging = false
+    local dragInput, dragStart, startPos
     local dragInput
     local dragStart
     local startPos
 
     local function update(input)
         local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 
         frame.Position = UDim2.new(
             startPos.X.Scale,
@@ -976,6 +705,7 @@ local function createRadar(config)
     end
 
     title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
 
@@ -992,6 +722,7 @@ local function createRadar(config)
     end)
 
     title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         if input.UserInputType == Enum.UserInputType.MouseMovement
             or input.UserInputType == Enum.UserInputType.Touch then
 
@@ -1008,6 +739,7 @@ local function createRadar(config)
     local radar = Instance.new("Frame")
     radar.Name = "Radar"
     radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
+    radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 40)
     radar.Position = UDim2.new(
         0.5,
         -RADAR_SIZE / 2,
@@ -1104,6 +836,7 @@ local function createRadar(config)
         point.AnchorPoint = Vector2.new(0.5, 0.5)
         point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
         point.BorderSizePixel = 0
+        point.Size = UDim2.fromOffset(data.size or 8, data.size or 8)
         point.Size = UDim2.fromOffset(
             data.size or 8,
             data.size or 8
@@ -1157,10 +890,12 @@ local function createRadar(config)
             saved[key] = value
         end
 
+        old.point.BackgroundColor3 = saved.color or Color3.new(1, 1, 1)
         old.point.BackgroundColor3 =
             saved.color or Color3.new(1, 1, 1)
 
         local pointSize = saved.size or 8
+        old.point.Size = UDim2.fromOffset(pointSize, pointSize)
 
         old.point.Size = UDim2.fromOffset(
             pointSize,
@@ -1182,6 +917,7 @@ local function createRadar(config)
             end
 
             old.text.Text = tostring(saved.text)
+            old.text.TextColor3 = saved.color or Color3.new(1, 1, 1)
             old.text.TextColor3 =
                 saved.color or Color3.new(1, 1, 1)
         end
@@ -1218,6 +954,7 @@ local function createRadar(config)
         local targetRoot = getRoot(data.target)
         local centerPosition = getCenterPosition()
 
+        if not targetRoot or not centerPosition or data.visible == false then
         if not targetRoot
             or not centerPosition
             or data.visible == false then
@@ -1229,6 +966,7 @@ local function createRadar(config)
         local offset = targetRoot.Position - centerPosition
         local distance = offset.Magnitude
 
+        -- ИЗМЕНЕНИЕ: Range теперь используется напрямую
         -- Range отвечает ТОЛЬКО за дальность существования точки.
         -- Он НЕ влияет на её положение внутри радара.
         if distance > Range then
@@ -1239,6 +977,7 @@ local function createRadar(config)
         object.point.Visible = true
 
         if distance < 0.01 then
+            object.point.Position = UDim2.new(0.5, 0, 0.5, 0)
             object.point.Position = UDim2.new(
                 0.5,
                 0,
@@ -1266,6 +1005,7 @@ local function createRadar(config)
             camera.CFrame.RightVector.Z
         )
 
+        if forward.Magnitude < 0.001 or right.Magnitude < 0.001 then
         if forward.Magnitude < 0.001
             or right.Magnitude < 0.001 then
             return
@@ -1277,6 +1017,9 @@ local function createRadar(config)
         local x = offset:Dot(right)
         local y = offset:Dot(forward)
 
+        -- ИЗМЕНЕНИЕ: normalizedDistance теперь делится на Range, а не на Size
+        -- Это нужно чтобы точка на краю Range оказывалась ровно на краю круга
+        local normalizedDistance = distance / Range
         -- Size отвечает ТОЛЬКО за zoom.
         --
         -- Size = 100:
@@ -1286,6 +1029,10 @@ local function createRadar(config)
         -- пока не превышен Range.
         local normalizedDistance = distance / Size
 
+        local maxDistance = 1
+
+        if normalizedDistance > maxDistance then
+            normalizedDistance = maxDistance
         if normalizedDistance > 1 then
             normalizedDistance = 1
         end
@@ -1293,6 +1040,7 @@ local function createRadar(config)
         local direction = Vector2.new(x, y)
 
         if direction.Magnitude > 0 then
+            direction = direction.Unit * normalizedDistance
             direction =
                 direction.Unit * normalizedDistance
         end
@@ -1323,6 +1071,7 @@ local function createRadar(config)
 
     local api = {}
 
+    function api:Set(listOrId, target, text, color, pointSize, visible)
     function api:Set(
         listOrId,
         target,
@@ -1362,6 +1111,8 @@ local function createRadar(config)
     end
 
     function api:SetRange(value)
+        -- ИЗМЕНЕНИЕ: убрано деление на 2
+        Range = tonumber(value) or Range
         Range = math.max(
             tonumber(value) or Range,
             0
@@ -1369,6 +1120,7 @@ local function createRadar(config)
     end
 
     function api:SetSize(value)
+        Size = math.max(tonumber(value) or Size, 0.01)
         Size = math.max(
             tonumber(value) or Size,
             0.01
