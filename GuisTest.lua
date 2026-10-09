@@ -62,7 +62,7 @@ function createInfoGui(config)
 
     -- ========= Константы =========
     local headerHeight  = 32
-    local bottomPadding = 3      -- ↓ уменьшено с 7
+    local bottomPadding = 3
     local linePadding   = 2
 
     local tweenTime     = pick(config, "TweenTime", "tweenTime") or 0.22
@@ -101,6 +101,7 @@ function createInfoGui(config)
     frameStroke.Transparency = borderTransparency
     frameStroke.Parent = frame
 
+    -- UIScale — ВАЖНО: задаём ДО updateFrameSize
     local uiScale = Instance.new("UIScale")
     uiScale.Scale = scale
     uiScale.Parent = frame
@@ -214,26 +215,32 @@ function createInfoGui(config)
 
     local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
 
-    -- ======== Точный подсчёт высоты контента ========
-    -- Приоритет: AbsoluteCanvasSize (движок сам считает под AutomaticCanvasSize),
-    -- fallback — layout.AbsoluteContentSize.
-    local function getContentHeight()
-        local h = scrolling.AbsoluteCanvasSize.Y
-        if not h or h <= 0 then
-            h = layout.AbsoluteContentSize.Y
-        end
-        return h
+    -- ======== Scale-aware helpers ========
+    -- Все Absolute*-значения движка идут в физических пикселях (уже с учётом UIScale).
+    -- frame.Size задаётся в логических юнитах, которые UIScale потом умножает.
+    -- Поэтому переводим абсолютные значения обратно в логические делением на scale.
+
+    local function getScale()
+        local s = uiScale.Scale
+        return (s and s > 0) and s or 1
     end
 
-    -- ======== AutoSize helpers ========
-    local function getEffectiveMaxHeight()
+    local function getContentHeightLogical()
+        -- layout.AbsoluteContentSize — размер всех детей + паддинги, БЕЗ пустого места viewport.
+        -- (AbsoluteCanvasSize для пустого ScrollingFrame возвращает размер самого viewport,
+        --  что и вызывало экспоненциальный рост при UIScale.)
+        return layout.AbsoluteContentSize.Y / getScale()
+    end
+
+    local function getEffectiveMaxHeightLogical()
         if autoSizeWindowEdge then
             local screenH = screen.AbsoluteSize.Y
             local yPos    = frame.AbsolutePosition.Y
-            local bottomMargin = 12
-            return math.max(headerHeight + 40, screenH - yPos - bottomMargin)
+            local bottomMargin = 12          -- физические пиксели
+            local available = screenH - yPos - bottomMargin
+            return math.max(headerHeight + 40, available / getScale())
         else
-            return autoSizeMaxSize
+            return autoSizeMaxSize           -- логические юниты (то, что задал пользователь)
         end
     end
 
@@ -244,11 +251,11 @@ function createInfoGui(config)
         if collapsed then
             targetHeight = headerHeight
         else
-            local contentH = getContentHeight()
+            local contentH = getContentHeightLogical()
             local desired  = headerHeight + contentH + bottomPadding
 
             if autoSizeEnabled then
-                local maxH = getEffectiveMaxHeight()
+                local maxH = getEffectiveMaxHeightLogical()
                 targetHeight = math.min(desired, maxH)
             else
                 targetHeight = fixedHeight
@@ -257,7 +264,7 @@ function createInfoGui(config)
 
         -- Полоса прокрутки
         if not collapsed then
-            local contentH   = getContentHeight()
+            local contentH   = getContentHeightLogical()
             local availableH = targetHeight - headerHeight
             if contentH > availableH + 1 then
                 scrolling.ScrollBarThickness = 4
@@ -423,8 +430,7 @@ function createInfoGui(config)
             end
         end
 
-        -- 🔧 Отложенный пересчёт: ловим финальный размер TextLabel
-        -- после того, как AutomaticSize пересчитает высоту
+        -- Отложенный пересчёт: AutomaticSize пересчитывает высоту в конце кадра
         task.defer(function()
             if not collapsed then
                 updateFrameSize(true)
@@ -456,7 +462,6 @@ function createInfoGui(config)
     if collapsed then setContentTransparency(1, true) end
     updateFrameSize(false)
 
-    -- Отложенный пересчёт после стартового наполнения
     task.defer(function()
         if not collapsed then
             updateFrameSize(false)
@@ -547,10 +552,24 @@ function createInfoGui(config)
         labels, lineData = {}, {}
         updateOrder()
         updateFrameSize(true)
+        -- Отложенный пересчёт на случай, если layout ещё не успел сжаться
+        task.defer(function()
+            if not collapsed then updateFrameSize(true) end
+        end)
     end
 
     function api:Visible(state) screen.Enabled = state end
-    function api:SetScale(value) uiScale.Scale = value or 1 end
+
+    -- ✅ ИСПРАВЛЕНО: SetScale теперь пересчитывает размер окна
+    function api:SetScale(value)
+        uiScale.Scale = value or 1
+        updateFrameSize(true)
+        -- Дополнительный пересчёт после того, как layout отработает scale
+        task.defer(function()
+            if not collapsed then updateFrameSize(true) end
+        end)
+    end
+
     function api:SetPosition(value) if value then frame.Position = value end end
     function api:SetTitle(newTitle)
         title = tostring(newTitle)
