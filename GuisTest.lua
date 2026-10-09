@@ -549,6 +549,114 @@ function createInfoGui(config)
         if screen then screen:Destroy() screen = nil end
     end
 
+        -- ======== Runtime setters (без пересоздания) ========
+    function api:SetAutoSize(cfg)
+        if type(cfg) ~= "table" then return end
+        local e = pick(cfg, "Enabled", "enabled")
+        if e ~= nil then autoSizeEnabled = e == true end
+        local m = pick(cfg, "MaxSize", "maxSize")
+        if m ~= nil then autoSizeMaxSize = tonumber(m) or autoSizeMaxSize end
+        local w = pick(cfg, "WindowEdge", "windowEdge")
+        if w ~= nil then autoSizeWindowEdge = w == true end
+        updateFrameSize(true)
+    end
+
+    function api:SetAutoSizeEnabled(v)
+        autoSizeEnabled = v == true
+        updateFrameSize(true)
+    end
+
+    function api:SetMaxSize(v)
+        autoSizeMaxSize = tonumber(v) or autoSizeMaxSize
+        updateFrameSize(true)
+    end
+
+    function api:SetWindowEdge(v)
+        autoSizeWindowEdge = v == true
+        updateFrameSize(true)
+    end
+
+    -- ======== Runtime setters (без пересоздания) ========
+    function api:SetAutoSize(cfg)
+        if type(cfg) ~= "table" then return end
+        local e = pick(cfg, "Enabled", "enabled")
+        if e ~= nil then autoSizeEnabled = e == true end
+        local m = pick(cfg, "MaxSize", "maxSize")
+        if m ~= nil then autoSizeMaxSize = tonumber(m) or autoSizeMaxSize end
+        local w = pick(cfg, "WindowEdge", "windowEdge")
+        if w ~= nil then autoSizeWindowEdge = w == true end
+        updateFrameSize(true)
+    end
+
+    function api:SetAutoSizeEnabled(v)
+        autoSizeEnabled = v == true
+        updateFrameSize(true)
+    end
+
+    function api:SetMaxSize(v)
+        autoSizeMaxSize = tonumber(v) or autoSizeMaxSize
+        updateFrameSize(true)
+    end
+
+    function api:SetWindowEdge(v)
+        autoSizeWindowEdge = v == true
+        updateFrameSize(true)
+    end
+
+    function api:SetCustomWindow(tbl)
+        if type(tbl) ~= "table" then return end
+        local v
+
+        v = pick(tbl, "WindowColor", "windowColor")
+        if v ~= nil then windowColor = v; frame.BackgroundColor3 = v end
+        v = pick(tbl, "WindowTransparency", "windowTransparency")
+        if v ~= nil then windowTransparency = v; frame.BackgroundTransparency = v end
+
+        v = pick(tbl, "HeaderColor", "headerColor")
+        if v ~= nil then headerColor = v; header.BackgroundColor3 = v end
+        v = pick(tbl, "HeaderTransparency", "headerTransparency")
+        if v ~= nil then headerTransparency = v; header.BackgroundTransparency = v end
+
+        v = pick(tbl, "BorderColor", "borderColor")
+        if v ~= nil then borderColor = v; frameStroke.Color = v end
+        v = pick(tbl, "BorderThickness", "borderThickness")
+        if v ~= nil then borderThickness = v; frameStroke.Thickness = v end
+        v = pick(tbl, "BorderTransparency", "borderTransparency")
+        if v ~= nil then borderTransparency = v; frameStroke.Transparency = v end
+
+        v = pick(tbl, "CornerRadius", "cornerRadius")
+        if v ~= nil then
+            cornerRadius = v
+            corner.CornerRadius = UDim.new(0, v)
+            headerCorner.CornerRadius = UDim.new(0, v)
+            shadowCorner.CornerRadius = UDim.new(0, v + 1)
+        end
+
+        v = pick(tbl, "AccentColor", "accentColor")
+        if v ~= nil then accentColor = v; accent.BackgroundColor3 = v end
+
+        v = pick(tbl, "TitleColor", "titleColor")
+        if v ~= nil then titleColor = v; titleLabel.TextColor3 = v end
+
+        v = pick(tbl, "ShadowColor", "shadowColor")
+        if v ~= nil then shadowColor = v; shadow.BackgroundColor3 = v end
+        v = pick(tbl, "ShadowTransparency", "shadowTransparency")
+        if v ~= nil then shadowTransparency = v; shadow.BackgroundTransparency = v end
+
+        v = pick(tbl, "ToggleColor", "toggleColor")
+        if v ~= nil then toggleColor = v; toggle.BackgroundColor3 = v end
+        v = pick(tbl, "ToggleTextColor", "toggleTextColor")
+        if v ~= nil then toggleTextColor = v; toggle.TextColor3 = v end
+
+        v = pick(tbl, "ScrollbarColor", "scrollbarColor")
+        if v ~= nil then scrollbarColor = v; scrolling.ScrollBarImageColor3 = v end
+
+        -- LineTextColor — обновляет дефолт для будущих строк
+        -- (уже нарисованные не трогаем, чтобы не сбивать индивидуальные цвета)
+        v = pick(tbl, "LineTextColor", "lineTextColor")
+        if v ~= nil then lineTextColor = v end
+    end
+
     return api
 end
 
