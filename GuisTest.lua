@@ -4,39 +4,77 @@ function createInfoGui(config)
     local TweenService = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local CoreGui = game:GetService("CoreGui")
+    local TextService = game:GetService("TextService")
 
-    local guiName = config.Name or "CustomWindow"
-    local title = config.Title or "Window"
-    local width = config.Width or 200
-    local scale = config.Scale or 1
-    local position = config.Position or UDim2.new(0.05, 0, 0.15, 0)
-    local textSize = config.TextSize or 14
-
-    local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
-    local defaultOutlineSize = config.outlineSize
-
-    local headerHeight = 32
-    local bottomPadding = 7
-    local linePadding = 2
-
-    local expandedBackground = Color3.fromRGB(30, 30, 35)
-    local headerBackground = Color3.fromRGB(35, 35, 42)
-    local borderColor = Color3.fromRGB(65, 65, 75)
-    local accentColor = config.AccentColor or Color3.fromRGB(90, 145, 255)
-
-    local tweenInfo = TweenInfo.new(
-        config.TweenTime or 0.22,
-        Enum.EasingStyle.Quint,
-        Enum.EasingDirection.Out
-    )
-
-    local lineFadeInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-    local screen = CoreGui:FindFirstChild(guiName)
-
-    if screen then
-        screen:Destroy()
+    -- Регистронезависимый "getter"
+    local function pick(tbl, ...)
+        if type(tbl) ~= "table" then return nil end
+        for _, key in ipairs({...}) do
+            if tbl[key] ~= nil then
+                return tbl[key]
+            end
+        end
+        return nil
     end
+
+    -- ========= CustomWindow =========
+    local cw = pick(config, "CustomWindow", "customWindow") or {}
+
+    local windowColor          = pick(cw, "WindowColor", "windowColor")             or Color3.fromRGB(30, 30, 35)
+    local windowTransparency   = pick(cw, "WindowTransparency", "windowTransparency")
+    if windowTransparency == nil then windowTransparency = 0 end
+    local headerColor          = pick(cw, "HeaderColor", "headerColor")             or Color3.fromRGB(35, 35, 42)
+    local headerTransparency   = pick(cw, "HeaderTransparency", "headerTransparency")
+    if headerTransparency == nil then headerTransparency = 0 end
+    local borderColor          = pick(cw, "BorderColor", "borderColor")             or Color3.fromRGB(65, 65, 75)
+    local borderThickness      = pick(cw, "BorderThickness", "borderThickness") or 1
+    local borderTransparency   = pick(cw, "BorderTransparency", "borderTransparency")
+    if borderTransparency == nil then borderTransparency = 0.15 end
+    local cornerRadius         = pick(cw, "CornerRadius", "cornerRadius") or 8
+    local accentColor          = pick(cw, "AccentColor", "accentColor")             or Color3.fromRGB(90, 145, 255)
+    local titleColor           = pick(cw, "TitleColor", "titleColor")               or Color3.fromRGB(245, 245, 248)
+    local shadowColor          = pick(cw, "ShadowColor", "shadowColor")             or Color3.new(0, 0, 0)
+    local shadowTransparency   = pick(cw, "ShadowTransparency", "shadowTransparency")
+    if shadowTransparency == nil then shadowTransparency = 0.65 end
+    local toggleColor          = pick(cw, "ToggleColor", "toggleColor")             or Color3.fromRGB(48, 48, 58)
+    local toggleTextColor      = pick(cw, "ToggleTextColor", "toggleTextColor")     or Color3.fromRGB(210, 210, 220)
+    local scrollbarColor       = pick(cw, "ScrollbarColor", "scrollbarColor")       or accentColor
+    local lineTextColor        = pick(cw, "LineTextColor", "lineTextColor")         or Color3.fromRGB(255, 255, 255)
+
+    -- ========= Основные настройки окна =========
+    local guiName   = pick(config, "Name", "name") or "CustomWindow"
+    local title     = pick(config, "Title", "title") or "Window"
+    local width     = pick(config, "Width", "width") or 200
+    local scale     = pick(config, "Scale", "scale") or 1
+    local position  = pick(config, "Position", "position") or UDim2.new(0.05, 0, 0.15, 0)
+    local textSize  = pick(config, "TextSize", "textSize") or 14
+    local font      = pick(config, "Font", "font") or Enum.Font.GothamMedium
+    local titleFont = pick(config, "TitleFont", "titleFont") or Enum.Font.GothamSemibold
+
+    local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
+    local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
+
+    -- ========= AutoSize =========
+    local autoSizeCfg       = pick(config, "AutoSize", "autoSize") or {}
+    local autoSizeEnabled   = pick(autoSizeCfg, "Enabled", "enabled")
+    if autoSizeEnabled == nil then autoSizeEnabled = true end
+    local autoSizeMaxSize   = pick(autoSizeCfg, "MaxSize", "maxSize") or 500
+
+    -- Фиксированная высота, когда AutoSize выключен
+    local fixedHeight = pick(config, "Height", "height") or 250
+
+    -- ========= Константы =========
+    local headerHeight  = 32
+    local bottomPadding = 7
+    local linePadding   = 2
+
+    local tweenTime     = pick(config, "TweenTime", "tweenTime") or 0.22
+    local tweenInfo     = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local lineFadeInfo  = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+    -- ========= Создание GUI =========
+    local screen = CoreGui:FindFirstChild(guiName)
+    if screen then screen:Destroy() end
 
     screen = Instance.new("ScreenGui")
     screen.Name = guiName
@@ -48,21 +86,22 @@ function createInfoGui(config)
     frame.Name = "MainFrame"
     frame.Size = UDim2.new(0, width, 0, headerHeight)
     frame.Position = position
-    frame.BackgroundColor3 = expandedBackground
+    frame.BackgroundColor3 = windowColor
+    frame.BackgroundTransparency = windowTransparency
     frame.BorderSizePixel = 0
     frame.Active = true
     frame.ClipsDescendants = true
     frame.Parent = screen
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
+    corner.CornerRadius = UDim.new(0, cornerRadius)
     corner.Parent = frame
 
     local frameStroke = Instance.new("UIStroke")
     frameStroke.Name = "Border"
     frameStroke.Color = borderColor
-    frameStroke.Thickness = 1
-    frameStroke.Transparency = 0.15
+    frameStroke.Thickness = borderThickness
+    frameStroke.Transparency = borderTransparency
     frameStroke.Parent = frame
 
     local uiScale = Instance.new("UIScale")
@@ -74,27 +113,28 @@ function createInfoGui(config)
     shadow.AnchorPoint = Vector2.new(0.5, 0.5)
     shadow.Position = UDim2.new(0.5, 0, 0.5, 2)
     shadow.Size = UDim2.new(1, 6, 1, 6)
-    shadow.BackgroundColor3 = Color3.new(0, 0, 0)
-    shadow.BackgroundTransparency = 0.65
+    shadow.BackgroundColor3 = shadowColor
+    shadow.BackgroundTransparency = shadowTransparency
     shadow.BorderSizePixel = 0
     shadow.ZIndex = -1
     shadow.Parent = frame
 
     local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, 9)
+    shadowCorner.CornerRadius = UDim.new(0, cornerRadius + 1)
     shadowCorner.Parent = shadow
 
     local header = Instance.new("Frame")
     header.Name = "Header"
     header.Size = UDim2.new(1, 0, 0, headerHeight)
-    header.BackgroundColor3 = headerBackground
+    header.BackgroundColor3 = headerColor
+    header.BackgroundTransparency = headerTransparency
     header.BorderSizePixel = 0
     header.Active = true
     header.ZIndex = 2
     header.Parent = frame
 
     local headerCorner = Instance.new("UICorner")
-    headerCorner.CornerRadius = UDim.new(0, 8)
+    headerCorner.CornerRadius = UDim.new(0, cornerRadius)
     headerCorner.Parent = header
 
     local accent = Instance.new("Frame")
@@ -116,8 +156,8 @@ function createInfoGui(config)
     titleLabel.Size = UDim2.new(1, -51, 1, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
-    titleLabel.TextColor3 = Color3.fromRGB(245, 245, 248)
-    titleLabel.Font = Enum.Font.GothamSemibold
+    titleLabel.TextColor3 = titleColor
+    titleLabel.Font = titleFont
     titleLabel.TextSize = textSize + 2
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
@@ -129,12 +169,12 @@ function createInfoGui(config)
     toggle.AnchorPoint = Vector2.new(1, 0.5)
     toggle.Position = UDim2.new(1, -7, 0.5, 0)
     toggle.Size = UDim2.fromOffset(24, 24)
-    toggle.BackgroundColor3 = Color3.fromRGB(48, 48, 58)
+    toggle.BackgroundColor3 = toggleColor
     toggle.BackgroundTransparency = 0.15
     toggle.BorderSizePixel = 0
     toggle.AutoButtonColor = false
     toggle.Text = "⌃"
-    toggle.TextColor3 = Color3.fromRGB(210, 210, 220)
+    toggle.TextColor3 = toggleTextColor
     toggle.Font = Enum.Font.GothamBold
     toggle.TextSize = 15
     toggle.ZIndex = 4
@@ -144,68 +184,66 @@ function createInfoGui(config)
     toggleCorner.CornerRadius = UDim.new(0, 6)
     toggleCorner.Parent = toggle
 
-    local container = Instance.new("Frame")
-    container.Name = "Container"
-    container.Position = UDim2.new(0, 0, 0, headerHeight)
-    container.Size = UDim2.new(1, 0, 1, -headerHeight)
-    container.BackgroundTransparency = 1
-    container.ClipsDescendants = false
-    container.Parent = frame
+    -- ======== Скроллящийся контейнер ========
+    local scrolling = Instance.new("ScrollingFrame")
+    scrolling.Name = "Container"
+    scrolling.Position = UDim2.new(0, 0, 0, headerHeight)
+    scrolling.Size = UDim2.new(1, 0, 1, -headerHeight)
+    scrolling.BackgroundTransparency = 1
+    scrolling.BorderSizePixel = 0
+    scrolling.ScrollBarThickness = 0
+    scrolling.ScrollBarImageColor3 = scrollbarColor
+    scrolling.ScrollBarImageTransparency = 0.3
+    scrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
+    scrolling.ElasticBehavior = Enum.ElasticBehavior.Never
+    scrolling.Parent = frame
+
+    if Enum.AutomaticSize then
+        scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    end
 
     local layout = Instance.new("UIListLayout")
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Padding = UDim.new(0, linePadding)
-    layout.Parent = container
+    layout.Parent = scrolling
 
     local labels = {}
     local lineData = {}
     local creationCounter = 0
 
-    local collapsed = config.Collapsed == true
+    local collapsed = pick(config, "Collapsed", "collapsed") == true
     local activeTween
-    local contentHeight = 0
 
-    -- Исправлено: теперь высота берется из UIListLayout, что позволяет учитывать перенос строк
-    local function getContentHeight()
-        local layout = container:FindFirstChildOfClass("UIListLayout")
-        if not layout then
-            return 0
-        end
-        return layout.AbsoluteContentSize.Y
-    end
-
-    local function getExpandedHeight()
-        return headerHeight + contentHeight + bottomPadding
-    end
-
-    local function setContentTransparency(transparency, instant)
-        for _, label in pairs(labels) do
-            if instant then
-                label.TextTransparency = transparency
-            else
-                TweenService:Create(label, tweenInfo, {
-                    TextTransparency = transparency
-                }):Play()
-            end
-
-            local stroke = label:FindFirstChild("Outline")
-
-            if stroke then
-                if instant then
-                    stroke.Transparency = transparency
-                else
-                    TweenService:Create(stroke, tweenInfo, {
-                        Transparency = transparency
-                    }):Play()
-                end
-            end
-        end
-    end
-
+    -- ======== Обновление размера ========
     local function updateFrameSize(animate)
-        contentHeight = getContentHeight()
+        local targetHeight
 
-        local targetHeight = collapsed and headerHeight or getExpandedHeight()
+        if collapsed then
+            targetHeight = headerHeight
+        else
+            local contentH = layout.AbsoluteContentSize.Y + bottomPadding
+            local desired  = headerHeight + contentH
+
+            if autoSizeEnabled then
+                targetHeight = math.min(desired, autoSizeMaxSize)
+            else
+                targetHeight = fixedHeight
+            end
+        end
+
+        -- Полоса прокрутки
+        if not collapsed then
+            local contentH   = layout.AbsoluteContentSize.Y + bottomPadding
+            local availableH = targetHeight - headerHeight
+            if contentH > availableH + 1 then
+                scrolling.ScrollBarThickness = 4
+            else
+                scrolling.ScrollBarThickness = 0
+            end
+        else
+            scrolling.ScrollBarThickness = 0
+        end
 
         if activeTween then
             activeTween:Cancel()
@@ -218,23 +256,40 @@ function createInfoGui(config)
                 tweenInfo,
                 { Size = UDim2.new(0, width, 0, targetHeight) }
             )
-
             activeTween:Play()
         else
             frame.Size = UDim2.new(0, width, 0, targetHeight)
         end
     end
 
-    -- Автоматическое обновление размера окна при изменении высоты контента (из-за переноса строк)
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         if not collapsed then
             updateFrameSize(true)
         end
     end)
 
+    -- ======== Вспомогательные ========
+    local function setContentTransparency(transparency, instant)
+        for _, label in pairs(labels) do
+            if instant then
+                label.TextTransparency = transparency
+            else
+                TweenService:Create(label, tweenInfo, { TextTransparency = transparency }):Play()
+            end
+
+            local stroke = label:FindFirstChild("Outline")
+            if stroke then
+                if instant then
+                    stroke.Transparency = transparency
+                else
+                    TweenService:Create(stroke, tweenInfo, { Transparency = transparency }):Play()
+                end
+            end
+        end
+    end
+
     local function applyOutline(label, data)
         local stroke = label:FindFirstChild("Outline")
-
         if data.outlineSize then
             if not stroke then
                 stroke = Instance.new("UIStroke")
@@ -242,7 +297,6 @@ function createInfoGui(config)
                 stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
                 stroke.Parent = label
             end
-
             stroke.Color = data.outlineColor or defaultOutlineColor
             stroke.Thickness = data.outlineSize
             stroke.Transparency = collapsed and 1 or 0
@@ -252,48 +306,29 @@ function createInfoGui(config)
     end
 
     local function updateOrder()
-        local explicit = {}
-        local withoutOrder = {}
-
+        local explicit, withoutOrder = {}, {}
         for _, data in pairs(lineData) do
-            if data.order ~= nil then
-                table.insert(explicit, data)
-            else
-                table.insert(withoutOrder, data)
-            end
+            if data.order ~= nil then table.insert(explicit, data)
+            else table.insert(withoutOrder, data) end
         end
 
         table.sort(explicit, function(a, b)
-            if a.order == b.order then
-                return a.created < b.created
-            end
+            if a.order == b.order then return a.created < b.created end
             return a.order < b.order
         end)
-
-        table.sort(withoutOrder, function(a, b)
-            return a.created < b.created
-        end)
+        table.sort(withoutOrder, function(a, b) return a.created < b.created end)
 
         local used = {}
-
         for _, data in ipairs(explicit) do
             local order = math.max(1, math.floor(data.order))
-
-            while used[order] do
-                order = order + 1
-            end
-
+            while used[order] do order = order + 1 end
             used[order] = true
             labels[data.id].LayoutOrder = order
         end
 
         local current = 1
-
         for _, data in ipairs(withoutOrder) do
-            while used[current] do
-                current = current + 1
-            end
-
+            while used[current] do current = current + 1 end
             used[current] = true
             labels[data.id].LayoutOrder = current
             current = current + 1
@@ -301,9 +336,7 @@ function createInfoGui(config)
     end
 
     local function setLine(data)
-        if not data or not data.id then
-            return
-        end
+        if not data or not data.id then return end
 
         local id = data.id
         local label = labels[id]
@@ -314,142 +347,89 @@ function createInfoGui(config)
 
             label = Instance.new("TextLabel")
             label.Name = id
-            -- Исправлено: высота теперь автоматическая (0), чтобы TextWrapped работал корректно
             label.Size = UDim2.new(1, 0, 0, 0)
             label.AutomaticSize = Enum.AutomaticSize.Y
             label.TextWrapped = true
             label.BackgroundTransparency = 1
-            label.Font = Enum.Font.GothamMedium
+            label.Font = font
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.TextYAlignment = Enum.TextYAlignment.Top
             label.TextTransparency = 1
-            label.Parent = container
+            label.Parent = scrolling
 
             local padding = Instance.new("UIPadding")
-            padding.PaddingLeft = UDim.new(0, 8)
-            padding.PaddingRight = UDim.new(0, 8)
-            padding.PaddingTop = UDim.new(0, 2)
+            padding.PaddingLeft   = UDim.new(0, 8)
+            padding.PaddingRight  = UDim.new(0, 8)
+            padding.PaddingTop    = UDim.new(0, 2)
             padding.PaddingBottom = UDim.new(0, 2)
             padding.Parent = label
 
             labels[id] = label
-
             lineData[id] = {
                 id = id,
                 text = "",
-                color = Color3.fromRGB(255, 255, 255),
+                color = lineTextColor,
                 outlineColor = defaultOutlineColor,
                 outlineSize = defaultOutlineSize,
                 order = nil,
-                created = creationCounter
+                created = creationCounter,
             }
         end
 
         local saved = lineData[id]
 
-        if data.text ~= nil then
-            saved.text = data.text
-        end
-
-        if data.color ~= nil then
-            saved.color = data.color
-        end
-
-        if data.outlineColor ~= nil then
-            saved.outlineColor = data.outlineColor
-        end
-
-        if data.outlineSize ~= nil then
-            saved.outlineSize = data.outlineSize == false and nil or data.outlineSize
-        end
-
-        if data.order ~= nil then
-            saved.order = data.order == false and nil or data.order
-        end
+        if data.text          ~= nil then saved.text          = data.text end
+        if data.color         ~= nil then saved.color         = data.color end
+        if data.outlineColor  ~= nil then saved.outlineColor  = data.outlineColor end
+        if data.outlineSize   ~= nil then saved.outlineSize   = data.outlineSize == false and nil or data.outlineSize end
+        if data.order         ~= nil then saved.order         = data.order == false and nil or data.order end
 
         label.Text = saved.text
         label.TextColor3 = saved.color
-
         applyOutline(label, saved)
 
         if isNew and not collapsed then
             local stroke = label:FindFirstChild("Outline")
+            if stroke then stroke.Transparency = 1 end
 
+            TweenService:Create(label, lineFadeInfo, { TextTransparency = 0 }):Play()
             if stroke then
-                stroke.Transparency = 1
-            end
-
-            TweenService:Create(label, lineFadeInfo, {
-                TextTransparency = 0
-            }):Play()
-
-            if stroke then
-                TweenService:Create(stroke, lineFadeInfo, {
-                    Transparency = 0
-                }):Play()
+                TweenService:Create(stroke, lineFadeInfo, { Transparency = 0 }):Play()
             end
         end
     end
 
     local function setText(lines)
-        if not lines then
-            return
-        end
-
-        for _, data in ipairs(lines) do
-            setLine(data)
-        end
-
+        if not lines then return end
+        for _, data in ipairs(lines) do setLine(data) end
         updateOrder()
         updateFrameSize(true)
-
-        if not collapsed then
-            setContentTransparency(0, false)
-        end
+        if not collapsed then setContentTransparency(0, false) end
     end
 
     local function setCollapsed(state, animate)
         collapsed = state == true
-
         toggle.Text = collapsed and "⌄" or "⌃"
-
-        if collapsed then
-            setContentTransparency(1, not animate)
-        end
-
+        if collapsed then setContentTransparency(1, not animate) end
         updateFrameSize(animate)
-
-        if not collapsed then
-            setContentTransparency(0, not animate)
-        end
+        if not collapsed then setContentTransparency(0, not animate) end
     end
 
-    for _, data in ipairs(config.Lines or {}) do
+    for _, data in ipairs(pick(config, "Lines", "lines") or {}) do
         setLine(data)
     end
 
     updateOrder()
-    contentHeight = getContentHeight()
-
-    if collapsed then
-        setContentTransparency(1, true)
-    end
-
+    if collapsed then setContentTransparency(1, true) end
     updateFrameSize(false)
 
-    local dragging = false
-    local dragInput
-    local dragStart
-    local startPos
+    -- ======== Drag ========
+    local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
 
     local function updateDrag(input)
-        if not dragging or not dragStart or not startPos then
-            return
-        end
-
+        if not dragging or not dragStart or not startPos then return end
         local delta = input.Position - dragStart
-
         frame.Position = UDim2.new(
             startPos.X.Scale,
             startPos.X.Offset + delta.X,
@@ -461,11 +441,9 @@ function createInfoGui(config)
     header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragging = true
+            dragging  = true
             dragStart = input.Position
-            startPos = frame.Position
-
+            startPos  = frame.Position
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -477,28 +455,25 @@ function createInfoGui(config)
     header.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement
             or input.UserInputType == Enum.UserInputType.Touch then
-
             dragInput = input
         end
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput then
-            updateDrag(input)
-        end
+        if input == dragInput then updateDrag(input) end
     end)
 
     toggle.MouseEnter:Connect(function()
         TweenService:Create(toggle, TweenInfo.new(0.12), {
             BackgroundColor3 = accentColor,
-            TextColor3 = Color3.new(1, 1, 1)
+            TextColor3 = Color3.new(1, 1, 1),
         }):Play()
     end)
 
     toggle.MouseLeave:Connect(function()
         TweenService:Create(toggle, TweenInfo.new(0.12), {
-            BackgroundColor3 = Color3.fromRGB(48, 48, 58),
-            TextColor3 = Color3.fromRGB(210, 210, 220)
+            BackgroundColor3 = toggleColor,
+            TextColor3 = toggleTextColor,
         }):Play()
     end)
 
@@ -506,66 +481,36 @@ function createInfoGui(config)
         setCollapsed(not collapsed, true)
     end)
 
+    -- ======== API ========
     local api = {}
 
-    function api:SetText(lines)
-        setText(lines)
-    end
+    function api:SetText(lines) setText(lines) end
 
     function api:RemoveLine(id)
         local label = labels[id]
-
         if label then
             label:Destroy()
             labels[id] = nil
             lineData[id] = nil
-
             updateOrder()
             updateFrameSize(true)
         end
     end
 
-    function api:Visible(state)
-        screen.Enabled = state
-    end
-
-    function api:SetScale(value)
-        uiScale.Scale = value or 1
-    end
-
-    function api:SetPosition(value)
-        if value then
-            frame.Position = value
-        end
-    end
-
+    function api:Visible(state) screen.Enabled = state end
+    function api:SetScale(value) uiScale.Scale = value or 1 end
+    function api:SetPosition(value) if value then frame.Position = value end end
     function api:SetTitle(newTitle)
         title = tostring(newTitle)
         titleLabel.Text = title
     end
-
-    function api:Collapse(state)
-        setCollapsed(state, true)
-    end
-
-    function api:Toggle()
-        setCollapsed(not collapsed, true)
-    end
-
-    function api:IsCollapsed()
-        return collapsed
-    end
+    function api:Collapse(state) setCollapsed(state, true) end
+    function api:Toggle() setCollapsed(not collapsed, true) end
+    function api:IsCollapsed() return collapsed end
 
     function api:Remove()
-        if activeTween then
-            activeTween:Cancel()
-            activeTween = nil
-        end
-
-        if screen then
-            screen:Destroy()
-            screen = nil
-        end
+        if activeTween then activeTween:Cancel() activeTween = nil end
+        if screen then screen:Destroy() screen = nil end
     end
 
     return api
@@ -576,66 +521,67 @@ function createInfoText(config)
 
     local TweenService = game:GetService("TweenService")
 
-    local name = config.Name or "GhostRoomESP"
-    local center = config.Center
-    local offset = config.Offset or Vector3.new(0, 3, 0)
-    local baseTextSize = config.TextSize or 20
-    local textSize = baseTextSize
-    local size = config.Size or UDim2.new(0, 300, 0, 0)
-    local baseSize = size -- Сохраняем базовый размер для масштабирования
-    local defaultOutlineColor = config.outlineColor or Color3.fromRGB(255, 255, 255)
-    local defaultOutlineSize = config.outlineSize
+    local function pick(tbl, ...)
+        if type(tbl) ~= "table" then return nil end
+        for _, key in ipairs({...}) do
+            if tbl[key] ~= nil then return tbl[key] end
+        end
+        return nil
+    end
 
-    -- ShowWindow: рисует фон под текстом
-    local showWindow = config.ShowWindow == true
+    local name           = pick(config, "Name", "name") or "GhostRoomESP"
+    local center         = pick(config, "Center", "center")
+    local offset         = pick(config, "Offset", "offset") or Vector3.new(0, 3, 0)
+    local baseTextSize   = pick(config, "TextSize", "textSize") or 20
+    local textSize       = baseTextSize
+    local baseSize       = pick(config, "Size", "size") or UDim2.new(0, 300, 0, 0)
+    local size           = baseSize
+    local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
+    local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
-    -- Стиль окна — захардкожен так же, как в createInfoGui
-    local windowBackground          = Color3.fromRGB(30, 30, 35)
-    local windowBorderColor         = Color3.fromRGB(65, 65, 75)
-    local windowBorderThickness     = 1
-    local windowBorderTransparency  = 0.15
-    local windowBackgroundTransparency = 0.15
-    local windowPadding             = 8
-    local windowCorner              = 8
+    -- CustomWindow-стиль
+    local cw = pick(config, "CustomWindow", "customWindow") or {}
+    local showWindow = pick(config, "ShowWindow", "showWindow") == true
+    if pick(cw, "ShowWindow", "showWindow") ~= nil then
+        showWindow = pick(cw, "ShowWindow", "showWindow") == true
+    end
+
+    local windowBackground          = pick(cw, "WindowColor", "windowColor")             or Color3.fromRGB(30, 30, 35)
+    local windowBackgroundTransparency = pick(cw, "WindowTransparency", "windowTransparency")
+    if windowBackgroundTransparency == nil then windowBackgroundTransparency = 0.15 end
+    local windowBorderColor         = pick(cw, "BorderColor", "borderColor")             or Color3.fromRGB(65, 65, 75)
+    local windowBorderThickness     = pick(cw, "BorderThickness", "borderThickness") or 1
+    local windowBorderTransparency  = pick(cw, "BorderTransparency", "borderTransparency")
+    if windowBorderTransparency == nil then windowBorderTransparency = 0.15 end
+    local windowCorner              = pick(cw, "CornerRadius", "cornerRadius") or 8
+    local windowPadding             = pick(cw, "Padding", "padding") or 8
 
     local sizeTweenInfo = TweenInfo.new(
-        config.TweenTime or 0.22,
+        pick(config, "TweenTime", "tweenTime") or 0.22,
         Enum.EasingStyle.Quint,
         Enum.EasingDirection.Out
     )
 
-    local billboard
-    local container
-    local windowFrame
-    local labels = {}
-    local lineData = {}
+    local billboard, container, windowFrame
+    local labels, lineData = {}, {}
     local creationCounter = 0
     local currentAdornee
     local isActive = true
     local activeSizeTween
 
-    local pendingOrder = {}
-    local pendingData = {}
+    local pendingOrder, pendingData = {}, {}
 
     local function resolveAdornee(target)
-        if not target then
-            return nil
-        end
-
+        if not target then return nil end
         if target:IsA("Model") then
             target = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
         end
-
-        if not target or not target:IsA("BasePart") then
-            return nil
-        end
-
+        if not target or not target:IsA("BasePart") then return nil end
         return target
     end
 
     local function applyOutline(label, data)
         local stroke = label:FindFirstChild("Outline")
-
         if data.outlineSize then
             if not stroke then
                 stroke = Instance.new("UIStroke")
@@ -643,7 +589,6 @@ function createInfoText(config)
                 stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
                 stroke.Parent = label
             end
-
             stroke.Color = data.outlineColor or defaultOutlineColor
             stroke.Thickness = data.outlineSize
             stroke.Transparency = 0
@@ -653,48 +598,27 @@ function createInfoText(config)
     end
 
     local function updateOrder()
-        local explicit = {}
-        local withoutOrder = {}
-
+        local explicit, withoutOrder = {}, {}
         for _, data in pairs(lineData) do
-            if data.order ~= nil then
-                table.insert(explicit, data)
-            else
-                table.insert(withoutOrder, data)
-            end
+            if data.order ~= nil then table.insert(explicit, data)
+            else table.insert(withoutOrder, data) end
         end
-
         table.sort(explicit, function(a, b)
-            if a.order == b.order then
-                return a.created < b.created
-            end
+            if a.order == b.order then return a.created < b.created end
             return a.order < b.order
         end)
-
-        table.sort(withoutOrder, function(a, b)
-            return a.created < b.created
-        end)
+        table.sort(withoutOrder, function(a, b) return a.created < b.created end)
 
         local used = {}
-
         for _, data in ipairs(explicit) do
             local order = math.max(1, math.floor(data.order))
-
-            while used[order] do
-                order = order + 1
-            end
-
+            while used[order] do order = order + 1 end
             used[order] = true
             labels[data.id].LayoutOrder = order
         end
-
         local current = 1
-
         for _, data in ipairs(withoutOrder) do
-            while used[current] do
-                current = current + 1
-            end
-
+            while used[current] do current = current + 1 end
             used[current] = true
             labels[data.id].LayoutOrder = current
             current = current + 1
@@ -702,35 +626,19 @@ function createInfoText(config)
     end
 
     local function applyWindowLayout()
-        if not container then
-            return
-        end
-
+        if not container then return end
         local p = showWindow and windowPadding or 0
-
         container.Position = UDim2.new(0, p, 0, p)
-        container.Size = UDim2.new(1, -p * 2, 1, -p * 2)
-
-        if windowFrame then
-            windowFrame.Visible = showWindow
-        end
+        container.Size     = UDim2.new(1, -p * 2, 1, -p * 2)
+        if windowFrame then windowFrame.Visible = showWindow end
     end
 
     local function updateSize(animate)
-        if not billboard then
-            return
-        end
-
-        -- Исправлено: высота берется из UIListLayout
+        if not billboard then return end
         local layout = container and container:FindFirstChildOfClass("UIListLayout")
         local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
-
         local extra = showWindow and (windowPadding * 2) or 0
-
-        local autoHeight = math.max(
-            textSize + extra,
-            layoutHeight + extra
-        )
+        local autoHeight = math.max(textSize + extra, layoutHeight + extra)
 
         local targetHeight
         if size.Y.Offset and size.Y.Offset > 0 then
@@ -739,24 +647,11 @@ function createInfoText(config)
             targetHeight = autoHeight
         end
 
-        local targetSize = UDim2.new(
-            size.X.Scale,
-            size.X.Offset,
-            0,
-            targetHeight
-        )
+        local targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, targetHeight)
 
-        if activeSizeTween then
-            activeSizeTween:Cancel()
-            activeSizeTween = nil
-        end
-
+        if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
         if animate then
-            activeSizeTween = TweenService:Create(
-                billboard,
-                sizeTweenInfo,
-                { Size = targetSize }
-            )
+            activeSizeTween = TweenService:Create(billboard, sizeTweenInfo, { Size = targetSize })
             activeSizeTween:Play()
         else
             billboard.Size = targetSize
@@ -765,11 +660,7 @@ function createInfoText(config)
 
     local function createBillboard()
         local adornee = resolveAdornee(center)
-
-        if not adornee then
-            return false
-        end
-
+        if not adornee then return false end
         currentAdornee = adornee
 
         billboard = Instance.new("BillboardGui")
@@ -781,7 +672,6 @@ function createInfoText(config)
         billboard.Enabled = isActive
         billboard.Parent = adornee
 
-        -- Фон/обводка окна (тот же стиль, что и у createInfoGui)
         windowFrame = Instance.new("Frame")
         windowFrame.Name = "Window"
         windowFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -816,50 +706,32 @@ function createInfoText(config)
         layout.Padding = UDim.new(0, 2)
         layout.Parent = container
 
-        -- Автоматическое обновление размера при изменении контента
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             updateSize(true)
         end)
 
         applyWindowLayout()
-
         return true
     end
 
     local setLine
-
     local function flushPending()
-        if #pendingOrder == 0 then
-            return
-        end
-
-        local savedOrder = pendingOrder
-        local savedData = pendingData
-        pendingOrder = {}
-        pendingData = {}
-
+        if #pendingOrder == 0 then return end
+        local savedOrder, savedData = pendingOrder, pendingData
+        pendingOrder, pendingData = {}, {}
         for _, id in ipairs(savedOrder) do
-            local data = savedData[id]
-            if data then
-                setLine(data)
-            end
+            if savedData[id] then setLine(savedData[id]) end
         end
     end
 
     setLine = function(data)
-        if not data or not data.id then
-            return
-        end
-
+        if not data or not data.id then return end
         if not billboard or not billboard.Parent then
             if not createBillboard() then
-                if not pendingData[data.id] then
-                    table.insert(pendingOrder, data.id)
-                end
+                if not pendingData[data.id] then table.insert(pendingOrder, data.id) end
                 pendingData[data.id] = data
                 return
             end
-
             flushPending()
         end
 
@@ -868,10 +740,8 @@ function createInfoText(config)
 
         if not label then
             creationCounter = creationCounter + 1
-
             label = Instance.new("TextLabel")
             label.Name = id
-            -- Исправлено: автоматическая высота и перенос строк
             label.Size = UDim2.new(1, 0, 0, 0)
             label.AutomaticSize = Enum.AutomaticSize.Y
             label.TextWrapped = true
@@ -883,84 +753,46 @@ function createInfoText(config)
             label.Parent = container
 
             labels[id] = label
-
             lineData[id] = {
-                id = id,
-                text = "",
-                color = Color3.fromRGB(255, 255, 255),
-                outlineColor = defaultOutlineColor,
-                outlineSize = defaultOutlineSize,
-                order = nil,
-                created = creationCounter
+                id = id, text = "", color = Color3.fromRGB(255, 255, 255),
+                outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize,
+                order = nil, created = creationCounter,
             }
         end
 
         local saved = lineData[id]
-
-        if data.text ~= nil then
-            saved.text = data.text
-        end
-
-        if data.color ~= nil then
-            saved.color = data.color
-        end
-
-        if data.outlineColor ~= nil then
-            saved.outlineColor = data.outlineColor
-        end
-
-        if data.outlineSize ~= nil then
-            saved.outlineSize = data.outlineSize == false and nil or data.outlineSize
-        end
-
-        if data.order ~= nil then
-            saved.order = data.order == false and nil or data.order
-        end
+        if data.text         ~= nil then saved.text         = data.text end
+        if data.color        ~= nil then saved.color        = data.color end
+        if data.outlineColor ~= nil then saved.outlineColor = data.outlineColor end
+        if data.outlineSize  ~= nil then saved.outlineSize  = data.outlineSize == false and nil or data.outlineSize end
+        if data.order        ~= nil then saved.order        = data.order == false and nil or data.order end
 
         label.Text = saved.text
         label.TextColor3 = saved.color
-
         applyOutline(label, saved)
     end
 
     local function setText(lines)
-        if not lines then
-            return
-        end
-
-        for _, data in ipairs(lines) do
-            setLine(data)
-        end
-
+        if not lines then return end
+        for _, data in ipairs(lines) do setLine(data) end
         updateOrder()
         updateSize(true)
     end
 
-    for _, data in ipairs(config.Lines or {}) do
-        setLine(data)
-    end
-
-    if billboard then
-        updateOrder()
-        updateSize(false)
-    end
+    for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
+    if billboard then updateOrder() updateSize(false) end
 
     local api = {}
 
-    function api:SetText(lines)
-        setText(lines)
-    end
+    function api:SetText(lines) setText(lines) end
 
     function api:RemoveLine(id)
         pendingData[id] = nil
-
         local label = labels[id]
-
         if label then
             label:Destroy()
             labels[id] = nil
             lineData[id] = nil
-
             updateOrder()
             updateSize(true)
         end
@@ -968,22 +800,14 @@ function createInfoText(config)
 
     function api:Visible(state)
         isActive = state
-
-        if billboard then
-            billboard.Enabled = state
-        end
+        if billboard then billboard.Enabled = state end
     end
 
     function api:SetCenter(newCenter)
         local adornee = resolveAdornee(newCenter)
-
-        if not adornee then
-            return
-        end
-
+        if not adornee then return end
         center = newCenter
         currentAdornee = adornee
-
         if billboard then
             billboard.Adornee = adornee
             billboard.Parent = adornee
@@ -997,106 +821,58 @@ function createInfoText(config)
     end
 
     function api:SetOffset(newOffset)
-        if not newOffset then
-            return
-        end
-
+        if not newOffset then return end
         offset = newOffset
-
-        if billboard then
-            billboard.StudsOffset = newOffset
-        end
+        if billboard then billboard.StudsOffset = newOffset end
     end
 
-    -- SetSize:
-    --   число  -> множитель текста и размера окна (1 = дефолт)
-    --   UDim2  -> размер окна билборда (при этом текст масштабируется пропорционально ширине)
-    function api:SetSize(newSize)
-        if newSize == nil then
-            return
+    -- Единый параметр: число-множитель
+    function api:SetSize(value)
+        if type(value) ~= "number" then return end
+        local scaleFactor = math.max(value, 0.1)
+
+        -- Обновляем текст
+        textSize = baseTextSize * scaleFactor
+
+        -- Обновляем окно
+        size = UDim2.new(
+            baseSize.X.Scale,
+            baseSize.X.Offset * scaleFactor,
+            baseSize.Y.Scale,
+            baseSize.Y.Offset * scaleFactor
+        )
+
+        for _, label in pairs(labels) do
+            label.TextSize = textSize
+            label.Size = UDim2.new(1, 0, 0, 0)
         end
 
-        if type(newSize) == "number" then
-            local scale = math.max(newSize, 0.1)
-            textSize = baseTextSize * scale
-
-            if not baseSize then
-                baseSize = size
-            end
-
-            size = UDim2.new(
-                baseSize.X.Scale,
-                baseSize.X.Offset * scale,
-                baseSize.Y.Scale,
-                baseSize.Y.Offset * scale
-            )
-
-            for _, label in pairs(labels) do
-                label.TextSize = textSize
-                label.Size = UDim2.new(1, 0, 0, 0)
-            end
-
+        if billboard then
+            billboard.Size = size
             updateSize(true)
-        elseif typeof(newSize) == "UDim2" then
-            -- Вычисляем коэффициент масштабирования текста на основе изменения ширины
-            if size.X.Offset > 0 and newSize.X.Offset > 0 then
-                local ratio = newSize.X.Offset / size.X.Offset
-                textSize = textSize * ratio
-                baseTextSize = baseTextSize * ratio
-
-                for _, label in pairs(labels) do
-                    label.TextSize = textSize
-                    label.Size = UDim2.new(1, 0, 0, 0)
-                end
-            elseif size.X.Scale > 0 and newSize.X.Scale > 0 then
-                local ratio = newSize.X.Scale / size.X.Scale
-                textSize = textSize * ratio
-                baseTextSize = baseTextSize * ratio
-
-                for _, label in pairs(labels) do
-                    label.TextSize = textSize
-                    label.Size = UDim2.new(1, 0, 0, 0)
-                end
-            end
-
-            size = newSize
-
-            if billboard then
-                updateSize(true)
-            end
         end
     end
 
     function api:ShowWindow(state)
         showWindow = state == true
-
         if billboard then
             applyWindowLayout()
             updateSize(true)
         end
     end
 
-    function api:IsWindowShown()
-        return showWindow
-    end
+    function api:IsWindowShown() return showWindow end
 
     function api:Remove()
-        if activeSizeTween then
-            activeSizeTween:Cancel()
-            activeSizeTween = nil
-        end
-
+        if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
         if billboard then
             billboard:Destroy()
             billboard = nil
             container = nil
             windowFrame = nil
         end
-
-        labels = {}
-        lineData = {}
-        pendingOrder = {}
-        pendingData = {}
+        labels, lineData = {}, {}
+        pendingOrder, pendingData = {}, {}
     end
 
     return api
