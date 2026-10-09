@@ -1033,6 +1033,53 @@ function createInfoText(config)
         pendingOrder, pendingData = {}, {}
     end
 
+        function api:SetCustomWindow(tbl)
+        if type(tbl) ~= "table" then return end
+        local v
+        v = pick(tbl, "WindowColor", "windowColor")
+        if v ~= nil then
+            windowBackground = v
+            if windowFrame then windowFrame.BackgroundColor3 = v end
+        end
+        v = pick(tbl, "WindowTransparency", "windowTransparency")
+        if v ~= nil then
+            windowBackgroundTransparency = v
+            if windowFrame then windowFrame.BackgroundTransparency = v end
+        end
+        v = pick(tbl, "BorderColor", "borderColor")
+        if v ~= nil then
+            windowBorderColor = v
+            if windowFrame then
+                local ws = windowFrame:FindFirstChild("Border")
+                if ws then ws.Color = v end
+            end
+        end
+        v = pick(tbl, "BorderThickness", "borderThickness")
+        if v ~= nil then
+            windowBorderThickness = v
+            if windowFrame then
+                local ws = windowFrame:FindFirstChild("Border")
+                if ws then ws.Thickness = v end
+            end
+        end
+        v = pick(tbl, "BorderTransparency", "borderTransparency")
+        if v ~= nil then
+            windowBorderTransparency = v
+            if windowFrame then
+                local ws = windowFrame:FindFirstChild("Border")
+                if ws then ws.Transparency = v end
+            end
+        end
+        v = pick(tbl, "CornerRadius", "cornerRadius")
+        if v ~= nil then
+            windowCorner = v
+            if windowFrame then
+                local wc = windowFrame:FindFirstChildOfClass("UICorner")
+                if wc then wc.CornerRadius = UDim.new(0, v) end
+            end
+        end
+    end
+
     return api
 end
 
@@ -1584,6 +1631,65 @@ local function createRadar(config)
     function api:Remove()
         RunService:UnbindFromRenderStep(renderName)
         gui:Destroy()
+    end
+
+        function api:SetCustomWindow(tbl)
+        if type(tbl) ~= "table" then return end
+        local v
+
+        v = pick(tbl, "WindowColor", "windowColor")
+        if v ~= nil then BackgroundColor = v; frame.BackgroundColor3 = v end
+        v = pick(tbl, "WindowTransparency", "windowTransparency")
+        if v ~= nil then BackTransparency = v; frame.BackgroundTransparency = v end
+
+        v = pick(tbl, "BorderColor", "borderColor")
+        if v ~= nil then
+            BorderColor = v
+            frameStroke.Color = v
+            radarStroke.Color = v
+        end
+        v = pick(tbl, "BorderThickness", "borderThickness")
+        if v ~= nil then BorderThickness = v; frameStroke.Thickness = v end
+        v = pick(tbl, "BorderTransparency", "borderTransparency")
+        if v ~= nil then
+            BorderTransparency = v
+            frameStroke.Transparency = v
+            radarStroke.Transparency = v
+        end
+
+        v = pick(tbl, "CornerRadius", "cornerRadius")
+        if v ~= nil then
+            CornerRadius = v
+            frameCorner.CornerRadius = UDim.new(0, v)
+        end
+
+        v = pick(tbl, "TitleColor", "titleColor")
+        if v ~= nil then TitleColor = v; title.TextColor3 = v end
+        v = pick(tbl, "TitleTransparency", "titleTransparency")
+        if v ~= nil then TitleTransparency = v; title.TextTransparency = v end
+
+        v = pick(tbl, "RadarColor", "radarColor")
+        if v ~= nil then RadarColor = v; radar.BackgroundColor3 = v end
+        v = pick(tbl, "RadarTransparency", "radarTransparency")
+        if v ~= nil then RadarTransparency = v; radar.BackgroundTransparency = v end
+
+        v = pick(tbl, "GridColor", "gridColor")
+        if v ~= nil then
+            GridColor = v
+            for _, child in ipairs(radar:GetChildren()) do
+                if child:IsA("Frame") then
+                    local s = child:FindFirstChildOfClass("UIStroke")
+                    if s then s.Color = v end
+                end
+            end
+        end
+
+        v = pick(tbl, "CrosshairColor", "crosshairColor")
+        if v ~= nil then
+            CrosshairColor = v
+            horizontalLine.BackgroundColor3 = v
+            verticalLine.BackgroundColor3 = v
+        end
     end
 
     return api
