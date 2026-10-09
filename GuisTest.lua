@@ -51,20 +51,26 @@ function createInfoGui(config)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
     -- ========= AutoSize =========
-    -- MaxSize работает в ОБОИХ режимах:
-    --   Enabled = true  → верхняя граница при динамическом росте
-    --   Enabled = false → фиксированная высота окна
+    -- Enabled = true             → динамический рост по контенту, верхняя граница = MaxSize
+    -- Enabled = false            → фиксированная высота = MaxSize
+    -- WindowEdge = true          → игнорит MaxSize, тянется до низа экрана (EDGE_MARGIN)
+    -- WindowEdgeWithMaxSize = true (только при WindowEdge = true)
+    --                              → максимум = min(MaxSize, доступная_высота_до_низа)
     local autoSizeCfg        = pick(config, "AutoSize", "autoSize") or {}
     local autoSizeEnabled    = pick(autoSizeCfg, "Enabled", "enabled")
     if autoSizeEnabled == nil then autoSizeEnabled = true end
     local autoSizeMaxSize    = pick(autoSizeCfg, "MaxSize", "maxSize") or 500
     local autoSizeWindowEdge = pick(autoSizeCfg, "WindowEdge", "windowEdge")
     if autoSizeWindowEdge == nil then autoSizeWindowEdge = false end
+    local autoSizeWindowEdgeWithMaxSize =
+        pick(autoSizeCfg, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
+    if autoSizeWindowEdgeWithMaxSize == nil then autoSizeWindowEdgeWithMaxSize = false end
 
     -- ========= Константы =========
     local headerHeight  = 32
     local bottomPadding = 3
     local linePadding   = 2
+    local EDGE_MARGIN   = 12      -- физические пиксели
 
     local tweenTime     = pick(config, "TweenTime", "tweenTime") or 0.22
     local tweenInfo     = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -225,16 +231,34 @@ function createInfoGui(config)
         return layout.AbsoluteContentSize.Y / getScale()
     end
 
+    -- Эффективная максимальная высота окна (в логических юнитах).
+    -- Минимум = headerHeight (чтобы хедер всегда влезал).
     local function getEffectiveMaxHeightLogical()
+        -- WindowEdgeWithMaxSize работает ТОЛЬКО когда WindowEdge = true
         if autoSizeWindowEdge then
             local screenH = screen.AbsoluteSize.Y
             local yPos    = frame.AbsolutePosition.Y
-            local bottomMargin = 12
-            local available = screenH - yPos - bottomMargin
-            return math.max(headerHeight + 40, available / getScale())
+            local edgeAvailable = (screenH - yPos - EDGE_MARGIN) / getScale()
+
+            -- Не даём уйти ниже headerHeight — иначе хедер пропадёт
+            edgeAvailable = math.max(edgeAvailable, headerHeight)
+
+            if autoSizeWindowEdgeWithMaxSize then
+                -- Комбинированный режим: учитываем и MaxSize, и край экрана
+                return math.min(autoSizeMaxSize, edgeAvailable)
+            else
+                -- Чистый WindowEdge: игнорит MaxSize
+                return edgeAvailable
+            end
         else
+            -- WindowEdge выключен — WindowEdgeWithMaxSize игнорируется
             return autoSizeMaxSize
         end
+    end
+
+    local function isEdgeMode()
+        -- Активен ли режим "прилипания к низу экрана" (нужно для drag/screen-resize)
+        return autoSizeWindowEdge
     end
 
     -- ======== Обновление размера ========
@@ -248,11 +272,9 @@ function createInfoGui(config)
             local desired  = headerHeight + contentH + bottomPadding
 
             if autoSizeEnabled then
-                -- Динамический режим: растём по контенту, ограничиваемся MaxSize / WindowEdge
                 local maxH = getEffectiveMaxHeightLogical()
                 targetHeight = math.min(desired, maxH)
             else
-                -- Фиксированный режим: высота = MaxSize (в логических юнитах)
                 targetHeight = autoSizeMaxSize
             end
         end
@@ -272,7 +294,7 @@ function createInfoGui(config)
 
         if activeTween then activeTween:Cancel() activeTween = nil end
 
-        if animate and not (autoSizeWindowEdge and dragging) then
+        if animate and not (isEdgeMode() and dragging) then
             activeTween = TweenService:Create(
                 frame, tweenInfo, { Size = UDim2.new(0, width, 0, targetHeight) }
             )
@@ -289,7 +311,7 @@ function createInfoGui(config)
     end)
 
     screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-        if autoSizeWindowEdge and not collapsed then
+        if isEdgeMode() and not collapsed then
             updateFrameSize(false)
         end
     end)
@@ -472,7 +494,7 @@ function createInfoGui(config)
             startPos.Y.Scale,
             startPos.Y.Offset + delta.Y
         )
-        if autoSizeWindowEdge and not collapsed then
+        if isEdgeMode() and not collapsed then
             updateFrameSize(false)
         end
     end
@@ -580,6 +602,8 @@ function createInfoGui(config)
         if m ~= nil then autoSizeMaxSize = tonumber(m) or autoSizeMaxSize end
         local w = pick(cfg, "WindowEdge", "windowEdge")
         if w ~= nil then autoSizeWindowEdge = w == true end
+        local wm = pick(cfg, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
+        if wm ~= nil then autoSizeWindowEdgeWithMaxSize = wm == true end
         updateFrameSize(true)
     end
 
@@ -595,6 +619,11 @@ function createInfoGui(config)
 
     function api:SetWindowEdge(v)
         autoSizeWindowEdge = v == true
+        updateFrameSize(true)
+    end
+
+    function api:SetWindowEdgeWithMaxSize(v)
+        autoSizeWindowEdgeWithMaxSize = v == true
         updateFrameSize(true)
     end
 
