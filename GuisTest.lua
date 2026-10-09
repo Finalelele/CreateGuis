@@ -51,14 +51,15 @@ function createInfoGui(config)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
     -- ========= AutoSize =========
+    -- MaxSize работает в ОБОИХ режимах:
+    --   Enabled = true  → верхняя граница при динамическом росте
+    --   Enabled = false → фиксированная высота окна
     local autoSizeCfg        = pick(config, "AutoSize", "autoSize") or {}
     local autoSizeEnabled    = pick(autoSizeCfg, "Enabled", "enabled")
     if autoSizeEnabled == nil then autoSizeEnabled = true end
     local autoSizeMaxSize    = pick(autoSizeCfg, "MaxSize", "maxSize") or 500
     local autoSizeWindowEdge = pick(autoSizeCfg, "WindowEdge", "windowEdge")
     if autoSizeWindowEdge == nil then autoSizeWindowEdge = false end
-
-    local fixedHeight = pick(config, "Height", "height") or 250
 
     -- ========= Константы =========
     local headerHeight  = 32
@@ -101,7 +102,6 @@ function createInfoGui(config)
     frameStroke.Transparency = borderTransparency
     frameStroke.Parent = frame
 
-    -- UIScale — ВАЖНО: задаём ДО updateFrameSize
     local uiScale = Instance.new("UIScale")
     uiScale.Scale = scale
     uiScale.Parent = frame
@@ -216,19 +216,12 @@ function createInfoGui(config)
     local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
 
     -- ======== Scale-aware helpers ========
-    -- Все Absolute*-значения движка идут в физических пикселях (уже с учётом UIScale).
-    -- frame.Size задаётся в логических юнитах, которые UIScale потом умножает.
-    -- Поэтому переводим абсолютные значения обратно в логические делением на scale.
-
     local function getScale()
         local s = uiScale.Scale
         return (s and s > 0) and s or 1
     end
 
     local function getContentHeightLogical()
-        -- layout.AbsoluteContentSize — размер всех детей + паддинги, БЕЗ пустого места viewport.
-        -- (AbsoluteCanvasSize для пустого ScrollingFrame возвращает размер самого viewport,
-        --  что и вызывало экспоненциальный рост при UIScale.)
         return layout.AbsoluteContentSize.Y / getScale()
     end
 
@@ -236,11 +229,11 @@ function createInfoGui(config)
         if autoSizeWindowEdge then
             local screenH = screen.AbsoluteSize.Y
             local yPos    = frame.AbsolutePosition.Y
-            local bottomMargin = 12          -- физические пиксели
+            local bottomMargin = 12
             local available = screenH - yPos - bottomMargin
             return math.max(headerHeight + 40, available / getScale())
         else
-            return autoSizeMaxSize           -- логические юниты (то, что задал пользователь)
+            return autoSizeMaxSize
         end
     end
 
@@ -255,10 +248,12 @@ function createInfoGui(config)
             local desired  = headerHeight + contentH + bottomPadding
 
             if autoSizeEnabled then
+                -- Динамический режим: растём по контенту, ограничиваемся MaxSize / WindowEdge
                 local maxH = getEffectiveMaxHeightLogical()
                 targetHeight = math.min(desired, maxH)
             else
-                targetHeight = fixedHeight
+                -- Фиксированный режим: высота = MaxSize (в логических юнитах)
+                targetHeight = autoSizeMaxSize
             end
         end
 
@@ -430,7 +425,6 @@ function createInfoGui(config)
             end
         end
 
-        -- Отложенный пересчёт: AutomaticSize пересчитывает высоту в конце кадра
         task.defer(function()
             if not collapsed then
                 updateFrameSize(true)
@@ -552,7 +546,6 @@ function createInfoGui(config)
         labels, lineData = {}, {}
         updateOrder()
         updateFrameSize(true)
-        -- Отложенный пересчёт на случай, если layout ещё не успел сжаться
         task.defer(function()
             if not collapsed then updateFrameSize(true) end
         end)
@@ -560,11 +553,9 @@ function createInfoGui(config)
 
     function api:Visible(state) screen.Enabled = state end
 
-    -- ✅ ИСПРАВЛЕНО: SetScale теперь пересчитывает размер окна
     function api:SetScale(value)
         uiScale.Scale = value or 1
         updateFrameSize(true)
-        -- Дополнительный пересчёт после того, как layout отработает scale
         task.defer(function()
             if not collapsed then updateFrameSize(true) end
         end)
