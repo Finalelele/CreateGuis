@@ -5,13 +5,10 @@ function createInfoGui(config)
     local UserInputService = game:GetService("UserInputService")
     local CoreGui = game:GetService("CoreGui")
 
-    -- Регистронезависимый "getter"
     local function pick(tbl, ...)
         if type(tbl) ~= "table" then return nil end
         for _, key in ipairs({...}) do
-            if tbl[key] ~= nil then
-                return tbl[key]
-            end
+            if tbl[key] ~= nil then return tbl[key] end
         end
         return nil
     end
@@ -61,12 +58,11 @@ function createInfoGui(config)
     local autoSizeWindowEdge = pick(autoSizeCfg, "WindowEdge", "windowEdge")
     if autoSizeWindowEdge == nil then autoSizeWindowEdge = false end
 
-    -- Фиксированная высота, когда AutoSize выключен
     local fixedHeight = pick(config, "Height", "height") or 250
 
     -- ========= Константы =========
     local headerHeight  = 32
-    local bottomPadding = 7
+    local bottomPadding = 3      -- ↓ уменьшено с 7
     local linePadding   = 2
 
     local tweenTime     = pick(config, "TweenTime", "tweenTime") or 0.22
@@ -216,8 +212,18 @@ function createInfoGui(config)
     local collapsed = pick(config, "Collapsed", "collapsed") == true
     local activeTween
 
-    -- Drag state — объявляем ДО updateFrameSize (WindowEdge смотрит на dragging)
     local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+
+    -- ======== Точный подсчёт высоты контента ========
+    -- Приоритет: AbsoluteCanvasSize (движок сам считает под AutomaticCanvasSize),
+    -- fallback — layout.AbsoluteContentSize.
+    local function getContentHeight()
+        local h = scrolling.AbsoluteCanvasSize.Y
+        if not h or h <= 0 then
+            h = layout.AbsoluteContentSize.Y
+        end
+        return h
+    end
 
     -- ======== AutoSize helpers ========
     local function getEffectiveMaxHeight()
@@ -238,8 +244,8 @@ function createInfoGui(config)
         if collapsed then
             targetHeight = headerHeight
         else
-            local contentH = layout.AbsoluteContentSize.Y + bottomPadding
-            local desired  = headerHeight + contentH
+            local contentH = getContentHeight()
+            local desired  = headerHeight + contentH + bottomPadding
 
             if autoSizeEnabled then
                 local maxH = getEffectiveMaxHeight()
@@ -251,7 +257,7 @@ function createInfoGui(config)
 
         -- Полоса прокрутки
         if not collapsed then
-            local contentH   = layout.AbsoluteContentSize.Y + bottomPadding
+            local contentH   = getContentHeight()
             local availableH = targetHeight - headerHeight
             if contentH > availableH + 1 then
                 scrolling.ScrollBarThickness = 4
@@ -262,17 +268,11 @@ function createInfoGui(config)
             scrolling.ScrollBarThickness = 0
         end
 
-        if activeTween then
-            activeTween:Cancel()
-            activeTween = nil
-        end
+        if activeTween then activeTween:Cancel() activeTween = nil end
 
-        -- При WindowEdge во время драга — без анимации, чтобы не отставать
         if animate and not (autoSizeWindowEdge and dragging) then
             activeTween = TweenService:Create(
-                frame,
-                tweenInfo,
-                { Size = UDim2.new(0, width, 0, targetHeight) }
+                frame, tweenInfo, { Size = UDim2.new(0, width, 0, targetHeight) }
             )
             activeTween:Play()
         else
@@ -286,7 +286,6 @@ function createInfoGui(config)
         end
     end)
 
-    -- WindowEdge реагирует на изменение размера экрана
     screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
         if autoSizeWindowEdge and not collapsed then
             updateFrameSize(false)
@@ -386,8 +385,8 @@ function createInfoGui(config)
             local padding = Instance.new("UIPadding")
             padding.PaddingLeft   = UDim.new(0, 8)
             padding.PaddingRight  = UDim.new(0, 8)
-            padding.PaddingTop    = UDim.new(0, 2)
-            padding.PaddingBottom = UDim.new(0, 2)
+            padding.PaddingTop    = UDim.new(0, 1)
+            padding.PaddingBottom = UDim.new(0, 1)
             padding.Parent = label
 
             labels[id] = label
@@ -423,6 +422,14 @@ function createInfoGui(config)
                 TweenService:Create(stroke, lineFadeInfo, { Transparency = 0 }):Play()
             end
         end
+
+        -- 🔧 Отложенный пересчёт: ловим финальный размер TextLabel
+        -- после того, как AutomaticSize пересчитает высоту
+        task.defer(function()
+            if not collapsed then
+                updateFrameSize(true)
+            end
+        end)
     end
 
     local function setText(lines)
@@ -449,6 +456,13 @@ function createInfoGui(config)
     if collapsed then setContentTransparency(1, true) end
     updateFrameSize(false)
 
+    -- Отложенный пересчёт после стартового наполнения
+    task.defer(function()
+        if not collapsed then
+            updateFrameSize(false)
+        end
+    end)
+
     -- ======== Drag ========
     local function updateDrag(input)
         if not dragging or not dragStart or not startPos then return end
@@ -459,7 +473,6 @@ function createInfoGui(config)
             startPos.Y.Scale,
             startPos.Y.Offset + delta.Y
         )
-        -- WindowEdge: пересчитываем высоту сразу при перетаскивании
         if autoSizeWindowEdge and not collapsed then
             updateFrameSize(false)
         end
@@ -521,6 +534,9 @@ function createInfoGui(config)
             lineData[id] = nil
             updateOrder()
             updateFrameSize(true)
+            task.defer(function()
+                if not collapsed then updateFrameSize(true) end
+            end)
         end
     end
 
@@ -540,43 +556,12 @@ function createInfoGui(config)
         title = tostring(newTitle)
         titleLabel.Text = title
     end
+
     function api:Collapse(state) setCollapsed(state, true) end
     function api:Toggle() setCollapsed(not collapsed, true) end
     function api:IsCollapsed() return collapsed end
 
-    function api:Remove()
-        if activeTween then activeTween:Cancel() activeTween = nil end
-        if screen then screen:Destroy() screen = nil end
-    end
-
-        -- ======== Runtime setters (без пересоздания) ========
-    function api:SetAutoSize(cfg)
-        if type(cfg) ~= "table" then return end
-        local e = pick(cfg, "Enabled", "enabled")
-        if e ~= nil then autoSizeEnabled = e == true end
-        local m = pick(cfg, "MaxSize", "maxSize")
-        if m ~= nil then autoSizeMaxSize = tonumber(m) or autoSizeMaxSize end
-        local w = pick(cfg, "WindowEdge", "windowEdge")
-        if w ~= nil then autoSizeWindowEdge = w == true end
-        updateFrameSize(true)
-    end
-
-    function api:SetAutoSizeEnabled(v)
-        autoSizeEnabled = v == true
-        updateFrameSize(true)
-    end
-
-    function api:SetMaxSize(v)
-        autoSizeMaxSize = tonumber(v) or autoSizeMaxSize
-        updateFrameSize(true)
-    end
-
-    function api:SetWindowEdge(v)
-        autoSizeWindowEdge = v == true
-        updateFrameSize(true)
-    end
-
-    -- ======== Runtime setters (без пересоздания) ========
+    -- ======== Runtime setters ========
     function api:SetAutoSize(cfg)
         if type(cfg) ~= "table" then return end
         local e = pick(cfg, "Enabled", "enabled")
@@ -651,10 +636,13 @@ function createInfoGui(config)
         v = pick(tbl, "ScrollbarColor", "scrollbarColor")
         if v ~= nil then scrollbarColor = v; scrolling.ScrollBarImageColor3 = v end
 
-        -- LineTextColor — обновляет дефолт для будущих строк
-        -- (уже нарисованные не трогаем, чтобы не сбивать индивидуальные цвета)
         v = pick(tbl, "LineTextColor", "lineTextColor")
         if v ~= nil then lineTextColor = v end
+    end
+
+    function api:Remove()
+        if activeTween then activeTween:Cancel() activeTween = nil end
+        if screen then screen:Destroy() screen = nil end
     end
 
     return api
