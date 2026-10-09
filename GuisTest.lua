@@ -4,7 +4,6 @@ function createInfoGui(config)
     local TweenService = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local CoreGui = game:GetService("CoreGui")
-    local TextService = game:GetService("TextService")
 
     -- Регистронезависимый "getter"
     local function pick(tbl, ...)
@@ -55,10 +54,12 @@ function createInfoGui(config)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
     -- ========= AutoSize =========
-    local autoSizeCfg       = pick(config, "AutoSize", "autoSize") or {}
-    local autoSizeEnabled   = pick(autoSizeCfg, "Enabled", "enabled")
+    local autoSizeCfg        = pick(config, "AutoSize", "autoSize") or {}
+    local autoSizeEnabled    = pick(autoSizeCfg, "Enabled", "enabled")
     if autoSizeEnabled == nil then autoSizeEnabled = true end
-    local autoSizeMaxSize   = pick(autoSizeCfg, "MaxSize", "maxSize") or 500
+    local autoSizeMaxSize    = pick(autoSizeCfg, "MaxSize", "maxSize") or 500
+    local autoSizeWindowEdge = pick(autoSizeCfg, "WindowEdge", "windowEdge")
+    if autoSizeWindowEdge == nil then autoSizeWindowEdge = false end
 
     -- Фиксированная высота, когда AutoSize выключен
     local fixedHeight = pick(config, "Height", "height") or 250
@@ -215,6 +216,21 @@ function createInfoGui(config)
     local collapsed = pick(config, "Collapsed", "collapsed") == true
     local activeTween
 
+    -- Drag state — объявляем ДО updateFrameSize (WindowEdge смотрит на dragging)
+    local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+
+    -- ======== AutoSize helpers ========
+    local function getEffectiveMaxHeight()
+        if autoSizeWindowEdge then
+            local screenH = screen.AbsoluteSize.Y
+            local yPos    = frame.AbsolutePosition.Y
+            local bottomMargin = 12
+            return math.max(headerHeight + 40, screenH - yPos - bottomMargin)
+        else
+            return autoSizeMaxSize
+        end
+    end
+
     -- ======== Обновление размера ========
     local function updateFrameSize(animate)
         local targetHeight
@@ -226,7 +242,8 @@ function createInfoGui(config)
             local desired  = headerHeight + contentH
 
             if autoSizeEnabled then
-                targetHeight = math.min(desired, autoSizeMaxSize)
+                local maxH = getEffectiveMaxHeight()
+                targetHeight = math.min(desired, maxH)
             else
                 targetHeight = fixedHeight
             end
@@ -250,7 +267,8 @@ function createInfoGui(config)
             activeTween = nil
         end
 
-        if animate then
+        -- При WindowEdge во время драга — без анимации, чтобы не отставать
+        if animate and not (autoSizeWindowEdge and dragging) then
             activeTween = TweenService:Create(
                 frame,
                 tweenInfo,
@@ -265,6 +283,13 @@ function createInfoGui(config)
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         if not collapsed then
             updateFrameSize(true)
+        end
+    end)
+
+    -- WindowEdge реагирует на изменение размера экрана
+    screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        if autoSizeWindowEdge and not collapsed then
+            updateFrameSize(false)
         end
     end)
 
@@ -425,8 +450,6 @@ function createInfoGui(config)
     updateFrameSize(false)
 
     -- ======== Drag ========
-    local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
-
     local function updateDrag(input)
         if not dragging or not dragStart or not startPos then return end
         local delta = input.Position - dragStart
@@ -436,6 +459,10 @@ function createInfoGui(config)
             startPos.Y.Scale,
             startPos.Y.Offset + delta.Y
         )
+        -- WindowEdge: пересчитываем высоту сразу при перетаскивании
+        if autoSizeWindowEdge and not collapsed then
+            updateFrameSize(false)
+        end
     end
 
     header.InputBegan:Connect(function(input)
@@ -497,6 +524,15 @@ function createInfoGui(config)
         end
     end
 
+    function api:Clear()
+        for _, label in pairs(labels) do
+            label:Destroy()
+        end
+        labels, lineData = {}, {}
+        updateOrder()
+        updateFrameSize(true)
+    end
+
     function api:Visible(state) screen.Enabled = state end
     function api:SetScale(value) uiScale.Scale = value or 1 end
     function api:SetPosition(value) if value then frame.Position = value end end
@@ -541,20 +577,26 @@ function createInfoText(config)
 
     -- CustomWindow-стиль
     local cw = pick(config, "CustomWindow", "customWindow") or {}
-    local showWindow = pick(config, "ShowWindow", "showWindow") == true
-    if pick(cw, "ShowWindow", "showWindow") ~= nil then
-        showWindow = pick(cw, "ShowWindow", "showWindow") == true
+
+    -- ShowWindow: приоритет у CustomWindow
+    local showWindow = false
+    local swConfig = pick(config, "ShowWindow", "showWindow")
+    local swCustom = pick(cw, "ShowWindow", "showWindow")
+    if swCustom ~= nil then
+        showWindow = swCustom == true
+    elseif swConfig ~= nil then
+        showWindow = swConfig == true
     end
 
-    local windowBackground          = pick(cw, "WindowColor", "windowColor")             or Color3.fromRGB(30, 30, 35)
+    local windowBackground             = pick(cw, "WindowColor", "windowColor")             or Color3.fromRGB(30, 30, 35)
     local windowBackgroundTransparency = pick(cw, "WindowTransparency", "windowTransparency")
     if windowBackgroundTransparency == nil then windowBackgroundTransparency = 0.15 end
-    local windowBorderColor         = pick(cw, "BorderColor", "borderColor")             or Color3.fromRGB(65, 65, 75)
-    local windowBorderThickness     = pick(cw, "BorderThickness", "borderThickness") or 1
-    local windowBorderTransparency  = pick(cw, "BorderTransparency", "borderTransparency")
+    local windowBorderColor            = pick(cw, "BorderColor", "borderColor")             or Color3.fromRGB(65, 65, 75)
+    local windowBorderThickness        = pick(cw, "BorderThickness", "borderThickness") or 1
+    local windowBorderTransparency     = pick(cw, "BorderTransparency", "borderTransparency")
     if windowBorderTransparency == nil then windowBorderTransparency = 0.15 end
-    local windowCorner              = pick(cw, "CornerRadius", "cornerRadius") or 8
-    local windowPadding             = pick(cw, "Padding", "padding") or 8
+    local windowCorner                 = pick(cw, "CornerRadius", "cornerRadius") or 8
+    local windowPadding                = pick(cw, "Padding", "padding") or 8
 
     local sizeTweenInfo = TweenInfo.new(
         pick(config, "TweenTime", "tweenTime") or 0.22,
@@ -798,6 +840,16 @@ function createInfoText(config)
         end
     end
 
+    function api:Clear()
+        for _, label in pairs(labels) do
+            label:Destroy()
+        end
+        labels, lineData = {}, {}
+        pendingOrder, pendingData = {}, {}
+        updateOrder()
+        updateSize(true)
+    end
+
     function api:Visible(state)
         isActive = state
         if billboard then billboard.Enabled = state end
@@ -826,15 +878,13 @@ function createInfoText(config)
         if billboard then billboard.StudsOffset = newOffset end
     end
 
-    -- Единый параметр: число-множитель
+    -- Единый параметр: число-множитель (и окно, и текст)
     function api:SetSize(value)
         if type(value) ~= "number" then return end
         local scaleFactor = math.max(value, 0.1)
 
-        -- Обновляем текст
         textSize = baseTextSize * scaleFactor
 
-        -- Обновляем окно
         size = UDim2.new(
             baseSize.X.Scale,
             baseSize.X.Offset * scaleFactor,
@@ -886,29 +936,51 @@ local function createRadar(config)
     local CoreGui = game:GetService("CoreGui")
     local UserInputService = game:GetService("UserInputService")
 
-    local Name = config.Name or "CustomRadar"
-    local Title = config.Title or "Radar"
-    local Position = config.Position or UDim2.new(0.03, 0, 0.3, 0)
+    -- Регистронезависимый "getter"
+    local function pick(tbl, ...)
+        if type(tbl) ~= "table" then return nil end
+        for _, key in ipairs({...}) do
+            if tbl[key] ~= nil then
+                return tbl[key]
+            end
+        end
+        return nil
+    end
 
-    local Size = math.max(tonumber(config.Size) or 100, 0.01)
-    local Scale = tonumber(config.Scale) or 1
-    local Range = math.max(tonumber(config.Range) or 100, 0)
+    -- ========= CustomWindow =========
+    local cw = pick(config, "CustomWindow", "customWindow") or {}
 
-    local Center = config.Center or Players.LocalPlayer
-    local CenterOffset = config.CenterOffset or Vector3.zero
+    local BackgroundColor    = pick(cw, "WindowColor", "windowColor")               or pick(config, "BackgroundColor", "backgroundColor") or Color3.fromRGB(10, 10, 15)
+    local BackTransparency   = pick(cw, "WindowTransparency", "windowTransparency") or 0
+    local BorderColor        = pick(cw, "BorderColor", "borderColor")               or pick(config, "BorderColor", "borderColor") or Color3.fromRGB(80, 80, 90)
+    local BorderThickness    = pick(cw, "BorderThickness", "borderThickness") or 4
+    local BorderTransparency = pick(cw, "BorderTransparency", "borderTransparency") or 0
+    local CornerRadius       = pick(cw, "CornerRadius", "cornerRadius") or 16
+    local TitleColor         = pick(cw, "TitleColor", "titleColor")                 or Color3.fromRGB(235, 235, 235)
+    local TitleTransparency  = pick(cw, "TitleTransparency", "titleTransparency")   or 0
+    local RadarColor         = pick(cw, "RadarColor", "radarColor")                 or Color3.fromRGB(5, 5, 8)
+    local RadarTransparency  = pick(cw, "RadarTransparency", "radarTransparency")   or 0
+    local GridColor          = pick(cw, "GridColor", "gridColor")                   or Color3.fromRGB(70, 70, 80)
+    local CrosshairColor     = pick(cw, "CrosshairColor", "crosshairColor")         or Color3.fromRGB(45, 45, 50)
 
-    local BackgroundColor = config.BackgroundColor or Color3.fromRGB(10, 10, 15)
-    local BorderColor = config.BorderColor or Color3.fromRGB(80, 80, 90)
-
-    local EDGE_TEXT_HIDE_THRESHOLD = tonumber(config.TextHideThreshold) or 0.95
+    -- ========= Основные =========
+    local Name         = pick(config, "Name", "name")         or "CustomRadar"
+    local Title        = pick(config, "Title", "title")       or "Radar"
+    local Position     = pick(config, "Position", "position") or UDim2.new(0.03, 0, 0.3, 0)
+    local Size         = math.max(tonumber(pick(config, "Size", "size")) or 100, 0.01)
+    local Scale        = tonumber(pick(config, "Scale", "scale")) or 1
+    local Range        = math.max(tonumber(pick(config, "Range", "range")) or 100, 0)
+    local Center       = pick(config, "Center", "center") or Players.LocalPlayer
+    local CenterOffset = pick(config, "CenterOffset", "centerOffset") or Vector3.zero
+    local EDGE_TEXT_HIDE_THRESHOLD = tonumber(pick(config, "TextHideThreshold", "textHideThreshold")) or 0.95
 
     local enabled = true
     local targets = {}
 
-    local WINDOW_SIZE = 220
+    local WINDOW_SIZE  = 220
     local WINDOW_HEIGHT = 260
-    local RADAR_SIZE = 190
-    local BORDER_SIZE = 4
+    local RADAR_SIZE   = 190
+    local BORDER_SIZE  = BorderThickness
 
     local gui = Instance.new("ScreenGui")
     gui.Name = Name
@@ -925,16 +997,18 @@ local function createRadar(config)
     frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_HEIGHT)
     frame.Position = Position
     frame.BackgroundColor3 = BackgroundColor
+    frame.BackgroundTransparency = BackTransparency
     frame.BorderSizePixel = 0
     frame.Parent = gui
 
     local frameCorner = Instance.new("UICorner")
-    frameCorner.CornerRadius = UDim.new(0, 16)
+    frameCorner.CornerRadius = UDim.new(0, CornerRadius)
     frameCorner.Parent = frame
 
     local frameStroke = Instance.new("UIStroke")
     frameStroke.Color = BorderColor
     frameStroke.Thickness = BORDER_SIZE
+    frameStroke.Transparency = BorderTransparency
     frameStroke.Parent = frame
 
     local title = Instance.new("TextLabel")
@@ -944,7 +1018,8 @@ local function createRadar(config)
     title.Size = UDim2.new(1, -24, 0, 28)
     title.Font = Enum.Font.GothamBold
     title.Text = Title
-    title.TextColor3 = Color3.fromRGB(235, 235, 235)
+    title.TextColor3 = TitleColor
+    title.TextTransparency = TitleTransparency
     title.TextSize = 17
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = frame
@@ -1004,7 +1079,8 @@ local function createRadar(config)
         0,
         42
     )
-    radar.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+    radar.BackgroundColor3 = RadarColor
+    radar.BackgroundTransparency = RadarTransparency
     radar.BorderSizePixel = 0
     radar.ClipsDescendants = true
     radar.Parent = frame
@@ -1016,6 +1092,7 @@ local function createRadar(config)
     local radarStroke = Instance.new("UIStroke")
     radarStroke.Color = BorderColor
     radarStroke.Thickness = 3
+    radarStroke.Transparency = BorderTransparency
     radarStroke.Parent = radar
 
     local function createCircle(csize, transparency)
@@ -1031,7 +1108,7 @@ local function createRadar(config)
         corner.Parent = circle
 
         local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(70, 70, 80)
+        stroke.Color = GridColor
         stroke.Thickness = 1
         stroke.Transparency = transparency or 0
         stroke.Parent = circle
@@ -1043,7 +1120,7 @@ local function createRadar(config)
     createCircle(0.42, 0)
 
     local horizontalLine = Instance.new("Frame")
-    horizontalLine.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    horizontalLine.BackgroundColor3 = CrosshairColor
     horizontalLine.BackgroundTransparency = 0.35
     horizontalLine.BorderSizePixel = 0
     horizontalLine.AnchorPoint = Vector2.new(0, 0.5)
@@ -1052,7 +1129,7 @@ local function createRadar(config)
     horizontalLine.Parent = radar
 
     local verticalLine = Instance.new("Frame")
-    verticalLine.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    verticalLine.BackgroundColor3 = CrosshairColor
     verticalLine.BackgroundTransparency = 0.35
     verticalLine.BorderSizePixel = 0
     verticalLine.AnchorPoint = Vector2.new(0.5, 0)
@@ -1102,7 +1179,7 @@ local function createRadar(config)
         old.text.Font = Enum.Font.Gotham
         old.text.TextSize = 13
         old.text.TextXAlignment = Enum.TextXAlignment.Center
-        old.text.ZIndex = 11                       -- поверх точки и обводки круга
+        old.text.ZIndex = 11
         old.text.Parent = old.point
 
         return old.text
@@ -1114,7 +1191,7 @@ local function createRadar(config)
         point.AnchorPoint = Vector2.new(0.5, 0.5)
         point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
         point.BorderSizePixel = 0
-        point.ZIndex = 10                          -- поверх обводки круга
+        point.ZIndex = 10
         point.Size = UDim2.fromOffset(
             data.size or 8,
             data.size or 8
