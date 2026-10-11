@@ -1,1729 +1,1193 @@
-function createInfoGui(config)
-    config = config or {}
+-- [[ KRALLDEN SPY v9.9.1 - FIXED BE PHANTOM + SCALE DRIFT ]] --
 
-    local TweenService = game:GetService("TweenService")
-    local UserInputService = game:GetService("UserInputService")
-    local CoreGui = game:GetService("CoreGui")
+local player = game:GetService("Players").LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local TextService = game:GetService("TextService")
+local UserInputService = game:GetService("UserInputService")
 
-    local function pick(tbl, ...)
-        if type(tbl) ~= "table" then return nil end
-        for _, key in ipairs({...}) do
-            if tbl[key] ~= nil then return tbl[key] end
-        end
-        return nil
-    end
+-- Проверка на мобильное устройство (Touch есть, Клавиатуры нет)
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
-    -- ========= CustomWindow =========
-    local cw = pick(config, "CustomWindow", "customWindow") or {}
+-- Очистка старых версий
+if playerGui:FindFirstChild("KralldenSpyUI") then 
+    playerGui.KralldenSpyUI:Destroy() 
+end
 
-    local windowColor          = pick(cw, "WindowColor", "windowColor")             or Color3.fromRGB(30, 30, 35)
-    local windowTransparency   = pick(cw, "WindowTransparency", "windowTransparency")
-    if windowTransparency == nil then windowTransparency = 0 end
-    local headerColor          = pick(cw, "HeaderColor", "headerColor")             or Color3.fromRGB(35, 35, 42)
-    local headerTransparency   = pick(cw, "HeaderTransparency", "headerTransparency")
-    if headerTransparency == nil then headerTransparency = 0 end
-    local borderColor          = pick(cw, "BorderColor", "borderColor")             or Color3.fromRGB(65, 65, 75)
-    local borderThickness      = pick(cw, "BorderThickness", "borderThickness") or 1
-    local borderTransparency   = pick(cw, "BorderTransparency", "borderTransparency")
-    if borderTransparency == nil then borderTransparency = 0.15 end
-    local cornerRadius         = pick(cw, "CornerRadius", "cornerRadius") or 8
-    local accentColor          = pick(cw, "AccentColor", "accentColor")             or Color3.fromRGB(90, 145, 255)
-    local titleColor           = pick(cw, "TitleColor", "titleColor")               or Color3.fromRGB(245, 245, 248)
-    local shadowColor          = pick(cw, "ShadowColor", "shadowColor")             or Color3.new(0, 0, 0)
-    local shadowTransparency   = pick(cw, "ShadowTransparency", "shadowTransparency")
-    if shadowTransparency == nil then shadowTransparency = 0.65 end
-    local toggleColor          = pick(cw, "ToggleColor", "toggleColor")             or Color3.fromRGB(48, 48, 58)
-    local toggleTextColor      = pick(cw, "ToggleTextColor", "toggleTextColor")     or Color3.fromRGB(210, 210, 220)
-    local scrollbarColor       = pick(cw, "ScrollbarColor", "scrollbarColor")       or accentColor
-    local lineTextColor        = pick(cw, "LineTextColor", "lineTextColor")         or Color3.fromRGB(255, 255, 255)
-
-    -- ========= Основные настройки окна =========
-    local guiName   = pick(config, "Name", "name") or "CustomWindow"
-    local title     = pick(config, "Title", "title") or "Window"
-    local width     = pick(config, "Width", "width") or 200
-    local scale     = pick(config, "Scale", "scale") or 1
-    local position  = pick(config, "Position", "position") or UDim2.new(0.05, 0, 0.15, 0)
-    local textSize  = pick(config, "TextSize", "textSize") or 14
-    local font      = pick(config, "Font", "font") or Enum.Font.GothamMedium
-    local titleFont = pick(config, "TitleFont", "titleFont") or Enum.Font.GothamSemibold
-
-    local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
-    local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
-
-    -- ========= AutoSize =========
-    -- Enabled = true             → динамический рост по контенту, верхняя граница = MaxSize
-    -- Enabled = false            → фиксированная высота = MaxSize
-    -- WindowEdge = true          → игнорит MaxSize, тянется до низа экрана (EDGE_MARGIN)
-    -- WindowEdgeWithMaxSize = true (только при WindowEdge = true)
-    --                              → максимум = min(MaxSize, доступная_высота_до_низа)
-    local autoSizeCfg        = pick(config, "AutoSize", "autoSize") or {}
-    local autoSizeEnabled    = pick(autoSizeCfg, "Enabled", "enabled")
-    if autoSizeEnabled == nil then autoSizeEnabled = true end
-    local autoSizeMaxSize    = pick(autoSizeCfg, "MaxSize", "maxSize") or 500
-    local autoSizeWindowEdge = pick(autoSizeCfg, "WindowEdge", "windowEdge")
-    if autoSizeWindowEdge == nil then autoSizeWindowEdge = false end
-    local autoSizeWindowEdgeWithMaxSize =
-        pick(autoSizeCfg, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
-    if autoSizeWindowEdgeWithMaxSize == nil then autoSizeWindowEdgeWithMaxSize = false end
-
-    -- ========= Константы =========
-    local headerHeight  = 32
-    local bottomPadding = 3
-    local linePadding   = 2
-    local EDGE_MARGIN   = 12      -- физические пиксели
-
-    local tweenTime     = pick(config, "TweenTime", "tweenTime") or 0.22
-    local tweenInfo     = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    local lineFadeInfo  = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-    -- ========= Создание GUI =========
-    local screen = CoreGui:FindFirstChild(guiName)
-    if screen then screen:Destroy() end
-
-    screen = Instance.new("ScreenGui")
-    screen.Name = guiName
-    screen.ResetOnSpawn = false
-    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screen.Parent = CoreGui
-
-    local frame = Instance.new("Frame")
-    frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, width, 0, headerHeight)
-    frame.Position = position
-    frame.BackgroundColor3 = windowColor
-    frame.BackgroundTransparency = windowTransparency
-    frame.BorderSizePixel = 0
-    frame.Active = true
-    frame.ClipsDescendants = true
-    frame.Parent = screen
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, cornerRadius)
-    corner.Parent = frame
-
-    local frameStroke = Instance.new("UIStroke")
-    frameStroke.Name = "Border"
-    frameStroke.Color = borderColor
-    frameStroke.Thickness = borderThickness
-    frameStroke.Transparency = borderTransparency
-    frameStroke.Parent = frame
-
-    local uiScale = Instance.new("UIScale")
-    uiScale.Scale = scale
-    uiScale.Parent = frame
-
-    local shadow = Instance.new("Frame")
-    shadow.Name = "Shadow"
-    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-    shadow.Position = UDim2.new(0.5, 0, 0.5, 2)
-    shadow.Size = UDim2.new(1, 6, 1, 6)
-    shadow.BackgroundColor3 = shadowColor
-    shadow.BackgroundTransparency = shadowTransparency
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = -1
-    shadow.Parent = frame
-
-    local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, cornerRadius + 1)
-    shadowCorner.Parent = shadow
-
-    local header = Instance.new("Frame")
-    header.Name = "Header"
-    header.Size = UDim2.new(1, 0, 0, headerHeight)
-    header.BackgroundColor3 = headerColor
-    header.BackgroundTransparency = headerTransparency
-    header.BorderSizePixel = 0
-    header.Active = true
-    header.ZIndex = 2
-    header.Parent = frame
-
-    local headerCorner = Instance.new("UICorner")
-    headerCorner.CornerRadius = UDim.new(0, cornerRadius)
-    headerCorner.Parent = header
-
-    local accent = Instance.new("Frame")
-    accent.Name = "Accent"
-    accent.Position = UDim2.new(0, 7, 0.5, -7)
-    accent.Size = UDim2.fromOffset(3, 14)
-    accent.BackgroundColor3 = accentColor
-    accent.BorderSizePixel = 0
-    accent.ZIndex = 3
-    accent.Parent = header
-
-    local accentCorner = Instance.new("UICorner")
-    accentCorner.CornerRadius = UDim.new(1, 0)
-    accentCorner.Parent = accent
-
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Name = "Title"
-    titleLabel.Position = UDim2.new(0, 17, 0, 0)
-    titleLabel.Size = UDim2.new(1, -51, 1, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = titleColor
-    titleLabel.Font = titleFont
-    titleLabel.TextSize = textSize + 2
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.TextYAlignment = Enum.TextYAlignment.Center
-    titleLabel.ZIndex = 3
-    titleLabel.Parent = header
-
-    local toggle = Instance.new("TextButton")
-    toggle.Name = "Toggle"
-    toggle.AnchorPoint = Vector2.new(1, 0.5)
-    toggle.Position = UDim2.new(1, -7, 0.5, 0)
-    toggle.Size = UDim2.fromOffset(24, 24)
-    toggle.BackgroundColor3 = toggleColor
-    toggle.BackgroundTransparency = 0.15
-    toggle.BorderSizePixel = 0
-    toggle.AutoButtonColor = false
-    toggle.Text = "⌃"
-    toggle.TextColor3 = toggleTextColor
-    toggle.Font = Enum.Font.GothamBold
-    toggle.TextSize = 15
-    toggle.ZIndex = 4
-    toggle.Parent = header
-
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 6)
-    toggleCorner.Parent = toggle
-
-    -- ======== Скроллящийся контейнер ========
-    local scrolling = Instance.new("ScrollingFrame")
-    scrolling.Name = "Container"
-    scrolling.Position = UDim2.new(0, 0, 0, headerHeight)
-    scrolling.Size = UDim2.new(1, 0, 1, -headerHeight)
-    scrolling.BackgroundTransparency = 1
-    scrolling.BorderSizePixel = 0
-    scrolling.ScrollBarThickness = 0
-    scrolling.ScrollBarImageColor3 = scrollbarColor
-    scrolling.ScrollBarImageTransparency = 0.3
-    scrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
-    scrolling.ElasticBehavior = Enum.ElasticBehavior.Never
-    scrolling.Parent = frame
-
-    if Enum.AutomaticSize then
-        scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    end
-
-    local layout = Instance.new("UIListLayout")
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, linePadding)
-    layout.Parent = scrolling
-
-    local labels = {}
-    local lineData = {}
-    local creationCounter = 0
-
-    local collapsed = pick(config, "Collapsed", "collapsed") == true
-    local activeTween
-
-    local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
-
-    -- ======== Scale-aware helpers ========
-    local function getScale()
-        local s = uiScale.Scale
-        return (s and s > 0) and s or 1
-    end
-
-    local function getContentHeightLogical()
-        return layout.AbsoluteContentSize.Y / getScale()
-    end
-
-    -- Эффективная максимальная высота окна (в логических юнитах).
-    -- Минимум = headerHeight (чтобы хедер всегда влезал).
-    local function getEffectiveMaxHeightLogical()
-        -- WindowEdgeWithMaxSize работает ТОЛЬКО когда WindowEdge = true
-        if autoSizeWindowEdge then
-            local screenH = screen.AbsoluteSize.Y
-            local yPos    = frame.AbsolutePosition.Y
-            local edgeAvailable = (screenH - yPos - EDGE_MARGIN) / getScale()
-
-            -- Не даём уйти ниже headerHeight — иначе хедер пропадёт
-            edgeAvailable = math.max(edgeAvailable, headerHeight)
-
-            if autoSizeWindowEdgeWithMaxSize then
-                -- Комбинированный режим: учитываем и MaxSize, и край экрана
-                return math.min(autoSizeMaxSize, edgeAvailable)
-            else
-                -- Чистый WindowEdge: игнорит MaxSize
-                return edgeAvailable
-            end
-        else
-            -- WindowEdge выключен — WindowEdgeWithMaxSize игнорируется
-            return autoSizeMaxSize
-        end
-    end
-
-    local function isEdgeMode()
-        -- Активен ли режим "прилипания к низу экрана" (нужно для drag/screen-resize)
-        return autoSizeWindowEdge
-    end
-
-    -- ======== Обновление размера ========
-    local function updateFrameSize(animate)
-        local targetHeight
-
-        if collapsed then
-            targetHeight = headerHeight
-        else
-            local contentH = getContentHeightLogical()
-            local desired  = headerHeight + contentH + bottomPadding
-
-            if autoSizeEnabled then
-                local maxH = getEffectiveMaxHeightLogical()
-                targetHeight = math.min(desired, maxH)
-            else
-                targetHeight = autoSizeMaxSize
-            end
-        end
-
-        -- Полоса прокрутки
-        if not collapsed then
-            local contentH   = getContentHeightLogical()
-            local availableH = targetHeight - headerHeight
-            if contentH > availableH + 1 then
-                scrolling.ScrollBarThickness = 4
-            else
-                scrolling.ScrollBarThickness = 0
-            end
-        else
-            scrolling.ScrollBarThickness = 0
-        end
-
-        if activeTween then activeTween:Cancel() activeTween = nil end
-
-        if animate and not (isEdgeMode() and dragging) then
-            activeTween = TweenService:Create(
-                frame, tweenInfo, { Size = UDim2.new(0, width, 0, targetHeight) }
-            )
-            activeTween:Play()
-        else
-            frame.Size = UDim2.new(0, width, 0, targetHeight)
-        end
-    end
-
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        if not collapsed then
-            updateFrameSize(true)
+for _, gui in ipairs(game.CoreGui:GetChildren()) do
+    pcall(function()
+        if gui.Name == "KralldenSpyUI" then 
+            gui:Destroy()
+        elseif gui:FindFirstChild("KralldenSpyUI") then 
+            gui.KralldenSpyUI:Destroy() 
         end
     end)
+end
 
-    screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-        if isEdgeMode() and not collapsed then
-            updateFrameSize(false)
+local targetParent = (gethui and gethui()) or (game:GetService("CoreGui"):FindFirstChild("RobloxGui")) or playerGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KralldenSpyUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 10
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = targetParent
+
+-- Anti-Hide
+task.spawn(function()
+    while task.wait(1) do 
+        if ScreenGui and ScreenGui.Parent and not ScreenGui.Enabled then 
+            ScreenGui.Enabled = true 
+        end 
+    end
+end)
+
+local Main = Instance.new("Frame")
+Main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+Main.Size = UDim2.new(0, 820, 0, 440)
+Main.Position = UDim2.new(0.5, -410, 0.5, -220)
+Main.Active = true
+Main.Draggable = true
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 8)
+mainCorner.Parent = Main
+
+-- === МАСШТАБ ДЛЯ МОБИЛОК (1.5x меньше) ===
+local uiScale = Instance.new("UIScale")
+uiScale.Name = "AutoScale"
+uiScale.Scale = isMobile and (2/3) or 1
+uiScale.Parent = Main
+
+-- === КНОПКА ТЕСТА МАСШТАБА (справа от окна) ===
+local TestScaleBtn = Instance.new("TextButton")
+TestScaleBtn.Name = "TestScaleBtn"
+TestScaleBtn.Size = UDim2.new(0, 44, 0, 44)
+TestScaleBtn.Position = UDim2.new(1, 8, 0, 0)
+TestScaleBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 160)
+TestScaleBtn.Text = isMobile and "66%" or "100%"
+TestScaleBtn.TextColor3 = Color3.new(1, 1, 1)
+TestScaleBtn.Font = Enum.Font.SourceSansBold
+TestScaleBtn.TextSize = 13
+TestScaleBtn.BorderSizePixel = 0
+TestScaleBtn.ZIndex = 30
+TestScaleBtn.Parent = Main
+
+local tsCorner = Instance.new("UICorner")
+tsCorner.CornerRadius = UDim.new(0, 6)
+tsCorner.Parent = TestScaleBtn
+
+local scaleModes = {1, 2/3}
+local scaleIdx = isMobile and 2 or 1
+
+TestScaleBtn.MouseButton1Click:Connect(function()
+    scaleIdx = (scaleIdx % #scaleModes) + 1
+    uiScale.Scale = scaleModes[scaleIdx]
+    TestScaleBtn.Text = tostring(math.floor(scaleModes[scaleIdx] * 100 + 0.5)) .. "%"
+end)
+
+-- Основные переменные и таблицы
+local MainMemory = {}
+local ManualBannedPaths = {}
+local AntiSpamCooldowns = {}
+local AntiSpamCounts = {}
+
+local pathCache = setmetatable({}, {__mode = "k"})
+
+local selfMode = true
+local controlMode = true
+local antiSpam = true
+
+local spyFS = true
+local spyFC = false
+local spyIS = false
+local spyBE = false  -- BindableEvent
+
+local sortArgs = false
+local currentSelectionGUID = nil
+local lastCount = 0
+local lastRedCount = 0 
+local isMin = false
+
+local function generateGUID() 
+    return tostring(tick()) .. "-" .. tostring(math.random(1, 100000)) 
+end
+
+local RedListScroll
+local Scroll
+local Details
+local ContentFrame
+local DetailsScroll
+
+-- Вспомогательные функции UI
+local activeFeedbacks = {}
+local function feedback(button, tempText)
+    if not button or activeFeedbacks[button] then return end
+    activeFeedbacks[button] = true
+    local oldText = button.Text
+    button.Text = tempText
+    task.delay(1, function()
+        if button and button.Parent then 
+            button.Text = oldText 
+            activeFeedbacks[button] = nil
         end
     end)
+end
 
-    -- ======== Вспомогательные ========
-    local function setContentTransparency(transparency, instant)
-        for _, label in pairs(labels) do
-            if instant then
-                label.TextTransparency = transparency
-            else
-                TweenService:Create(label, tweenInfo, { TextTransparency = transparency }):Play()
+local function forceUpdateCanvas()
+    if not Details or not DetailsScroll then return end
+    local width = DetailsScroll.AbsoluteSize.X - 45 
+    if width <= 0 then width = 413 end
+    
+    local cleanText = Details.Text:gsub("%z", "") 
+    local size = TextService:GetTextSize(cleanText, Details.TextSize, Details.Font, Vector2.new(width, math.huge))
+    local textHeight = size.Y + 60
+    Details.Size = UDim2.new(1, -10, 0, textHeight)
+    DetailsScroll.CanvasSize = UDim2.new(0, 0, 0, textHeight)
+end
+
+local function updateDetailsView()
+    if not currentSelectionGUID then 
+        Details.Text = ""
+        forceUpdateCanvas()
+        return 
+    end
+    
+    local found = false
+    for _, d in ipairs(MainMemory) do
+        if d.guid == currentSelectionGUID then 
+            Details.Text = sortArgs and d.fullTextPretty or d.fullText
+            found = true
+            break 
+        end
+    end
+    
+    if not found then
+        for _, data in pairs(ManualBannedPaths) do
+            if data.guid == currentSelectionGUID then 
+                Details.Text = sortArgs and (data.fullTextPretty or data.fullText) or data.fullText
+                found = true
+                break 
             end
+        end
+    end
+    forceUpdateCanvas()
+end
 
-            local stroke = label:FindFirstChild("Outline")
-            if stroke then
-                if instant then
-                    stroke.Transparency = transparency
+local function refreshSelectionColors()
+    if not Scroll or not RedListScroll then return end
+    
+    for _, v in pairs(Scroll:GetChildren()) do
+        if v:IsA("TextButton") then
+            local isSelected = (v:GetAttribute("GUID") == currentSelectionGUID)
+            if isSelected then
+                v.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
+            else
+                if v:GetAttribute("IsSelf") then
+                    v.BackgroundColor3 = Color3.fromRGB(45, 90, 45)
                 else
-                    TweenService:Create(stroke, tweenInfo, { Transparency = transparency }):Play()
+                    v.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
                 end
             end
         end
     end
-
-    local function applyOutline(label, data)
-        local stroke = label:FindFirstChild("Outline")
-        if data.outlineSize then
-            if not stroke then
-                stroke = Instance.new("UIStroke")
-                stroke.Name = "Outline"
-                stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-                stroke.Parent = label
-            end
-            stroke.Color = data.outlineColor or defaultOutlineColor
-            stroke.Thickness = data.outlineSize
-            stroke.Transparency = collapsed and 1 or 0
-        elseif stroke then
-            stroke:Destroy()
-        end
-    end
-
-    local function updateOrder()
-        local explicit, withoutOrder = {}, {}
-        for _, data in pairs(lineData) do
-            if data.order ~= nil then table.insert(explicit, data)
-            else table.insert(withoutOrder, data) end
-        end
-
-        table.sort(explicit, function(a, b)
-            if a.order == b.order then return a.created < b.created end
-            return a.order < b.order
-        end)
-        table.sort(withoutOrder, function(a, b) return a.created < b.created end)
-
-        local used = {}
-        for _, data in ipairs(explicit) do
-            local order = math.max(1, math.floor(data.order))
-            while used[order] do order = order + 1 end
-            used[order] = true
-            labels[data.id].LayoutOrder = order
-        end
-
-        local current = 1
-        for _, data in ipairs(withoutOrder) do
-            while used[current] do current = current + 1 end
-            used[current] = true
-            labels[data.id].LayoutOrder = current
-            current = current + 1
-        end
-    end
-
-    local function setLine(data)
-        if not data or not data.id then return end
-
-        local id = data.id
-        local label = labels[id]
-        local isNew = label == nil
-
-        if isNew then
-            creationCounter = creationCounter + 1
-
-            label = Instance.new("TextLabel")
-            label.Name = id
-            label.Size = UDim2.new(1, 0, 0, 0)
-            label.AutomaticSize = Enum.AutomaticSize.Y
-            label.TextWrapped = true
-            label.BackgroundTransparency = 1
-            label.Font = font
-            label.TextSize = textSize
-            label.TextXAlignment = Enum.TextXAlignment.Left
-            label.TextYAlignment = Enum.TextYAlignment.Top
-            label.TextTransparency = 1
-            label.Parent = scrolling
-
-            local padding = Instance.new("UIPadding")
-            padding.PaddingLeft   = UDim.new(0, 8)
-            padding.PaddingRight  = UDim.new(0, 8)
-            padding.PaddingTop    = UDim.new(0, 1)
-            padding.PaddingBottom = UDim.new(0, 1)
-            padding.Parent = label
-
-            labels[id] = label
-            lineData[id] = {
-                id = id,
-                text = "",
-                color = lineTextColor,
-                outlineColor = defaultOutlineColor,
-                outlineSize = defaultOutlineSize,
-                order = nil,
-                created = creationCounter,
-            }
-        end
-
-        local saved = lineData[id]
-
-        if data.text          ~= nil then saved.text          = data.text end
-        if data.color         ~= nil then saved.color         = data.color end
-        if data.outlineColor  ~= nil then saved.outlineColor  = data.outlineColor end
-        if data.outlineSize   ~= nil then saved.outlineSize   = data.outlineSize == false and nil or data.outlineSize end
-        if data.order         ~= nil then saved.order         = data.order == false and nil or data.order end
-
-        label.Text = saved.text
-        label.TextColor3 = saved.color
-        applyOutline(label, saved)
-
-        if isNew and not collapsed then
-            local stroke = label:FindFirstChild("Outline")
-            if stroke then stroke.Transparency = 1 end
-
-            TweenService:Create(label, lineFadeInfo, { TextTransparency = 0 }):Play()
-            if stroke then
-                TweenService:Create(stroke, lineFadeInfo, { Transparency = 0 }):Play()
+    
+    for _, v in pairs(RedListScroll:GetChildren()) do
+        if v:IsA("TextButton") then
+            local isSelected = (v:GetAttribute("GUID") == currentSelectionGUID)
+            if isSelected then
+                v.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
+            else
+                v.BackgroundColor3 = Color3.fromRGB(100, 35, 35)
             end
         end
-
-        task.defer(function()
-            if not collapsed then
-                updateFrameSize(true)
-            end
-        end)
     end
-
-    local function setText(lines)
-        if not lines then return end
-        for _, data in ipairs(lines) do setLine(data) end
-        updateOrder()
-        updateFrameSize(true)
-        if not collapsed then setContentTransparency(0, false) end
-    end
-
-    local function setCollapsed(state, animate)
-        collapsed = state == true
-        toggle.Text = collapsed and "⌄" or "⌃"
-        if collapsed then setContentTransparency(1, not animate) end
-        updateFrameSize(animate)
-        if not collapsed then setContentTransparency(0, not animate) end
-    end
-
-    for _, data in ipairs(pick(config, "Lines", "lines") or {}) do
-        setLine(data)
-    end
-
-    updateOrder()
-    if collapsed then setContentTransparency(1, true) end
-    updateFrameSize(false)
-
-    task.defer(function()
-        if not collapsed then
-            updateFrameSize(false)
-        end
-    end)
-
-    -- ======== Drag ========
-    local function updateDrag(input)
-        if not dragging or not dragStart or not startPos then return end
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-        if isEdgeMode() and not collapsed then
-            updateFrameSize(false)
-        end
-    end
-
-    header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-            dragging  = true
-            dragStart = input.Position
-            startPos  = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-
-    header.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput then updateDrag(input) end
-    end)
-
-    toggle.MouseEnter:Connect(function()
-        TweenService:Create(toggle, TweenInfo.new(0.12), {
-            BackgroundColor3 = accentColor,
-            TextColor3 = Color3.new(1, 1, 1),
-        }):Play()
-    end)
-
-    toggle.MouseLeave:Connect(function()
-        TweenService:Create(toggle, TweenInfo.new(0.12), {
-            BackgroundColor3 = toggleColor,
-            TextColor3 = toggleTextColor,
-        }):Play()
-    end)
-
-    toggle.MouseButton1Click:Connect(function()
-        setCollapsed(not collapsed, true)
-    end)
-
-    -- ======== API ========
-    local api = {}
-
-    function api:SetText(lines) setText(lines) end
-
-    function api:RemoveLine(id)
-        local label = labels[id]
-        if label then
-            label:Destroy()
-            labels[id] = nil
-            lineData[id] = nil
-            updateOrder()
-            updateFrameSize(true)
-            task.defer(function()
-                if not collapsed then updateFrameSize(true) end
-            end)
-        end
-    end
-
-    function api:Clear()
-        for _, label in pairs(labels) do
-            label:Destroy()
-        end
-        labels, lineData = {}, {}
-        updateOrder()
-        updateFrameSize(true)
-        task.defer(function()
-            if not collapsed then updateFrameSize(true) end
-        end)
-    end
-
-    function api:Visible(state) screen.Enabled = state end
-
-    function api:SetScale(value)
-        uiScale.Scale = value or 1
-        updateFrameSize(true)
-        task.defer(function()
-            if not collapsed then updateFrameSize(true) end
-        end)
-    end
-
-    function api:SetPosition(value) if value then frame.Position = value end end
-    function api:SetTitle(newTitle)
-        title = tostring(newTitle)
-        titleLabel.Text = title
-    end
-
-    function api:Collapse(state) setCollapsed(state, true) end
-    function api:Toggle() setCollapsed(not collapsed, true) end
-    function api:IsCollapsed() return collapsed end
-
-    -- ======== Runtime setters ========
-    function api:SetAutoSize(cfg)
-        if type(cfg) ~= "table" then return end
-        local e = pick(cfg, "Enabled", "enabled")
-        if e ~= nil then autoSizeEnabled = e == true end
-        local m = pick(cfg, "MaxSize", "maxSize")
-        if m ~= nil then autoSizeMaxSize = tonumber(m) or autoSizeMaxSize end
-        local w = pick(cfg, "WindowEdge", "windowEdge")
-        if w ~= nil then autoSizeWindowEdge = w == true end
-        local wm = pick(cfg, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
-        if wm ~= nil then autoSizeWindowEdgeWithMaxSize = wm == true end
-        updateFrameSize(true)
-    end
-
-    function api:SetAutoSizeEnabled(v)
-        autoSizeEnabled = v == true
-        updateFrameSize(true)
-    end
-
-    function api:SetMaxSize(v)
-        autoSizeMaxSize = tonumber(v) or autoSizeMaxSize
-        updateFrameSize(true)
-    end
-
-    function api:SetWindowEdge(v)
-        autoSizeWindowEdge = v == true
-        updateFrameSize(true)
-    end
-
-    function api:SetWindowEdgeWithMaxSize(v)
-        autoSizeWindowEdgeWithMaxSize = v == true
-        updateFrameSize(true)
-    end
-
-    function api:SetCustomWindow(tbl)
-        if type(tbl) ~= "table" then return end
-        local v
-
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then windowColor = v; frame.BackgroundColor3 = v end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then windowTransparency = v; frame.BackgroundTransparency = v end
-
-        v = pick(tbl, "HeaderColor", "headerColor")
-        if v ~= nil then headerColor = v; header.BackgroundColor3 = v end
-        v = pick(tbl, "HeaderTransparency", "headerTransparency")
-        if v ~= nil then headerTransparency = v; header.BackgroundTransparency = v end
-
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then borderColor = v; frameStroke.Color = v end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then borderThickness = v; frameStroke.Thickness = v end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then borderTransparency = v; frameStroke.Transparency = v end
-
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then
-            cornerRadius = v
-            corner.CornerRadius = UDim.new(0, v)
-            headerCorner.CornerRadius = UDim.new(0, v)
-            shadowCorner.CornerRadius = UDim.new(0, v + 1)
-        end
-
-        v = pick(tbl, "AccentColor", "accentColor")
-        if v ~= nil then accentColor = v; accent.BackgroundColor3 = v end
-
-        v = pick(tbl, "TitleColor", "titleColor")
-        if v ~= nil then titleColor = v; titleLabel.TextColor3 = v end
-
-        v = pick(tbl, "ShadowColor", "shadowColor")
-        if v ~= nil then shadowColor = v; shadow.BackgroundColor3 = v end
-        v = pick(tbl, "ShadowTransparency", "shadowTransparency")
-        if v ~= nil then shadowTransparency = v; shadow.BackgroundTransparency = v end
-
-        v = pick(tbl, "ToggleColor", "toggleColor")
-        if v ~= nil then toggleColor = v; toggle.BackgroundColor3 = v end
-        v = pick(tbl, "ToggleTextColor", "toggleTextColor")
-        if v ~= nil then toggleTextColor = v; toggle.TextColor3 = v end
-
-        v = pick(tbl, "ScrollbarColor", "scrollbarColor")
-        if v ~= nil then scrollbarColor = v; scrolling.ScrollBarImageColor3 = v end
-
-        v = pick(tbl, "LineTextColor", "lineTextColor")
-        if v ~= nil then lineTextColor = v end
-    end
-
-    function api:Remove()
-        if activeTween then activeTween:Cancel() activeTween = nil end
-        if screen then screen:Destroy() screen = nil end
-    end
-
-    return api
 end
 
-function createInfoText(config)
-    config = config or {}
-
-    local TweenService = game:GetService("TweenService")
-
-    local function pick(tbl, ...)
-        if type(tbl) ~= "table" then return nil end
-        for _, key in ipairs({...}) do
-            if tbl[key] ~= nil then return tbl[key] end
+local function formatTableVisual(val, indent)
+    indent = indent or 0
+    local tab = string.rep("    ", indent)
+    local t = typeof(val)
+    
+    if t == "table" then
+        local res = "{\n"
+        local isArray = true
+        local count = 0
+        
+        for k, v in pairs(val) do 
+            count = count + 1
+            if type(k) ~= "number" or k ~= count then 
+                isArray = false 
+                break 
+            end 
         end
-        return nil
-    end
-
-    local name           = pick(config, "Name", "name") or "GhostRoomESP"
-    local center         = pick(config, "Center", "center")
-    local offset         = pick(config, "Offset", "offset") or Vector3.new(0, 3, 0)
-    local baseTextSize   = pick(config, "TextSize", "textSize") or 20
-    local textSize       = baseTextSize
-    local baseSize       = pick(config, "Size", "size") or UDim2.new(0, 300, 0, 0)
-    local size           = baseSize
-    local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
-    local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
-
-    -- CustomWindow-стиль
-    local cw = pick(config, "CustomWindow", "customWindow") or {}
-
-    -- ShowWindow: приоритет у CustomWindow
-    local showWindow = false
-    local swConfig = pick(config, "ShowWindow", "showWindow")
-    local swCustom = pick(cw, "ShowWindow", "showWindow")
-    if swCustom ~= nil then
-        showWindow = swCustom == true
-    elseif swConfig ~= nil then
-        showWindow = swConfig == true
-    end
-
-    local windowBackground             = pick(cw, "WindowColor", "windowColor")             or Color3.fromRGB(30, 30, 35)
-    local windowBackgroundTransparency = pick(cw, "WindowTransparency", "windowTransparency")
-    if windowBackgroundTransparency == nil then windowBackgroundTransparency = 0.15 end
-    local windowBorderColor            = pick(cw, "BorderColor", "borderColor")             or Color3.fromRGB(65, 65, 75)
-    local windowBorderThickness        = pick(cw, "BorderThickness", "borderThickness") or 1
-    local windowBorderTransparency     = pick(cw, "BorderTransparency", "borderTransparency")
-    if windowBorderTransparency == nil then windowBorderTransparency = 0.15 end
-    local windowCorner                 = pick(cw, "CornerRadius", "cornerRadius") or 8
-    local windowPadding                = pick(cw, "Padding", "padding") or 8
-
-    local sizeTweenInfo = TweenInfo.new(
-        pick(config, "TweenTime", "tweenTime") or 0.22,
-        Enum.EasingStyle.Quint,
-        Enum.EasingDirection.Out
-    )
-
-    local billboard, container, windowFrame
-    local labels, lineData = {}, {}
-    local creationCounter = 0
-    local currentAdornee
-    local isActive = true
-    local activeSizeTween
-
-    local pendingOrder, pendingData = {}, {}
-
-    local function resolveAdornee(target)
-        if not target then return nil end
-        if target:IsA("Model") then
-            target = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
-        end
-        if not target or not target:IsA("BasePart") then return nil end
-        return target
-    end
-
-    local function applyOutline(label, data)
-        local stroke = label:FindFirstChild("Outline")
-        if data.outlineSize then
-            if not stroke then
-                stroke = Instance.new("UIStroke")
-                stroke.Name = "Outline"
-                stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-                stroke.Parent = label
+       
+        for k, v in pairs(val) do
+            local keyStr = ""
+            if not isArray then
+                if type(k) == "string" then
+                    keyStr = k .. " = "
+                else
+                    keyStr = "[" .. tostring(k) .. "] = "
+                end
             end
-            stroke.Color = data.outlineColor or defaultOutlineColor
-            stroke.Thickness = data.outlineSize
-            stroke.Transparency = 0
-        elseif stroke then
-            stroke:Destroy()
+            res = res .. tab .. "    " .. keyStr .. formatTableVisual(v, indent + 1) .. ",\n"
         end
+        return res .. tab .. "}"
+    elseif t == "string" then 
+        return '"' .. val .. '"'
+    elseif t == "Vector3" then 
+        return string.format("Vector3.new(%.3f, %.3f, %.3f)", val.X, val.Y, val.Z)
+    elseif t == "CFrame" then 
+        return "CFrame.new(" .. tostring(val) .. ")"
+    else 
+        return tostring(val) 
     end
-
-    local function updateOrder()
-        local explicit, withoutOrder = {}, {}
-        for _, data in pairs(lineData) do
-            if data.order ~= nil then table.insert(explicit, data)
-            else table.insert(withoutOrder, data) end
-        end
-        table.sort(explicit, function(a, b)
-            if a.order == b.order then return a.created < b.created end
-            return a.order < b.order
-        end)
-        table.sort(withoutOrder, function(a, b) return a.created < b.created end)
-
-        local used = {}
-        for _, data in ipairs(explicit) do
-            local order = math.max(1, math.floor(data.order))
-            while used[order] do order = order + 1 end
-            used[order] = true
-            labels[data.id].LayoutOrder = order
-        end
-        local current = 1
-        for _, data in ipairs(withoutOrder) do
-            while used[current] do current = current + 1 end
-            used[current] = true
-            labels[data.id].LayoutOrder = current
-            current = current + 1
-        end
-    end
-
-    local function applyWindowLayout()
-        if not container then return end
-        local p = showWindow and windowPadding or 0
-        container.Position = UDim2.new(0, p, 0, p)
-        container.Size     = UDim2.new(1, -p * 2, 1, -p * 2)
-        if windowFrame then windowFrame.Visible = showWindow end
-    end
-
-    local function updateSize(animate)
-        if not billboard then return end
-        local layout = container and container:FindFirstChildOfClass("UIListLayout")
-        local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
-        local extra = showWindow and (windowPadding * 2) or 0
-        local autoHeight = math.max(textSize + extra, layoutHeight + extra)
-
-        local targetHeight
-        if size.Y.Offset and size.Y.Offset > 0 then
-            targetHeight = size.Y.Offset
-        else
-            targetHeight = autoHeight
-        end
-
-        local targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, targetHeight)
-
-        if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
-        if animate then
-            activeSizeTween = TweenService:Create(billboard, sizeTweenInfo, { Size = targetSize })
-            activeSizeTween:Play()
-        else
-            billboard.Size = targetSize
-        end
-    end
-
-    local function createBillboard()
-        local adornee = resolveAdornee(center)
-        if not adornee then return false end
-        currentAdornee = adornee
-
-        billboard = Instance.new("BillboardGui")
-        billboard.Name = name
-        billboard.Adornee = adornee
-        billboard.Size = size
-        billboard.StudsOffset = offset
-        billboard.AlwaysOnTop = true
-        billboard.Enabled = isActive
-        billboard.Parent = adornee
-
-        windowFrame = Instance.new("Frame")
-        windowFrame.Name = "Window"
-        windowFrame.Size = UDim2.new(1, 0, 1, 0)
-        windowFrame.Position = UDim2.new(0, 0, 0, 0)
-        windowFrame.BackgroundColor3 = windowBackground
-        windowFrame.BackgroundTransparency = windowBackgroundTransparency
-        windowFrame.BorderSizePixel = 0
-        windowFrame.Visible = showWindow
-        windowFrame.ZIndex = 0
-        windowFrame.Parent = billboard
-
-        local wc = Instance.new("UICorner")
-        wc.CornerRadius = UDim.new(0, windowCorner)
-        wc.Parent = windowFrame
-
-        local ws = Instance.new("UIStroke")
-        ws.Name = "Border"
-        ws.Color = windowBorderColor
-        ws.Thickness = windowBorderThickness
-        ws.Transparency = windowBorderTransparency
-        ws.Parent = windowFrame
-
-        container = Instance.new("Frame")
-        container.Name = "Container"
-        container.Size = UDim2.new(1, 0, 1, 0)
-        container.BackgroundTransparency = 1
-        container.ZIndex = 1
-        container.Parent = billboard
-
-        local layout = Instance.new("UIListLayout")
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Padding = UDim.new(0, 2)
-        layout.Parent = container
-
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            updateSize(true)
-        end)
-
-        applyWindowLayout()
-        return true
-    end
-
-    local setLine
-    local function flushPending()
-        if #pendingOrder == 0 then return end
-        local savedOrder, savedData = pendingOrder, pendingData
-        pendingOrder, pendingData = {}, {}
-        for _, id in ipairs(savedOrder) do
-            if savedData[id] then setLine(savedData[id]) end
-        end
-    end
-
-    setLine = function(data)
-        if not data or not data.id then return end
-        if not billboard or not billboard.Parent then
-            if not createBillboard() then
-                if not pendingData[data.id] then table.insert(pendingOrder, data.id) end
-                pendingData[data.id] = data
-                return
-            end
-            flushPending()
-        end
-
-        local id = data.id
-        local label = labels[id]
-
-        if not label then
-            creationCounter = creationCounter + 1
-            label = Instance.new("TextLabel")
-            label.Name = id
-            label.Size = UDim2.new(1, 0, 0, 0)
-            label.AutomaticSize = Enum.AutomaticSize.Y
-            label.TextWrapped = true
-            label.BackgroundTransparency = 1
-            label.Font = Enum.Font.GothamMedium
-            label.TextSize = textSize
-            label.TextXAlignment = Enum.TextXAlignment.Center
-            label.TextYAlignment = Enum.TextYAlignment.Top
-            label.Parent = container
-
-            labels[id] = label
-            lineData[id] = {
-                id = id, text = "", color = Color3.fromRGB(255, 255, 255),
-                outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize,
-                order = nil, created = creationCounter,
-            }
-        end
-
-        local saved = lineData[id]
-        if data.text         ~= nil then saved.text         = data.text end
-        if data.color        ~= nil then saved.color        = data.color end
-        if data.outlineColor ~= nil then saved.outlineColor = data.outlineColor end
-        if data.outlineSize  ~= nil then saved.outlineSize  = data.outlineSize == false and nil or data.outlineSize end
-        if data.order        ~= nil then saved.order        = data.order == false and nil or data.order end
-
-        label.Text = saved.text
-        label.TextColor3 = saved.color
-        applyOutline(label, saved)
-    end
-
-    local function setText(lines)
-        if not lines then return end
-        for _, data in ipairs(lines) do setLine(data) end
-        updateOrder()
-        updateSize(true)
-    end
-
-    for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
-    if billboard then updateOrder() updateSize(false) end
-
-    local api = {}
-
-    function api:SetText(lines) setText(lines) end
-
-    function api:RemoveLine(id)
-        pendingData[id] = nil
-        local label = labels[id]
-        if label then
-            label:Destroy()
-            labels[id] = nil
-            lineData[id] = nil
-            updateOrder()
-            updateSize(true)
-        end
-    end
-
-    function api:Clear()
-        for _, label in pairs(labels) do
-            label:Destroy()
-        end
-        labels, lineData = {}, {}
-        pendingOrder, pendingData = {}, {}
-        updateOrder()
-        updateSize(true)
-    end
-
-    function api:Visible(state)
-        isActive = state
-        if billboard then billboard.Enabled = state end
-    end
-
-    function api:SetCenter(newCenter)
-        local adornee = resolveAdornee(newCenter)
-        if not adornee then return end
-        center = newCenter
-        currentAdornee = adornee
-        if billboard then
-            billboard.Adornee = adornee
-            billboard.Parent = adornee
-            billboard.Enabled = isActive
-        else
-            createBillboard()
-            flushPending()
-            updateOrder()
-            updateSize(false)
-        end
-    end
-
-    function api:SetOffset(newOffset)
-        if not newOffset then return end
-        offset = newOffset
-        if billboard then billboard.StudsOffset = newOffset end
-    end
-
-    -- Единый параметр: число-множитель (и окно, и текст)
-    function api:SetSize(value)
-        if type(value) ~= "number" then return end
-        local scaleFactor = math.max(value, 0.1)
-
-        textSize = baseTextSize * scaleFactor
-
-        size = UDim2.new(
-            baseSize.X.Scale,
-            baseSize.X.Offset * scaleFactor,
-            baseSize.Y.Scale,
-            baseSize.Y.Offset * scaleFactor
-        )
-
-        for _, label in pairs(labels) do
-            label.TextSize = textSize
-            label.Size = UDim2.new(1, 0, 0, 0)
-        end
-
-        if billboard then
-            billboard.Size = size
-            updateSize(true)
-        end
-    end
-
-    function api:ShowWindow(state)
-        showWindow = state == true
-        if billboard then
-            applyWindowLayout()
-            updateSize(true)
-        end
-    end
-
-    function api:IsWindowShown() return showWindow end
-
-    function api:Remove()
-        if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
-        if billboard then
-            billboard:Destroy()
-            billboard = nil
-            container = nil
-            windowFrame = nil
-        end
-        labels, lineData = {}, {}
-        pendingOrder, pendingData = {}, {}
-    end
-
-        function api:SetCustomWindow(tbl)
-        if type(tbl) ~= "table" then return end
-        local v
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then
-            windowBackground = v
-            if windowFrame then windowFrame.BackgroundColor3 = v end
-        end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then
-            windowBackgroundTransparency = v
-            if windowFrame then windowFrame.BackgroundTransparency = v end
-        end
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then
-            windowBorderColor = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Color = v end
-            end
-        end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then
-            windowBorderThickness = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Thickness = v end
-            end
-        end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then
-            windowBorderTransparency = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Transparency = v end
-            end
-        end
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then
-            windowCorner = v
-            if windowFrame then
-                local wc = windowFrame:FindFirstChildOfClass("UICorner")
-                if wc then wc.CornerRadius = UDim.new(0, v) end
-            end
-        end
-    end
-
-    return api
 end
 
-local function createRadar(config)
-    config = config or {}
+local function updateRedListUI()
+    if not RedListScroll then return end
+    for _, v in pairs(RedListScroll:GetChildren()) do 
+        if v:IsA("TextButton") then v:Destroy() end 
+    end
+    
+    for path, data in pairs(ManualBannedPaths) do
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(1, -6, 0, 25)
+        b.BackgroundColor3 = (currentSelectionGUID == data.guid) and Color3.fromRGB(100, 50, 200) or Color3.fromRGB(100, 35, 35)
+        b.TextColor3 = Color3.new(1, 1, 1)
+        b.Font = Enum.Font.SourceSansBold
+        b.TextSize = 10
+        b.BorderSizePixel = 0
+        b.ClipsDescendants = true
+        
+        local displayPath = path:match("[^%.%[%]]+$") or path
+        displayPath = displayPath:gsub('^"', ''):gsub('"$', ''):gsub('%]$', '')
+        b.Text = " [X] " .. displayPath
+        b.Parent = RedListScroll
+        
+        b:SetAttribute("GUID", data.guid)
+        b:SetAttribute("Path", path)
+        
+        b.MouseButton1Click:Connect(function() 
+            currentSelectionGUID = data.guid
+            updateDetailsView()
+            refreshSelectionColors()
+        end)
+    end
+end
 
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local CoreGui = game:GetService("CoreGui")
-    local UserInputService = game:GetService("UserInputService")
+-- ================= HEADER =================
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 35)
+Header.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Header.ZIndex = 10
+Header.BorderSizePixel = 0
+Header.Parent = Main
 
-    -- Регистронезависимый "getter"
-    local function pick(tbl, ...)
-        if type(tbl) ~= "table" then return nil end
-        for _, key in ipairs({...}) do
-            if tbl[key] ~= nil then
-                return tbl[key]
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 8)
+headerCorner.Parent = Header
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0, 200, 1, 0)
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Text = "KRALLDEN SPY v9.9.1"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Title.ZIndex = 11
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 45, 0, 35)
+MinBtn.Position = UDim2.new(1, -45, 0, 0)
+MinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 180)
+MinBtn.Text = "_"
+MinBtn.TextColor3 = Color3.new(1, 1, 1)
+MinBtn.TextSize = 22
+MinBtn.ZIndex = 12
+MinBtn.BorderSizePixel = 0
+MinBtn.Parent = Header
+
+local function createHeaderBtn(text, offset, color, sizeX)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, sizeX or 100, 0, 24)
+    b.Position = UDim2.new(1, offset, 0.5, -12)
+    b.BackgroundColor3 = color
+    b.Text = text
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.SourceSansBold
+    b.TextSize = 11
+    b.ZIndex = 11
+    b.BorderSizePixel = 0
+    b.Parent = Header
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 4)
+    c.Parent = b
+    return b
+end
+
+local ControlBtn = createHeaderBtn("CONTROL: ON", -150, Color3.fromRGB(0, 170, 190))
+local SelfBtn = createHeaderBtn("SELF: ON", -235, Color3.fromRGB(45, 90, 45), 80)
+local DelBtn = createHeaderBtn("DEL BTN", -310, Color3.fromRGB(200, 100, 0), 70)
+
+local AntiSpamBtn = createHeaderBtn("ANTI-SPAM: ON", -420, Color3.fromRGB(180, 150, 40))
+AntiSpamBtn.Visible = false
+local BlockBtn = createHeaderBtn("BLOCK EVENT", -530, Color3.fromRGB(150, 50, 50))
+BlockBtn.Visible = false
+
+local KeybindBtn = nil
+local ClearKeybindBtn = nil
+
+if not isMobile then
+    KeybindBtn = Instance.new("TextButton")
+    KeybindBtn.Size = UDim2.new(0, 65, 0, 22)
+    KeybindBtn.Position = UDim2.new(0, 150, 0.5, -11)
+    KeybindBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    KeybindBtn.Text = "BIND: NONE"
+    KeybindBtn.TextColor3 = Color3.fromRGB(255, 200, 100)
+    KeybindBtn.Font = Enum.Font.SourceSansBold
+    KeybindBtn.TextSize = 11
+    KeybindBtn.BorderSizePixel = 0
+    KeybindBtn.ZIndex = 12
+    KeybindBtn.Parent = Header
+
+    local kbC = Instance.new("UICorner")
+    kbC.CornerRadius = UDim.new(0, 4)
+    kbC.Parent = KeybindBtn
+
+    ClearKeybindBtn = Instance.new("TextButton")
+    ClearKeybindBtn.Size = UDim2.new(0, 22, 0, 22)
+    ClearKeybindBtn.Position = UDim2.new(0, 220, 0.5, -11)
+    ClearKeybindBtn.BackgroundColor3 = Color3.fromRGB(35, 75, 150)
+    ClearKeybindBtn.Text = "X"
+    ClearKeybindBtn.TextColor3 = Color3.new(1, 1, 1)
+    ClearKeybindBtn.Font = Enum.Font.SourceSansBold
+    ClearKeybindBtn.TextSize = 11
+    ClearKeybindBtn.BorderSizePixel = 0
+    ClearKeybindBtn.ZIndex = 12
+    ClearKeybindBtn.Parent = Header
+
+    local ckC = Instance.new("UICorner")
+    ckC.CornerRadius = UDim.new(0, 4)
+    ckC.Parent = ClearKeybindBtn
+end
+
+-- ================= TAB BAR =================
+local TabBar = Instance.new("Frame")
+TabBar.Name = "TabBar"
+TabBar.Size = UDim2.new(1, 0, 0, 28)
+TabBar.Position = UDim2.new(0, 0, 0, 35)
+TabBar.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+TabBar.BorderSizePixel = 0
+TabBar.ZIndex = 9
+TabBar.Parent = Main
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.FillDirection = Enum.FillDirection.Horizontal
+TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabLayout.Padding = UDim.new(0, 4)
+TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+TabLayout.Parent = TabBar
+
+local TabPad = Instance.new("UIPadding")
+TabPad.PaddingLeft = UDim.new(0, 8)
+TabPad.Parent = TabBar
+
+local activeTabName = "LOG"
+
+local function makeTab(name)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, 110, 0, 22)
+    b.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    b.Text = name
+    b.TextColor3 = Color3.fromRGB(200, 200, 200)
+    b.Font = Enum.Font.SourceSansBold
+    b.TextSize = 12
+    b.BorderSizePixel = 0
+    b.Parent = TabBar
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 4)
+    c.Parent = b
+    return b
+end
+
+local LogTabBtn = makeTab("LOG")
+local SettingsTabBtn = makeTab("SETTINGS")
+
+-- ================= CONTENT =================
+ContentFrame = Instance.new("Frame")
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Size = UDim2.new(1, 0, 1, -63)
+ContentFrame.Position = UDim2.new(0, 0, 0, 63)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.ClipsDescendants = true
+ContentFrame.Parent = Main
+
+-- ==== LOG PANEL ====
+Scroll = Instance.new("ScrollingFrame")
+Scroll.Position = UDim2.new(0, 8, 0, 8)
+Scroll.Size = UDim2.new(0, 190, 1, -16)
+Scroll.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 4
+Scroll.Parent = ContentFrame
+
+local ScrollCorner = Instance.new("UICorner")
+ScrollCorner.CornerRadius = UDim.new(0, 4)
+ScrollCorner.Parent = Scroll
+
+local ScrollLayout = Instance.new("UIListLayout")
+ScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ScrollLayout.Parent = Scroll
+
+DetailsScroll = Instance.new("ScrollingFrame")
+DetailsScroll.Name = "DetailsScroll"
+DetailsScroll.Position = UDim2.new(0, 205, 0, 8)
+DetailsScroll.Size = UDim2.new(0, 448, 0, 240)
+DetailsScroll.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+DetailsScroll.BorderSizePixel = 0
+DetailsScroll.ScrollBarThickness = 6
+DetailsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+DetailsScroll.AutomaticCanvasSize = Enum.AutomaticSize.None
+DetailsScroll.Parent = ContentFrame
+
+local dsCorner = Instance.new("UICorner")
+dsCorner.CornerRadius = UDim.new(0, 4)
+dsCorner.Parent = DetailsScroll
+
+local detailPad = Instance.new("UIPadding")
+detailPad.PaddingLeft = UDim.new(0, 10)
+detailPad.PaddingRight = UDim.new(0, 10)
+detailPad.PaddingTop = UDim.new(0, 10)
+detailPad.PaddingBottom = UDim.new(0, 10)
+detailPad.Parent = DetailsScroll
+
+Details = Instance.new("TextBox")
+Details.Size = UDim2.new(1, 0, 0, 0)
+Details.BackgroundTransparency = 1
+Details.TextColor3 = Color3.new(1, 1, 1)
+Details.TextWrapped = true
+Details.MultiLine = true
+Details.ClearTextOnFocus = false
+Details.Font = Enum.Font.Code
+Details.TextSize = 13
+Details.TextXAlignment = Enum.TextXAlignment.Left
+Details.TextYAlignment = Enum.TextYAlignment.Top
+Details.Text = ""
+Details.Parent = DetailsScroll
+
+Details:GetPropertyChangedSignal("Text"):Connect(forceUpdateCanvas)
+
+local BanListTitle = Instance.new("TextLabel")
+BanListTitle.Size = UDim2.new(0, 150, 0, 20)
+BanListTitle.Position = UDim2.new(0, 662, 0, 118)
+BanListTitle.BackgroundTransparency = 1
+BanListTitle.Text = "BAN LIST"
+BanListTitle.TextColor3 = Color3.fromRGB(255, 100, 100)
+BanListTitle.Font = Enum.Font.SourceSansBold
+BanListTitle.TextSize = 14
+BanListTitle.Parent = ContentFrame
+
+RedListScroll = Instance.new("ScrollingFrame")
+RedListScroll.Position = UDim2.new(0, 662, 0, 140)
+RedListScroll.Size = UDim2.new(0, 150, 0, 225)
+RedListScroll.BackgroundColor3 = Color3.fromRGB(30, 15, 15)
+RedListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+RedListScroll.BorderSizePixel = 0
+RedListScroll.ScrollBarThickness = 4
+RedListScroll.Parent = ContentFrame
+
+local rlsCorner = Instance.new("UICorner")
+rlsCorner.CornerRadius = UDim.new(0, 4)
+rlsCorner.Parent = RedListScroll
+
+local RedListLayout = Instance.new("UIListLayout")
+RedListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+RedListLayout.Parent = RedListScroll
+
+-- ================= PATH LOGIC =================
+local function getSafePath(obj)
+    if not obj then return "nil" end
+    if pathCache[obj] then return pathCache[obj] end
+    
+    local p = ""
+    pcall(function() 
+        local t = obj
+        while t and t ~= game do 
+            local n = tostring(t.Name)
+            local safeName = ""
+            if n:match("^%d") or n:match("[%s%W]") then
+                safeName = '["' .. n .. '"]'
+            else
+                safeName = n
             end
-        end
-        return nil
-    end
-
-    -- ========= CustomWindow =========
-    local cw = pick(config, "CustomWindow", "customWindow") or {}
-
-    local BackgroundColor    = pick(cw, "WindowColor", "windowColor")               or pick(config, "BackgroundColor", "backgroundColor") or Color3.fromRGB(10, 10, 15)
-    local BackTransparency   = pick(cw, "WindowTransparency", "windowTransparency") or 0
-    local BorderColor        = pick(cw, "BorderColor", "borderColor")               or pick(config, "BorderColor", "borderColor") or Color3.fromRGB(80, 80, 90)
-    local BorderThickness    = pick(cw, "BorderThickness", "borderThickness") or 4
-    local BorderTransparency = pick(cw, "BorderTransparency", "borderTransparency") or 0
-    local CornerRadius       = pick(cw, "CornerRadius", "cornerRadius") or 16
-    local TitleColor         = pick(cw, "TitleColor", "titleColor")                 or Color3.fromRGB(235, 235, 235)
-    local TitleTransparency  = pick(cw, "TitleTransparency", "titleTransparency")   or 0
-    local RadarColor         = pick(cw, "RadarColor", "radarColor")                 or Color3.fromRGB(5, 5, 8)
-    local RadarTransparency  = pick(cw, "RadarTransparency", "radarTransparency")   or 0
-    local GridColor          = pick(cw, "GridColor", "gridColor")                   or Color3.fromRGB(70, 70, 80)
-    local CrosshairColor     = pick(cw, "CrosshairColor", "crosshairColor")         or Color3.fromRGB(45, 45, 50)
-
-    -- ========= Основные =========
-    local Name         = pick(config, "Name", "name")         or "CustomRadar"
-    local Title        = pick(config, "Title", "title")       or "Radar"
-    local Position     = pick(config, "Position", "position") or UDim2.new(0.03, 0, 0.3, 0)
-    local Size         = math.max(tonumber(pick(config, "Size", "size")) or 100, 0.01)
-    local Scale        = tonumber(pick(config, "Scale", "scale")) or 1
-    local Range        = math.max(tonumber(pick(config, "Range", "range")) or 100, 0)
-    local Center       = pick(config, "Center", "center") or Players.LocalPlayer
-    local CenterOffset = pick(config, "CenterOffset", "centerOffset") or Vector3.zero
-    local EDGE_TEXT_HIDE_THRESHOLD = tonumber(pick(config, "TextHideThreshold", "textHideThreshold")) or 0.95
-
-    local enabled = true
-    local targets = {}
-
-    local WINDOW_SIZE  = 220
-    local WINDOW_HEIGHT = 260
-    local RADAR_SIZE   = 190
-    local BORDER_SIZE  = BorderThickness
-
-    local gui = Instance.new("ScreenGui")
-    gui.Name = Name
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.Parent = (gethui and gethui()) or CoreGui
-
-    local scaleObject = Instance.new("UIScale")
-    scaleObject.Scale = Scale
-    scaleObject.Parent = gui
-
-    local frame = Instance.new("Frame")
-    frame.Name = "MainFrame"
-    frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_HEIGHT)
-    frame.Position = Position
-    frame.BackgroundColor3 = BackgroundColor
-    frame.BackgroundTransparency = BackTransparency
-    frame.BorderSizePixel = 0
-    frame.Parent = gui
-
-    local frameCorner = Instance.new("UICorner")
-    frameCorner.CornerRadius = UDim.new(0, CornerRadius)
-    frameCorner.Parent = frame
-
-    local frameStroke = Instance.new("UIStroke")
-    frameStroke.Color = BorderColor
-    frameStroke.Thickness = BORDER_SIZE
-    frameStroke.Transparency = BorderTransparency
-    frameStroke.Parent = frame
-
-    local title = Instance.new("TextLabel")
-    title.Name = "Title"
-    title.BackgroundTransparency = 1
-    title.Position = UDim2.fromOffset(12, 4)
-    title.Size = UDim2.new(1, -24, 0, 28)
-    title.Font = Enum.Font.GothamBold
-    title.Text = Title
-    title.TextColor3 = TitleColor
-    title.TextTransparency = TitleTransparency
-    title.TextSize = 17
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = frame
-
-    local dragging = false
-    local dragInput
-    local dragStart
-    local startPos
-
-    local function update(input)
-        local delta = input.Position - dragStart
-
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-
-    title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
+       
+            if p == "" then 
+                p = safeName 
+            else 
+                if safeName:sub(1,1) == "[" then
+                    p = safeName .. "." .. p 
+                else
+                    p = safeName .. "." .. p
                 end
+            end
+            t = t.Parent 
+        end 
+    end)
+    
+    local finalPath = "game." .. p
+    finalPath = finalPath:gsub("%.%[", "[") 
+    pathCache[obj] = finalPath
+    return finalPath
+end
+
+-- ================= ADD LOG =================
+local function addLog(rem, args, isSelf, typeLabel)
+    if typeLabel == "FS" and not spyFS then return end
+    if typeLabel == "FC" and not spyFC then return end
+    if typeLabel == "IS" and not spyIS then return end
+    if typeLabel == "BE" and not spyBE then return end
+    
+    local eventPath = getSafePath(rem)
+    if not isSelf and ManualBannedPaths[eventPath] then return end
+
+    local function parseValue(v, d)
+        d = d or 0
+        if d > 4 then return "..." end
+        local t = type(v)
+        if t == "string" then return '"' .. v .. '"'
+        elseif t == "table" then
+            local isArray = true
+            local count = 0
+            for k, val in pairs(v) do count = count + 1 if type(k) ~= "number" or k ~= count then isArray = false break end end
+            local res = "{"
+            for k, val in pairs(v) do 
+                if isArray then res = res .. parseValue(val, d + 1) .. ", " 
+                else 
+                    local key = (type(k) == "number") and "["..k.."]" or '["'..tostring(k)..'"]'
+                    res = res .. key .. " = " .. parseValue(val, d + 1) .. ", " 
+                end
+            end
+            local result = res:gsub(", $", "") .. "}"
+            return (result == "}") and "{}" or result
+        elseif t == "userdata" then
+            local tn = typeof(v)
+            if tn == "CFrame" then return "CFrame.new(" .. tostring(v) .. ")"
+            elseif tn == "Vector3" then return "Vector3.new(" .. tostring(v) .. ")"
+            elseif tn == "Instance" then return getSafePath(v) end
+            return tostring(v)
+        else return tostring(v) end
+    end
+
+    local argList = {}
+    for _, v in ipairs(args) do argList[#argList + 1] = parseValue(v) end
+    local finalArgsStr = table.concat(argList, ", ")
+    
+    local alreadyExists = false
+    for _, m in pairs(MainMemory) do
+        if m.path == eventPath and m.isSelf == isSelf then
+            if isSelf then if selfMode or m.argsStr == finalArgsStr then alreadyExists = true break end
+            else if controlMode or m.argsStr == finalArgsStr then alreadyExists = true break end end
+        end
+    end
+    if alreadyExists then return end
+
+    local methodName
+    if typeLabel == "IS" then methodName = "InvokeServer"
+    elseif typeLabel == "FC" then methodName = "FireClient"
+    elseif typeLabel == "BE" then methodName = "Fire"
+    else methodName = "FireServer" end
+
+    local displayArgs = (finalArgsStr == "") and "None" or finalArgsStr
+    local displayArgsPretty = formatTableVisual(args)
+    
+    local logDetails = string.format("Type: %s\n\nPath: %s\n\nArgs: %s\n\nScript:\n%s:%s(%s)", typeLabel, eventPath, displayArgs, eventPath, methodName, finalArgsStr)
+    local logDetailsPretty = string.format("Type: %s\n\nPath: %s\n\nArgs: %s\n\nScript:\n%s:%s(%s)", typeLabel, eventPath, displayArgsPretty, eventPath, methodName, finalArgsStr)
+
+    if not isSelf and not controlMode and antiSpam then
+        local currentTime = tick()
+        if (currentTime - (AntiSpamCooldowns[eventPath] or 0)) < 0.4 then
+            AntiSpamCounts[eventPath] = (AntiSpamCounts[eventPath] or 0) + 1
+            if AntiSpamCounts[eventPath] >= 4 then
+                ManualBannedPaths[eventPath] = {
+                    guid = generateGUID(),
+                    type = typeLabel, path = eventPath, argsStr = finalArgsStr,
+                    fullText = "AUTO-BANNED\n\n" .. logDetails,
+                    fullTextPretty = "AUTO-BANNED\n\n" .. logDetailsPretty
+                }
+                local nM = {}
+                for _, m in ipairs(MainMemory) do if not (m.path == eventPath and not m.isSelf) then nM[#nM + 1] = m end end
+                MainMemory = nM
+                lastCount = -1 
+                return 
+            end
+        else AntiSpamCounts[eventPath] = 0 end
+        AntiSpamCooldowns[eventPath] = currentTime
+    end
+
+    local newLog = { 
+        guid = generateGUID(), name = tostring(rem.Name), type = typeLabel, isSelf = isSelf, 
+        fullText = logDetails, fullTextPretty = logDetailsPretty, path = eventPath, argsStr = finalArgsStr
+    }
+    table.insert(MainMemory, 1, newLog)
+    if #MainMemory > 150 then table.remove(MainMemory, 151) end
+end
+
+-- ================= ПЕРЕХВАТ (HOOKS) =================
+local oldNamecall
+local oldIndex
+
+local function processEvent(self, method, args, isSelf)
+    if not self or typeof(self) ~= "Instance" then return end
+    
+    local lowerM = method:lower()
+    if lowerM == "fireserver" and self:IsA("RemoteEvent") then
+        task.spawn(addLog, self, args, isSelf, "FS")
+    elseif lowerM == "fireclient" and self:IsA("RemoteEvent") then
+        task.spawn(addLog, self, args, isSelf, "FC")
+    elseif lowerM == "invokeserver" and self:IsA("RemoteFunction") then
+        task.spawn(addLog, self, args, isSelf, "IS")
+    elseif lowerM == "fire" and self:IsA("BindableEvent") then
+        -- ФИКС: фильтруем фантомный BindableEvent, который эксплойт-окружение
+        -- подсовывает как прямой child of game (у настоящих игр таких нет).
+        if self.Parent == game then return end
+        task.spawn(addLog, self, args, isSelf, "BE")
+    end
+end
+
+-- 1. ХУК ДЛЯ КЛАССИЧЕСКИХ ВЫЗОВОВ
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local isSelf = checkcaller()
+    
+    local args = {...}
+    task.spawn(function()
+        processEvent(self, method, args, isSelf)
+    end)
+        
+    return oldNamecall(self, ...)
+end))
+
+-- 2. ХУК ДЛЯ ВЫЗОВОВ ЧЕРЕЗ ТОЧКУ
+oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
+    local originalResult = oldIndex(self, key)
+    
+    if typeof(self) == "Instance" and type(key) == "string" then
+        local lowerKey = key:lower()
+        if lowerKey == "fireserver" or lowerKey == "fireclient" or lowerKey == "invokeserver" then
+            return newcclosure(function(instanceSelf, ...)
+                local isSelf = checkcaller()
+                local args = {...}
+                task.spawn(function()
+                    processEvent(instanceSelf, key, args, isSelf)
+                end)
+                return originalResult(instanceSelf, ...)
+            end)
+        elseif lowerKey == "fire" and self:IsA("BindableEvent") then
+            -- ФИКС: тот же фильтр фантомного game.Event
+            if self.Parent == game then
+                return originalResult
+            end
+            return newcclosure(function(instanceSelf, ...)
+                local isSelf = checkcaller()
+                local args = {...}
+                task.spawn(function()
+                    processEvent(instanceSelf, key, args, isSelf)
+                end)
+                return originalResult(instanceSelf, ...)
             end)
         end
-    end)
-
-    title.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            update(input)
-        end
-    end)
-
-    local radar = Instance.new("Frame")
-    radar.Name = "Radar"
-    radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
-    radar.Position = UDim2.new(
-        0.5,
-        -RADAR_SIZE / 2,
-        0,
-        42
-    )
-    radar.BackgroundColor3 = RadarColor
-    radar.BackgroundTransparency = RadarTransparency
-    radar.BorderSizePixel = 0
-    radar.ClipsDescendants = true
-    radar.Parent = frame
-
-    local radarCorner = Instance.new("UICorner")
-    radarCorner.CornerRadius = UDim.new(1, 0)
-    radarCorner.Parent = radar
-
-    local radarStroke = Instance.new("UIStroke")
-    radarStroke.Color = BorderColor
-    radarStroke.Thickness = 3
-    radarStroke.Transparency = BorderTransparency
-    radarStroke.Parent = radar
-
-    local function createCircle(csize, transparency)
-        local circle = Instance.new("Frame")
-        circle.BackgroundTransparency = 1
-        circle.Size = UDim2.new(csize, 0, csize, 0)
-        circle.Position = UDim2.new(0.5, 0, 0.5, 0)
-        circle.AnchorPoint = Vector2.new(0.5, 0.5)
-        circle.Parent = radar
-
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(1, 0)
-        corner.Parent = circle
-
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = GridColor
-        stroke.Thickness = 1
-        stroke.Transparency = transparency or 0
-        stroke.Parent = circle
-
-        return circle
     end
+    
+    return originalResult
+end))
 
-    createCircle(0.66, 0)
-    createCircle(0.42, 0)
-
-    local horizontalLine = Instance.new("Frame")
-    horizontalLine.BackgroundColor3 = CrosshairColor
-    horizontalLine.BackgroundTransparency = 0.35
-    horizontalLine.BorderSizePixel = 0
-    horizontalLine.AnchorPoint = Vector2.new(0, 0.5)
-    horizontalLine.Position = UDim2.new(0, 0, 0.5, 0)
-    horizontalLine.Size = UDim2.new(1, 0, 0, 1)
-    horizontalLine.Parent = radar
-
-    local verticalLine = Instance.new("Frame")
-    verticalLine.BackgroundColor3 = CrosshairColor
-    verticalLine.BackgroundTransparency = 0.35
-    verticalLine.BorderSizePixel = 0
-    verticalLine.AnchorPoint = Vector2.new(0.5, 0)
-    verticalLine.Position = UDim2.new(0.5, 0, 0, 0)
-    verticalLine.Size = UDim2.new(0, 1, 1, 0)
-    verticalLine.Parent = radar
-
-    local targetObjects = {}
-
-    local function getRoot(target)
-        if not target then
-            return nil
-        end
-
-        if target:IsA("Player") then
-            return target.Character
-                and (
-                    target.Character:FindFirstChild("HumanoidRootPart")
-                    or target.Character.PrimaryPart
-                )
-        end
-
-        if target:IsA("Model") then
-            return target:FindFirstChild("HumanoidRootPart")
-                or target.PrimaryPart
-                or target:FindFirstChildWhichIsA("BasePart")
-        end
-
-        if target:IsA("BasePart") then
-            return target
-        end
-
-        return nil
+-- ================= INTERACTIONS =================
+ControlBtn.MouseButton1Click:Connect(function() 
+    controlMode = not controlMode
+    if controlMode then
+        ControlBtn.Text = "CONTROL: ON"
+        ControlBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 190)
+        AntiSpamBtn.Visible = false
+        BlockBtn.Visible = false
+    else
+        ControlBtn.Text = "CONTROL: OFF"
+        ControlBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 85)
+        AntiSpamBtn.Visible = true
+        BlockBtn.Visible = true
     end
+    lastCount = -1 
+end)
 
-    local function ensureText(old)
-        if old.text then
-            return old.text
-        end
-
-        old.text = Instance.new("TextLabel")
-        old.text.Name = "Text"
-        old.text.BackgroundTransparency = 1
-        old.text.AnchorPoint = Vector2.new(0.5, 1)
-        old.text.Position = UDim2.new(0.5, 0, 0, -4)
-        old.text.Size = UDim2.fromOffset(140, 18)
-        old.text.Font = Enum.Font.Gotham
-        old.text.TextSize = 13
-        old.text.TextXAlignment = Enum.TextXAlignment.Center
-        old.text.ZIndex = 11
-        old.text.Parent = old.point
-
-        return old.text
-    end
-
-    local function createTarget(data)
-        local point = Instance.new("Frame")
-        point.Name = tostring(data.id)
-        point.AnchorPoint = Vector2.new(0.5, 0.5)
-        point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
-        point.BorderSizePixel = 0
-        point.ZIndex = 10
-        point.Size = UDim2.fromOffset(
-            data.size or 8,
-            data.size or 8
-        )
-        point.Parent = radar
-
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(1, 0)
-        corner.Parent = point
-
-        local obj = {
-            point = point,
-            text = nil,
-            data = data,
-        }
-
-        if data.text ~= nil then
-            local tl = ensureText(obj)
-            tl.Text = tostring(data.text)
-            tl.TextColor3 = data.color or Color3.new(1, 1, 1)
-        end
-
-        targetObjects[data.id] = obj
-    end
-
-    local function setTarget(data)
-        if not data or not data.id then
-            return
-        end
-
-        local old = targetObjects[data.id]
-
-        if not old then
-            targets[data.id] = data
-            createTarget(data)
-            return
-        end
-
-        local saved = old.data
-
-        for key, value in pairs(data) do
-            saved[key] = value
-        end
-
-        old.point.BackgroundColor3 =
-            saved.color or Color3.new(1, 1, 1)
-
-        local pointSize = saved.size or 8
-
-        old.point.Size = UDim2.fromOffset(
-            pointSize,
-            pointSize
-        )
-
-        if saved.text ~= nil then
-            local tl = ensureText(old)
-            tl.Text = tostring(saved.text)
-            tl.TextColor3 = saved.color or Color3.new(1, 1, 1)
-        end
-
-        if saved.visible == false then
-            old.point.Visible = false
-        end
-
-        targets[data.id] = saved
-    end
-
-    if config.Targets then
-        for _, data in ipairs(config.Targets) do
-            setTarget(data)
-        end
-    end
-
-    local function getCenterPosition()
-        local root = getRoot(Center)
-
-        if root then
-            return root.Position + CenterOffset
-        end
-
-        if typeof(Center) == "Vector3" then
-            return Center + CenterOffset
-        end
-
-        if typeof(Center) == "CFrame" then
-            return Center.Position + CenterOffset
-        end
-
-        return nil
-    end
-
-    local function updateTarget(id, object)
-        local data = object.data
-        local targetRoot = getRoot(data.target)
-        local centerPosition = getCenterPosition()
-
-        if not targetRoot
-            or not centerPosition
-            or data.visible == false then
-
-            object.point.Visible = false
-            if object.text then object.text.Visible = false end
-            return
-        end
-
-        local offset = targetRoot.Position - centerPosition
-        local distance = offset.Magnitude
-
-        if distance > Range then
-            object.point.Visible = false
-            if object.text then object.text.Visible = false end
-            return
-        end
-
-        object.point.Visible = true
-
-        if distance < 0.01 then
-            object.point.Position = UDim2.new(0.5, 0, 0.5, 0)
-
-            if object.text then object.text.Visible = true end
-            return
-        end
-
-        local camera = workspace.CurrentCamera
-
-        if not camera then
-            return
-        end
-
-        local forward = Vector3.new(
-            camera.CFrame.LookVector.X,
-            0,
-            camera.CFrame.LookVector.Z
-        )
-
-        local right = Vector3.new(
-            camera.CFrame.RightVector.X,
-            0,
-            camera.CFrame.RightVector.Z
-        )
-
-        if forward.Magnitude < 0.001
-            or right.Magnitude < 0.001 then
-            return
-        end
-
-        forward = forward.Unit
-        right = right.Unit
-
-        local x = offset:Dot(right)
-        local y = offset:Dot(forward)
-
-        local normalizedDistance = distance / Size
-
-        if normalizedDistance > 1 then
-            normalizedDistance = 1
-        end
-
-        local direction = Vector2.new(x, y)
-
-        if direction.Magnitude > 0 then
-            direction =
-                direction.Unit * normalizedDistance
-        end
-
-        object.point.Position = UDim2.new(
-            0.5 + direction.X * 0.5,
-            0,
-            0.5 - direction.Y * 0.5,
-            0
-        )
-
-        if object.text then
-            object.text.Visible = normalizedDistance < EDGE_TEXT_HIDE_THRESHOLD
-        end
-    end
-
-    local renderName = Name .. "_RadarUpdate"
-
-    RunService:BindToRenderStep(
-        renderName,
-        Enum.RenderPriority.Camera.Value + 1,
-        function()
-            if not enabled then
-                return
-            end
-
-            for id, object in pairs(targetObjects) do
-                updateTarget(id, object)
+DelBtn.MouseButton1Click:Connect(function()
+    if currentSelectionGUID then
+        local targetData = nil
+        local foundInBanList = false
+        
+        for path, data in pairs(ManualBannedPaths) do
+            if data.guid == currentSelectionGUID then 
+                targetData = {path = path, guid = data.guid}
+                foundInBanList = true
+                break 
             end
         end
-    )
-
-    local api = {}
-
-    function api:Set(
-        listOrId,
-        target,
-        text,
-        color,
-        pointSize,
-        visible
-    )
-        if type(listOrId) == "table" then
-            for _, data in ipairs(listOrId) do
-                setTarget(data)
+        
+        if not foundInBanList then
+            local nM = {}
+            for _, m in ipairs(MainMemory) do 
+                if m.guid == currentSelectionGUID then 
+                    targetData = m 
+                else 
+                    nM[#nM + 1] = m 
+                end 
             end
-
-            return
+            if targetData then MainMemory = nM end
         end
+        
+        if targetData then
+            if ManualBannedPaths[targetData.path] then
+                ManualBannedPaths[targetData.path] = nil
+            end
+            
+            AntiSpamCooldowns[targetData.path] = 0
+            AntiSpamCounts[targetData.path] = 0
 
-        setTarget({
-            id = listOrId,
-            target = target,
-            text = text,
-            color = color,
-            size = pointSize,
-            visible = visible,
-        })
+            if foundInBanList then feedback(DelBtn, "UNBANNED") else feedback(DelBtn, "DELETED") end
+            
+            lastCount = -1
+            currentSelectionGUID = nil
+            Details.Text = ""
+            forceUpdateCanvas()
+        end
     end
+end)
 
-    function api:SetTitle(newTitle)
-        title.Text = tostring(newTitle)
+BlockBtn.MouseButton1Click:Connect(function()
+    if currentSelectionGUID then
+        for i, d in ipairs(MainMemory) do
+            if d.guid == currentSelectionGUID and not d.isSelf then
+                ManualBannedPaths[d.path] = {
+                    guid = d.guid, 
+                    type = d.type, path = d.path, argsStr = d.argsStr,
+                    fullText = "MANUAL BANNED:\n\n" .. d.fullText, 
+                    fullTextPretty = "MANUAL BANNED:\n\n" .. d.fullTextPretty
+                }
+                
+                local nM = {}
+                for _, m in ipairs(MainMemory) do 
+                    if not (m.path == d.path and not m.isSelf) then 
+                        nM[#nM + 1] = m 
+                    end 
+                end
+                
+                MainMemory = nM
+                lastCount = -1
+                currentSelectionGUID = nil
+                Details.Text = "Banned."
+                forceUpdateCanvas()
+                feedback(BlockBtn, "BANNED")
+                break
+            end
+        end
     end
+end)
 
-    function api:SetCenter(newCenter)
-        Center = newCenter
-    end
-
-    function api:SetCenterOffset(newOffset)
-        CenterOffset = newOffset or Vector3.zero
-    end
-
-    function api:SetRange(value)
-        Range = math.max(
-            tonumber(value) or Range,
-            0
+-- ================= MINIMIZE / RESTORE (ФИКС UISCALE DRIFT) =================
+MinBtn.MouseButton1Click:Connect(function()
+    isMin = not isMin
+    local curX = Main.AbsolutePosition.X + Main.AbsoluteSize.X
+    local curY = Main.AbsolutePosition.Y
+    local s = uiScale.Scale or 1
+    if s <= 0 then s = 1 end
+    
+    if isMin then
+        ContentFrame.Visible = false
+        TabBar.Visible = false
+        ControlBtn.Visible = false
+        SelfBtn.Visible = false
+        AntiSpamBtn.Visible = false
+        BlockBtn.Visible = false
+        DelBtn.Visible = false
+        
+        if KeybindBtn then KeybindBtn.Visible = false end
+        if ClearKeybindBtn then ClearKeybindBtn.Visible = false end
+       
+        local w = 250
+        -- UIScale масштабирует и offset от AnchorPoint, поэтому делим на s
+        Main:TweenSizeAndPosition(
+            UDim2.new(0, w, 0, 35), 
+            UDim2.new(0, curX / s - w, 0, curY / s), 
+            "Out", "Quad", 0.15, true
         )
-    end
-
-    function api:SetSize(value)
-        Size = math.max(
-            tonumber(value) or Size,
-            0.01
-        )
-    end
-
-    function api:RemoveTarget(id)
-        targets[id] = nil
-
-        local object = targetObjects[id]
-
-        if object then
-            object.point:Destroy()
-            targetObjects[id] = nil
-        end
-    end
-
-    function api:Clear()
-        for id, object in pairs(targetObjects) do
-            object.point:Destroy()
-            targetObjects[id] = nil
-            targets[id] = nil
-        end
-    end
-
-    function api:Visible(state)
-        enabled = state ~= false
-        gui.Enabled = enabled
-    end
-
-    function api:SetScale(value)
-        Scale = tonumber(value) or Scale
-        scaleObject.Scale = Scale
-    end
-
-    function api:SetPosition(value)
-        Position = value
-        frame.Position = value
-    end
-
-    function api:Remove()
-        RunService:UnbindFromRenderStep(renderName)
-        gui:Destroy()
-    end
-
-        function api:SetCustomWindow(tbl)
-        if type(tbl) ~= "table" then return end
-        local v
-
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then BackgroundColor = v; frame.BackgroundColor3 = v end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then BackTransparency = v; frame.BackgroundTransparency = v end
-
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then
-            BorderColor = v
-            frameStroke.Color = v
-            radarStroke.Color = v
-        end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then BorderThickness = v; frameStroke.Thickness = v end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then
-            BorderTransparency = v
-            frameStroke.Transparency = v
-            radarStroke.Transparency = v
-        end
-
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then
-            CornerRadius = v
-            frameCorner.CornerRadius = UDim.new(0, v)
-        end
-
-        v = pick(tbl, "TitleColor", "titleColor")
-        if v ~= nil then TitleColor = v; title.TextColor3 = v end
-        v = pick(tbl, "TitleTransparency", "titleTransparency")
-        if v ~= nil then TitleTransparency = v; title.TextTransparency = v end
-
-        v = pick(tbl, "RadarColor", "radarColor")
-        if v ~= nil then RadarColor = v; radar.BackgroundColor3 = v end
-        v = pick(tbl, "RadarTransparency", "radarTransparency")
-        if v ~= nil then RadarTransparency = v; radar.BackgroundTransparency = v end
-
-        v = pick(tbl, "GridColor", "gridColor")
-        if v ~= nil then
-            GridColor = v
-            for _, child in ipairs(radar:GetChildren()) do
-                if child:IsA("Frame") then
-                    local s = child:FindFirstChildOfClass("UIStroke")
-                    if s then s.Color = v end
+        MinBtn.Text = "+"
+    else
+        local w = 820
+        Main:TweenSizeAndPosition(
+            UDim2.new(0, w, 0, 440), 
+            UDim2.new(0, curX / s - w, 0, curY / s), 
+            "Out", "Quad", 0.15, true, function()
+                ContentFrame.Visible = true
+                TabBar.Visible = true
+                ControlBtn.Visible = true
+                SelfBtn.Visible = true
+                DelBtn.Visible = true
+                
+                if KeybindBtn then KeybindBtn.Visible = true end
+                if ClearKeybindBtn then ClearKeybindBtn.Visible = true end
+                
+                if not controlMode then
+                    AntiSpamBtn.Visible = true
+                    BlockBtn.Visible = true
                 end
             end
-        end
-
-        v = pick(tbl, "CrosshairColor", "crosshairColor")
-        if v ~= nil then
-            CrosshairColor = v
-            horizontalLine.BackgroundColor3 = v
-            verticalLine.BackgroundColor3 = v
-        end
+        )
+        MinBtn.Text = "_"
+        lastCount = -1
     end
+end)
 
-    return api
+if not isMobile and KeybindBtn and ClearKeybindBtn then
+    local currentKeybind = nil
+    local isBinding = false
+
+    KeybindBtn.MouseButton1Click:Connect(function()
+        isBinding = true
+        KeybindBtn.Text = "..."
+    end)
+
+    ClearKeybindBtn.MouseButton1Click:Connect(function()
+        currentKeybind = nil
+        KeybindBtn.Text = "BIND: NONE"
+    end)
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if isBinding then
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                currentKeybind = input.KeyCode
+                isBinding = false
+                KeybindBtn.Text = "BIND: " .. input.KeyCode.Name:upper()
+            end
+            return
+        end
+        
+        if currentKeybind and input.KeyCode == currentKeybind then
+            local events = getconnections(MinBtn.MouseButton1Click)
+            for _, connection in ipairs(events) do
+                connection:Fire()
+            end
+        end
+    end)
 end
 
-return {
-    createInfoGui = createInfoGui,
-    createInfoText = createInfoText,
-    createRadar = createRadar
-}
+-- ================= BOTTOM BUTTONS (LOG PANEL) =================
+local function createBotBtn(text, pos, size, color, parentOverride)
+    local b = Instance.new("TextButton")
+    b.Size = size or UDim2.new(0, 220, 0, 58)
+    b.Position = pos
+    b.BackgroundColor3 = color
+    b.Text = text
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.SourceSansBold
+    b.TextSize = 14
+    b.BorderSizePixel = 0
+    b.Parent = parentOverride or ContentFrame
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 4)
+    c.Parent = b
+    return b
+end
+
+local CopyArgsBtn = createBotBtn("COPY ARGS", UDim2.new(0, 205, 0, 256), UDim2.new(0, 95, 0, 55), Color3.fromRGB(45, 90, 45))
+CopyArgsBtn.MouseButton1Click:Connect(function() 
+    local a = Details.Text:match("Args: (.-)\n\nScript")
+    if a then 
+        setclipboard(a) 
+        feedback(CopyArgsBtn, "COPIED!")
+    end
+end)
+
+local SortBtn = createBotBtn("SORT: OFF", UDim2.new(0, 305, 0, 256), UDim2.new(0, 120, 0, 55), Color3.fromRGB(80, 80, 85))
+SortBtn.MouseButton1Click:Connect(function()
+    sortArgs = not sortArgs
+    SortBtn.Text = "SORT: " .. (sortArgs and "ON" or "OFF")
+    SortBtn.BackgroundColor3 = sortArgs and Color3.fromRGB(0, 140, 140) or Color3.fromRGB(80, 80, 85)
+    updateDetailsView()
+end)
+
+local CopyScriptBtn = createBotBtn("COPY SCRIPT", UDim2.new(0, 205, 0, 318), nil, Color3.fromRGB(60, 60, 120))
+CopyScriptBtn.MouseButton1Click:Connect(function() 
+    local s = Details.Text:match("Script:\n(.*)")
+    if s then 
+        setclipboard(s) 
+        feedback(CopyScriptBtn, "COPIED!")
+    end
+end)
+
+local ClearLogBtn = createBotBtn("CLEAR LOG", UDim2.new(0, 432, 0, 256), UDim2.new(0, 108, 0, 55), Color3.fromRGB(80, 80, 85))
+ClearLogBtn.MouseButton1Click:Connect(function()
+    local nM = {}
+    for _, m in ipairs(MainMemory) do if m.isSelf then nM[#nM + 1] = m end end
+    MainMemory = nM
+    lastCount = -1
+    feedback(ClearLogBtn, "CLEARED")
+end)
+
+local ClearSelfBtn = createBotBtn("CLEAR SELF", UDim2.new(0, 544, 0, 256), UDim2.new(0, 108, 0, 55), Color3.fromRGB(100, 80, 60))
+ClearSelfBtn.MouseButton1Click:Connect(function()
+    local nM = {}
+    for _, m in ipairs(MainMemory) do if not m.isSelf then nM[#nM + 1] = m end end
+    MainMemory = nM
+    lastCount = -1
+    feedback(ClearSelfBtn, "CLEARED")
+end)
+
+local ExecuteBtn = createBotBtn("EXECUTE", UDim2.new(0, 432, 0, 318), nil, Color3.fromRGB(120, 60, 60))
+ExecuteBtn.MouseButton1Click:Connect(function() 
+    local s = Details.Text:match("Script:\n(.*)") or Details.Text
+    if s and s ~= "" then 
+        local f = loadstring(s)
+        if f then 
+            task.spawn(f) 
+            feedback(ExecuteBtn, "EXECUTED!")
+        end
+    end 
+end)
+
+SelfBtn.MouseButton1Click:Connect(function() 
+    selfMode = not selfMode
+    SelfBtn.Text = "SELF: " .. (selfMode and "ON" or "OFF")
+    SelfBtn.BackgroundColor3 = selfMode and Color3.fromRGB(45, 90, 45) or Color3.fromRGB(150, 50, 50)
+    lastCount = -1
+end)
+
+AntiSpamBtn.MouseButton1Click:Connect(function() 
+    antiSpam = not antiSpam
+    AntiSpamBtn.Text = "ANTI-SPAM: " .. (antiSpam and "ON" or "OFF")
+    AntiSpamBtn.BackgroundColor3 = antiSpam and Color3.fromRGB(180, 150, 40) or Color3.fromRGB(80, 80, 85)
+end)
+
+-- ================= SETTINGS PANEL =================
+local SettingsPanel = Instance.new("Frame")
+SettingsPanel.Name = "SettingsPanel"
+SettingsPanel.Size = UDim2.new(1, 0, 1, 0)
+SettingsPanel.Position = UDim2.new(0, 0, 0, 0)
+SettingsPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+SettingsPanel.BorderSizePixel = 0
+SettingsPanel.Visible = false
+SettingsPanel.ZIndex = 15
+SettingsPanel.Parent = ContentFrame
+
+local settingsScroll = Instance.new("ScrollingFrame")
+settingsScroll.Size = UDim2.new(1, 0, 1, 0)
+settingsScroll.Position = UDim2.new(0, 0, 0, 0)
+settingsScroll.BackgroundTransparency = 1
+settingsScroll.BorderSizePixel = 0
+settingsScroll.ScrollBarThickness = 4
+settingsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+settingsScroll.Parent = SettingsPanel
+
+local settingsList = Instance.new("UIListLayout")
+settingsList.SortOrder = Enum.SortOrder.LayoutOrder
+settingsList.Padding = UDim.new(0, 8)
+settingsList.Parent = settingsScroll
+
+local settingsPad = Instance.new("UIPadding")
+settingsPad.PaddingTop = UDim.new(0, 12)
+settingsPad.PaddingLeft = UDim.new(0, 14)
+settingsPad.PaddingRight = UDim.new(0, 14)
+settingsPad.PaddingBottom = UDim.new(0, 12)
+settingsPad.Parent = settingsScroll
+
+local SettingsTitle = Instance.new("TextLabel")
+SettingsTitle.Size = UDim2.new(1, 0, 0, 26)
+SettingsTitle.BackgroundTransparency = 1
+SettingsTitle.Text = "SETTINGS — Здесь можно добавлять новые функции"
+SettingsTitle.TextColor3 = Color3.fromRGB(180, 180, 210)
+SettingsTitle.Font = Enum.Font.SourceSansBold
+SettingsTitle.TextSize = 13
+SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+SettingsTitle.LayoutOrder = 0
+SettingsTitle.Parent = settingsScroll
+
+local function createToggleRow(label, initialState, activeColor, onToggle, order)
+    local row = Instance.new("TextButton")
+    row.Size = UDim2.new(1, 0, 0, 38)
+    row.BackgroundColor3 = initialState and activeColor or Color3.fromRGB(40, 40, 45)
+    row.Text = ""
+    row.BorderSizePixel = 0
+    row.LayoutOrder = order
+    row.Parent = settingsScroll
+
+    local rc = Instance.new("UICorner")
+    rc.CornerRadius = UDim.new(0, 6)
+    rc.Parent = row
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -24, 1, 0)
+    lbl.Position = UDim2.new(0, 14, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label .. ": " .. (initialState and "ON" or "OFF")
+    lbl.TextColor3 = Color3.new(1, 1, 1)
+    lbl.Font = Enum.Font.SourceSansBold
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = row
+
+    row.MouseButton1Click:Connect(function()
+        local state = onToggle()
+        row.BackgroundColor3 = state and activeColor or Color3.fromRGB(40, 40, 45)
+        lbl.Text = label .. ": " .. (state and "ON" or "OFF")
+    end)
+
+    return row
+end
+
+-- Оставлены только типы перехвата (CONTROL/ANTI-SPAM/SELF теперь только в шапке)
+createToggleRow("FS SPY (FireServer)", spyFS, Color3.fromRGB(130, 70, 220), function()
+    spyFS = not spyFS
+    return spyFS
+end, 1)
+
+createToggleRow("FC SPY (FireClient)", spyFC, Color3.fromRGB(50, 150, 255), function()
+    spyFC = not spyFC
+    return spyFC
+end, 2)
+
+createToggleRow("IS SPY (InvokeServer)", spyIS, Color3.fromRGB(255, 150, 50), function()
+    spyIS = not spyIS
+    return spyIS
+end, 3)
+
+createToggleRow("BE SPY (BindableEvent)", spyBE, Color3.fromRGB(50, 200, 150), function()
+    spyBE = not spyBE
+    return spyBE
+end, 4)
+
+-- Placeholder для будущих функций
+local Placeholder = Instance.new("TextLabel")
+Placeholder.Size = UDim2.new(1, 0, 0, 60)
+Placeholder.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+Placeholder.Text = "⬇ Будущие функции можно добавлять сюда ⬇"
+Placeholder.TextColor3 = Color3.fromRGB(120, 120, 140)
+Placeholder.Font = Enum.Font.SourceSans
+Placeholder.TextSize = 12
+Placeholder.LayoutOrder = 999
+Placeholder.Parent = settingsScroll
+
+local pc = Instance.new("UICorner")
+pc.CornerRadius = UDim.new(0, 6)
+pc.Parent = Placeholder
+
+-- ================= TAB SWITCHING =================
+local function updateTabVisuals()
+    if activeTabName == "LOG" then
+        SettingsPanel.Visible = false
+        LogTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
+        LogTabBtn.TextColor3 = Color3.new(1, 1, 1)
+        SettingsTabBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        SettingsTabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    else
+        SettingsPanel.Visible = true
+        LogTabBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        LogTabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        SettingsTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
+        SettingsTabBtn.TextColor3 = Color3.new(1, 1, 1)
+    end
+end
+
+LogTabBtn.MouseButton1Click:Connect(function()
+    activeTabName = "LOG"
+    updateTabVisuals()
+end)
+
+SettingsTabBtn.MouseButton1Click:Connect(function()
+    activeTabName = "SETTINGS"
+    updateTabVisuals()
+end)
+
+updateTabVisuals()
+
+-- ================= RENDER LOOP =================
+task.spawn(function()
+    while task.wait(0.5) do
+        if not ContentFrame or not ContentFrame.Visible then continue end
+        
+        local currentRedCount = 0
+        for _ in pairs(ManualBannedPaths) do currentRedCount = currentRedCount + 1 end
+        if currentRedCount ~= lastRedCount then
+            lastRedCount = currentRedCount
+            updateRedListUI()
+        end
+
+        if #MainMemory == lastCount then continue end
+        lastCount = #MainMemory
+        
+        local sortedMemory = {}
+        for _, d in ipairs(MainMemory) do if d.isSelf then sortedMemory[#sortedMemory + 1] = d end end
+        for _, d in ipairs(MainMemory) do if not d.isSelf then sortedMemory[#sortedMemory + 1] = d end end
+        
+        local currentButtons = {}
+        for _, v in pairs(Scroll:GetChildren()) do 
+            if v:IsA("TextButton") then 
+                table.insert(currentButtons, v)
+            end 
+        end
+        
+        if #currentButtons > #sortedMemory then
+            for i = #sortedMemory + 1, #currentButtons do
+                currentButtons[i]:Destroy()
+                currentButtons[i] = nil
+            end
+        end
+        
+        for i, d in ipairs(sortedMemory) do
+            local b = currentButtons[i]
+            
+            if not b then
+                b = Instance.new("TextButton")
+                b.TextColor3 = Color3.new(1, 1, 1)
+                b.BorderSizePixel = 0
+                b.ClipsDescendants = true
+                b.Parent = Scroll
+                
+                local bcorner = Instance.new("UICorner")
+                bcorner.CornerRadius = UDim.new(0, 4)
+                bcorner.Parent = b
+                
+                b.MouseButton1Click:Connect(function()
+                    local buttonGUID = b:GetAttribute("GUID")
+                    if buttonGUID then
+                        currentSelectionGUID = buttonGUID
+                        updateDetailsView()
+                        refreshSelectionColors()
+                    end
+                end)
+            end
+            
+            b.Size = UDim2.new(1, -6, 0, 30)
+            b.LayoutOrder = i
+            
+            local cleanName = d.name:match("[^%.%[%]]+$") or d.name
+            cleanName = cleanName:gsub('^"', ''):gsub('"$', ''):gsub('%]$', '')
+            
+            b.Text = string.format("[%s]%s [%s]", d.type, (d.isSelf and " [S]" or ""), cleanName)
+            
+            if currentSelectionGUID == d.guid then
+                b.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
+            else
+                b.BackgroundColor3 = d.isSelf and Color3.fromRGB(45, 90, 45) or Color3.fromRGB(40, 40, 45)
+            end
+            
+            b:SetAttribute("GUID", d.guid)
+            b:SetAttribute("IsSelf", d.isSelf)
+        end
+    end
+end)
