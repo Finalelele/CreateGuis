@@ -385,10 +385,52 @@ function createInfoGui(config)
         task.defer(function() if not collapsed then updateFrameSize(true) end end)
     end
 
+        -- 🆕 Массовый патч: применить поля ко всем существующим строкам
+    local function applyGlobalPatch(patch)
+        if type(patch) ~= "table" then return end
+        for id, saved in pairs(lineData) do
+            local label = labels[id]
+            if label then
+                if patch.text         ~= nil then saved.text         = patch.text end
+                if patch.color        ~= nil then saved.color        = patch.color end
+                if patch.outlineColor ~= nil then saved.outlineColor = patch.outlineColor end
+                if patch.outlineSize  ~= nil then
+                    saved.outlineSize = patch.outlineSize == false and nil or patch.outlineSize
+                end
+                if patch.order        ~= nil then
+                    saved.order = patch.order == false and nil or patch.order
+                end
+
+                label.Text = saved.text
+                label.TextColor3 = saved.color
+                applyOutline(label, saved)
+            end
+        end
+        updateOrder()
+    end
+
     local function setText(lines)
         if not lines then return end
-        for _, data in ipairs(lines) do setLine(data) end
-        updateOrder()
+
+        if lines.id then
+            -- Одиночная строка
+            setLine(lines)
+        elseif #lines > 0 and type(lines[1]) == "table" then
+            -- Список строк (+ опциональный патч внутри)
+            for _, data in ipairs(lines) do
+                if type(data) == "table" then
+                    if data.id then
+                        setLine(data)
+                    else
+                        applyGlobalPatch(data)
+                    end
+                end
+            end
+        else
+            -- Патч без id → на все существующие строки
+            applyGlobalPatch(lines)
+        end
+
         updateFrameSize(true)
         if not collapsed then setContentTransparency(0, false) end
     end
@@ -872,10 +914,49 @@ function createInfoText(config)
         applyOutline(label, saved)
     end
 
+        -- 🆕 Массовый патч: применить поля ко всем существующим строкам
+    local function applyGlobalPatch(patch)
+        if type(patch) ~= "table" then return end
+        for id, saved in pairs(lineData) do
+            local label = labels[id]
+            if label then
+                if patch.text         ~= nil then saved.text         = patch.text end
+                if patch.color        ~= nil then saved.color        = patch.color end
+                if patch.outlineColor ~= nil then saved.outlineColor = patch.outlineColor end
+                if patch.outlineSize  ~= nil then
+                    saved.outlineSize = patch.outlineSize == false and nil or patch.outlineSize
+                end
+                if patch.order        ~= nil then
+                    saved.order = patch.order == false and nil or patch.order
+                end
+
+                label.Text = saved.text
+                label.TextColor3 = saved.color
+                applyOutline(label, saved)
+            end
+        end
+        updateOrder()
+    end
+
     local function setText(lines)
         if not lines then return end
-        for _, data in ipairs(lines) do setLine(data) end
-        updateOrder()
+
+        if lines.id then
+            setLine(lines)
+        elseif #lines > 0 and type(lines[1]) == "table" then
+            for _, data in ipairs(lines) do
+                if type(data) == "table" then
+                    if data.id then
+                        setLine(data)
+                    else
+                        applyGlobalPatch(data)
+                    end
+                end
+            end
+        else
+            applyGlobalPatch(lines)
+        end
+
         updateSize(true)
     end
 
