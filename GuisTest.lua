@@ -657,9 +657,8 @@ function createInfoText(config)
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
-    local zIndex       = pick(config, "ZIndex", "zIndex") or 1
-
-    local displayOrder = pick(config, "DisplayOrder", "displayOrder") or 0
+    -- ZIndex: порядок отрисовки внутри BillboardGui (не влияет на BHA)
+    local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
     local font = pick(cw, "Font", "font") or pick(config, "Font", "font") or Enum.Font.GothamMedium
 
@@ -773,7 +772,7 @@ function createInfoText(config)
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
         billboard.Enabled = isActive
-        billboard.DisplayOrder = displayOrder
+        -- ✅ DisplayOrder убран — это свойство ScreenGui, не BillboardGui
         billboard.Parent = adornee
 
         windowFrame = Instance.new("Frame")
@@ -783,7 +782,7 @@ function createInfoText(config)
         windowFrame.BackgroundTransparency = windowBackgroundTransparency
         windowFrame.BorderSizePixel = 0
         windowFrame.Visible = showWindow
-        windowFrame.ZIndex = zIndex                 -- 🆕
+        windowFrame.ZIndex = zIndex
         windowFrame.Parent = billboard
 
         local wc = Instance.new("UICorner")
@@ -801,7 +800,7 @@ function createInfoText(config)
         container.Name = "Container"
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
-        container.ZIndex = zIndex + 1               -- 🆕 (текст всегда поверх фона)
+        container.ZIndex = zIndex + 1
         container.Parent = billboard
 
         local layout = Instance.new("UIListLayout")
@@ -850,7 +849,7 @@ function createInfoText(config)
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Center
             label.TextYAlignment = Enum.TextYAlignment.Top
-            label.ZIndex = zIndex + 2               -- 🆕 (поверх контейнера)
+            label.ZIndex = zIndex + 2
             label.Parent = container
 
             labels[id] = label
@@ -974,20 +973,13 @@ function createInfoText(config)
         v = pick(tbl, "ShowWindow", "showWindow")
         if v ~= nil then api:ShowWindow(v) end
 
-        -- 🆕 ZIndex
+        -- ZIndex
         v = pick(tbl, "ZIndex", "zIndex")
         if v ~= nil then
             zIndex = tonumber(v) or zIndex
             if windowFrame then windowFrame.ZIndex = zIndex end
             if container   then container.ZIndex   = zIndex + 1 end
             for _, label in pairs(labels) do label.ZIndex = zIndex + 2 end
-        end
-
-        -- 🆕 DisplayOrder
-        v = pick(tbl, "DisplayOrder", "displayOrder")
-        if v ~= nil then
-            displayOrder = tonumber(v) or displayOrder
-            if billboard then billboard.DisplayOrder = displayOrder end
         end
 
         v = pick(tbl, "OutlineColor", "outlineColor")
