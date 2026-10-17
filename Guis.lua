@@ -1,6 +1,3 @@
--- =====================================================================
---  createInfoGui
--- =====================================================================
 function createInfoGui(config)
     config = config or {}
 
@@ -16,7 +13,6 @@ function createInfoGui(config)
         return nil
     end
 
-    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
 
     local windowColor        = pick(cw, "WindowColor", "windowColor")               or Color3.fromRGB(30, 30, 35)
@@ -40,11 +36,9 @@ function createInfoGui(config)
     local scrollbarColor     = pick(cw, "ScrollbarColor", "scrollbarColor")         or accentColor
     local lineTextColor      = pick(cw, "LineTextColor", "lineTextColor")           or Color3.fromRGB(255, 255, 255)
 
-    -- font/titleFont теперь живут в CustomWindow (с fallback на config)
     local font      = pick(cw, "Font", "font")           or pick(config, "Font", "font")           or Enum.Font.GothamMedium
     local titleFont = pick(cw, "TitleFont", "titleFont") or pick(config, "TitleFont", "titleFont") or Enum.Font.GothamSemibold
 
-    -- ========= Основные =========
     local guiName   = pick(config, "Name", "name") or "CustomWindow"
     local title     = pick(config, "Title", "title") or "Window"
     local width     = pick(config, "Width", "width") or 200
@@ -55,7 +49,6 @@ function createInfoGui(config)
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
-    -- ========= AutoSize =========
     local autoSizeCfg        = pick(config, "AutoSize", "autoSize") or {}
     local autoSizeEnabled    = pick(autoSizeCfg, "Enabled", "enabled")
     if autoSizeEnabled == nil then autoSizeEnabled = true end
@@ -74,7 +67,6 @@ function createInfoGui(config)
     local tweenInfo     = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local lineFadeInfo  = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-    -- ========= GUI =========
     local screen = CoreGui:FindFirstChild(guiName)
     if screen then screen:Destroy() end
 
@@ -385,7 +377,6 @@ function createInfoGui(config)
         task.defer(function() if not collapsed then updateFrameSize(true) end end)
     end
 
-        -- 🆕 Массовый патч: применить поля ко всем существующим строкам
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
@@ -406,17 +397,14 @@ function createInfoGui(config)
                 applyOutline(label, saved)
             end
         end
-        updateOrder()
     end
 
     local function setText(lines)
         if not lines then return end
 
         if lines.id then
-            -- Одиночная строка
             setLine(lines)
         elseif #lines > 0 and type(lines[1]) == "table" then
-            -- Список строк (+ опциональный патч внутри)
             for _, data in ipairs(lines) do
                 if type(data) == "table" then
                     if data.id then
@@ -427,10 +415,10 @@ function createInfoGui(config)
                 end
             end
         else
-            -- Патч без id → на все существующие строки
             applyGlobalPatch(lines)
         end
-
+        
+        updateOrder()
         updateFrameSize(true)
         if not collapsed then setContentTransparency(0, false) end
     end
@@ -484,7 +472,6 @@ function createInfoGui(config)
     end)
     toggle.MouseButton1Click:Connect(function() setCollapsed(not collapsed, true) end)
 
-    -- ========= API =========
     local api = {}
 
     function api:SetText(lines) setText(lines) end
@@ -514,7 +501,6 @@ function createInfoGui(config)
     function api:Toggle() setCollapsed(not collapsed, true) end
     function api:IsCollapsed() return collapsed end
 
-    -- ===== SetParameter =====
     function api:SetParameter(tbl)
         if type(tbl) ~= "table" then return end
         local v
@@ -578,7 +564,6 @@ function createInfoGui(config)
         end
     end
 
-    -- ===== SetAutoSize =====
     function api:SetAutoSize(tbl)
         if type(tbl) ~= "table" then return end
 
@@ -597,7 +582,6 @@ function createInfoGui(config)
         updateFrameSize(true)
     end
 
-    -- ===== SetCustomWindow =====
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
         local v
@@ -671,9 +655,6 @@ function createInfoGui(config)
 end
 
 
--- =====================================================================
---  createInfoText
--- =====================================================================
 function createInfoText(config)
     config = config or {}
 
@@ -699,7 +680,6 @@ function createInfoText(config)
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
-    -- ZIndex: порядок отрисовки внутри BillboardGui (не влияет на BHA)
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
     local font = pick(cw, "Font", "font") or pick(config, "Font", "font") or Enum.Font.GothamMedium
@@ -814,7 +794,6 @@ function createInfoText(config)
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
         billboard.Enabled = isActive
-        -- ✅ DisplayOrder убран — это свойство ScreenGui, не BillboardGui
         billboard.Parent = adornee
 
         windowFrame = Instance.new("Frame")
@@ -914,7 +893,6 @@ function createInfoText(config)
         applyOutline(label, saved)
     end
 
-        -- 🆕 Массовый патч: применить поля ко всем существующим строкам
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
@@ -935,7 +913,6 @@ function createInfoText(config)
                 applyOutline(label, saved)
             end
         end
-        updateOrder()
     end
 
     local function setText(lines)
@@ -957,6 +934,7 @@ function createInfoText(config)
             applyGlobalPatch(lines)
         end
 
+        updateOrder()
         updateSize(true)
     end
 
@@ -996,7 +974,6 @@ function createInfoText(config)
 
     function api:IsWindowShown() return showWindow end
 
-    -- ===== SetParameter =====
     function api:SetParameter(tbl)
         if type(tbl) ~= "table" then return end
         local v
@@ -1054,7 +1031,6 @@ function createInfoText(config)
         v = pick(tbl, "ShowWindow", "showWindow")
         if v ~= nil then api:ShowWindow(v) end
 
-        -- ZIndex
         v = pick(tbl, "ZIndex", "zIndex")
         if v ~= nil then
             zIndex = tonumber(v) or zIndex
@@ -1091,7 +1067,6 @@ function createInfoText(config)
         end
     end
 
-    -- ===== SetCustomWindow =====
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
         local v
@@ -1165,9 +1140,6 @@ function createInfoText(config)
 end
 
 
--- =====================================================================
---  createRadar
--- =====================================================================
 local function createRadar(config)
     config = config or {}
 
@@ -1465,15 +1437,6 @@ local function createRadar(config)
 
     local api = {}
 
-    -- ===== Set (единый, работает как SetText) =====
-    -- Одиночный: api:Set({ id = "t1", target = part, text = "...", color = Color3, size = 8, visible = true })
-    -- Батч:     api:Set({ { id = "t1", ... }, { id = "t2", ... } })
-    -- Пропущенные поля:
-    --   target  → nil
-    --   text    → nil (TextLabel удаляется)
-    --   color   → Color3.new(1, 1, 1)
-    --   size    → 8
-    --   visible → true
     function api:Set(listOrData)
         if type(listOrData) ~= "table" then return end
 
@@ -1543,7 +1506,6 @@ local function createRadar(config)
 
     function api:Visible(state) enabled = state ~= false gui.Enabled = enabled end
 
-    -- ===== SetParameter =====
     function api:SetParameter(tbl)
         if type(tbl) ~= "table" then return end
         local v
@@ -1573,7 +1535,6 @@ local function createRadar(config)
         if v ~= nil then EDGE_TEXT_HIDE_THRESHOLD = tonumber(v) or EDGE_TEXT_HIDE_THRESHOLD end
     end
 
-    -- ===== SetCustomWindow =====
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
         local v
@@ -1633,7 +1594,6 @@ local function createRadar(config)
 
     return api
 end
-
 
 return {
     createInfoGui  = createInfoGui,
