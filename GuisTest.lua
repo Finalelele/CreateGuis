@@ -789,6 +789,15 @@ function createInfoGui(config)
         if activeTween then activeTween:Cancel() activeTween = nil end
         if screen then screen:Destroy() screen = nil end
     end
+    
+    function api:GetLines()
+        local list = {}
+        for id, _ in pairs(lineData) do
+            table.insert(list, id)
+        end
+        table.sort(list)
+        return list
+    end
 
     return api
 end
