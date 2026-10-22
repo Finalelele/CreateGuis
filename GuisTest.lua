@@ -356,29 +356,26 @@ function createInfoGui(config)
             local isActive = saved.toggle.value == true
             local trackStroke = ui.track:FindFirstChildOfClass("UIStroke")
             
-            -- Настройка трека (фона тогла)
             if isActive then
-                ui.track.BackgroundColor3 = saved.toggle.color or Color3.fromRGB(70, 130, 180)
+                ui.track.BackgroundColor3 = saved.toggle.enabledColor or saved.toggle.color or Color3.fromRGB(70, 130, 180)
                 if trackStroke then trackStroke.Color = saved.toggle.outlineColor or saved.toggle.color or Color3.fromRGB(70, 130, 180) end
             else
-                ui.track.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+                ui.track.BackgroundColor3 = saved.toggle.disabledColor or Color3.fromRGB(200, 200, 200)
                 if trackStroke then trackStroke.Color = saved.toggle.outlineColor or Color3.fromRGB(150, 150, 150) end
             end
 
             local targetPos = isActive and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
             TweenService:Create(ui.knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
 
-            -- Настройка кружочка (Knob) с использованием enabledColor/disabledColor
-            local knobColor = isActive and (saved.toggle.enabledColor or Color3.fromRGB(255, 255, 255)) or (saved.toggle.disabledColor or Color3.fromRGB(150, 150, 150))
-
+            -- ИЗМЕНЕНО: кружок всегда белый
             if saved.toggle.image then
                 ui.knob.BackgroundTransparency = 1
                 ui.knob.Image = saved.toggle.image
-                ui.knob.ImageColor3 = knobColor
+                ui.knob.ImageColor3 = Color3.new(1, 1, 1)
             else
                 ui.knob.BackgroundTransparency = 0
                 ui.knob.Image = ""
-                ui.knob.BackgroundColor3 = knobColor
+                ui.knob.BackgroundColor3 = Color3.new(1, 1, 1)
             end
         else
             ui.track.Visible = false
