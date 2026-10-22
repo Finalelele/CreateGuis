@@ -411,12 +411,12 @@ function createInfoGui(config)
             label.TextTransparency = 1
             label.Parent = lineFrame
 
-            local toggleBtn = Instance.new("TextButton")
+            -- ИСПРАВЛЕНО: TextButton заменен на ImageButton, чтобы работало свойство Image
+            local toggleBtn = Instance.new("ImageButton")
             toggleBtn.Name = "Toggle"
             toggleBtn.Size = UDim2.fromOffset(18, 18)
             toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             toggleBtn.BorderSizePixel = 0
-            toggleBtn.Text = ""
             toggleBtn.AutoButtonColor = false
             toggleBtn.AnchorPoint = Vector2.new(0, 0)
             toggleBtn.Visible = false
