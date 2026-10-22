@@ -337,39 +337,43 @@ function createInfoGui(config)
         applyOutline(ui.text, saved.text)
 
         if saved.toggle then
-            ui.toggle.Visible = true
+            ui.track.Visible = true
             local isLeft = (saved.toggle.side == "left")
             if isLeft then
-                ui.toggle.Position = UDim2.new(0, 0, 0, 2)
-                ui.text.Position = UDim2.new(0, 26, 0, 0)
-                ui.text.Size = UDim2.new(1, -26, 0, 0)
+                ui.track.Position = UDim2.new(0, 0, 0.5, -7)
+                ui.text.Position = UDim2.new(0, 34, 0, 0)
+                ui.text.Size = UDim2.new(1, -34, 0, 0)
             else
-                ui.toggle.Position = UDim2.new(1, -18, 0, 2)
+                ui.track.Position = UDim2.new(1, -28, 0.5, -7)
                 ui.text.Position = UDim2.new(0, 0, 0, 0)
-                ui.text.Size = UDim2.new(1, -26, 0, 0)
+                ui.text.Size = UDim2.new(1, -34, 0, 0)
             end
 
-            local stroke = ui.toggle:FindFirstChildOfClass("UIStroke")
-            if saved.toggle.image then
-                ui.toggle.BackgroundTransparency = 1
-                if stroke then stroke.Transparency = 1 end
-                ui.toggle.Image = saved.toggle.image
-                ui.toggle.ImageColor3 = saved.toggle.color or Color3.new(1,1,1)
+            local isActive = saved.toggle.value == true
+            local trackStroke = ui.track:FindFirstChildOfClass("UIStroke")
+            
+            if isActive then
+                ui.track.BackgroundColor3 = saved.toggle.color or Color3.fromRGB(70, 130, 180)
+                if trackStroke then trackStroke.Color = saved.toggle.outlineColor or saved.toggle.color or Color3.fromRGB(70, 130, 180) end
             else
-                ui.toggle.Image = ""
-                ui.toggle.BackgroundTransparency = 0
-                if stroke then
-                    stroke.Transparency = 0
-                    stroke.Color = saved.toggle.outlineColor or Color3.fromRGB(70, 130, 180)
-                end
-                if saved.toggle.value then
-                    ui.toggle.BackgroundColor3 = saved.toggle.color or Color3.fromRGB(70, 130, 180)
-                else
-                    ui.toggle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                end
+                ui.track.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+                if trackStroke then trackStroke.Color = saved.toggle.outlineColor or Color3.fromRGB(150, 150, 150) end
+            end
+
+            local targetPos = isActive and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
+            TweenService:Create(ui.knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+
+            if saved.toggle.image then
+                ui.knob.BackgroundTransparency = 1
+                ui.knob.Image = saved.toggle.image
+                ui.knob.ImageColor3 = isActive and (saved.toggle.color or Color3.new(1,1,1)) or Color3.new(1,1,1)
+            else
+                ui.knob.BackgroundTransparency = 0
+                ui.knob.Image = ""
+                ui.knob.BackgroundColor3 = Color3.new(1, 1, 1)
             end
         else
-            ui.toggle.Visible = false
+            ui.track.Visible = false
             ui.text.Position = UDim2.new(0, 0, 0, 0)
             ui.text.Size = UDim2.new(1, 0, 0, 0)
         end
@@ -394,8 +398,8 @@ function createInfoGui(config)
             local padding = Instance.new("UIPadding")
             padding.PaddingLeft   = UDim.new(0, 8)
             padding.PaddingRight  = UDim.new(0, 8)
-            padding.PaddingTop    = UDim.new(0, 1)
-            padding.PaddingBottom = UDim.new(0, 1)
+            padding.PaddingTop    = UDim.new(0, 2)
+            padding.PaddingBottom = UDim.new(0, 2)
             padding.Parent = lineFrame
 
             local label = Instance.new("TextLabel")
@@ -407,31 +411,43 @@ function createInfoGui(config)
             label.Font = font
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Left
-            label.TextYAlignment = Enum.TextYAlignment.Top
+            label.TextYAlignment = Enum.TextYAlignment.Center
             label.TextTransparency = 1
             label.Parent = lineFrame
 
-            -- ИСПРАВЛЕНО: TextButton заменен на ImageButton, чтобы работало свойство Image
-            local toggleBtn = Instance.new("ImageButton")
-            toggleBtn.Name = "Toggle"
-            toggleBtn.Size = UDim2.fromOffset(18, 18)
-            toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            toggleBtn.BorderSizePixel = 0
-            toggleBtn.AutoButtonColor = false
-            toggleBtn.AnchorPoint = Vector2.new(0, 0)
-            toggleBtn.Visible = false
-            toggleBtn.Parent = lineFrame
+            -- Новый тогл (Track)
+            local track = Instance.new("Frame")
+            track.Name = "ToggleTrack"
+            track.Size = UDim2.fromOffset(28, 14)
+            track.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+            track.BorderSizePixel = 0
+            track.Visible = false
+            track.Parent = lineFrame
 
-            local btnCorner = Instance.new("UICorner")
-            btnCorner.CornerRadius = UDim.new(0, 4)
-            btnCorner.Parent = toggleBtn
+            local trackCorner = Instance.new("UICorner")
+            trackCorner.CornerRadius = UDim.new(1, 0)
+            trackCorner.Parent = track
 
-            local btnStroke = Instance.new("UIStroke")
-            btnStroke.Thickness = 2
-            btnStroke.Color = Color3.fromRGB(70, 130, 180)
-            btnStroke.Parent = toggleBtn
+            local trackStroke = Instance.new("UIStroke")
+            trackStroke.Thickness = 1
+            trackStroke.Color = Color3.fromRGB(150, 150, 150)
+            trackStroke.Parent = track
 
-            toggleBtn.MouseButton1Click:Connect(function()
+            -- Квадратик внутри тогла (Knob)
+            local knob = Instance.new("ImageButton")
+            knob.Name = "ToggleKnob"
+            knob.Size = UDim2.fromOffset(10, 10)
+            knob.Position = UDim2.new(0, 2, 0.5, -5)
+            knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            knob.BorderSizePixel = 0
+            knob.AutoButtonColor = false
+            knob.Parent = track
+
+            local knobCorner = Instance.new("UICorner")
+            knobCorner.CornerRadius = UDim.new(1, 0)
+            knobCorner.Parent = knob
+
+            local function onToggleClick()
                 local s = lineData[id]
                 if s and s.toggle then
                     s.toggle.value = not (s.toggle.value or false)
@@ -440,9 +456,21 @@ function createInfoGui(config)
                         s.toggle.callback(s.toggle.value)
                     end
                 end
+            end
+
+            track.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    onToggleClick()
+                end
+            end)
+            
+            knob.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    onToggleClick()
+                end
             end)
 
-            labels[id] = { frame = lineFrame, text = label, toggle = toggleBtn }
+            labels[id] = { frame = lineFrame, text = label, track = track, knob = knob }
             lineData[id] = {
                 id = id, 
                 text = { text = "", color = lineTextColor, outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
@@ -467,7 +495,7 @@ function createInfoGui(config)
         if data.order ~= nil then saved.order = data.order == false and nil or data.order end
 
         if data.toggle ~= nil then
-            if saved.toggle == nil then saved.toggle = { value = false } end
+            if saved.toggle == nil then saved.toggle = { value = false, side = "right" } end
             for k, v in pairs(data.toggle) do
                 saved.toggle[k] = v
             end
@@ -500,7 +528,7 @@ function createInfoGui(config)
             if patch.outlineSize ~= nil then saved.text.outlineSize = patch.outlineSize == false and nil or patch.outlineSize end
             if patch.order ~= nil then saved.order = patch.order == false and nil or patch.order end
             if patch.toggle ~= nil then
-                if saved.toggle == nil then saved.toggle = { value = false } end
+                if saved.toggle == nil then saved.toggle = { value = false, side = "right" } end
                 for k, v in pairs(patch.toggle) do saved.toggle[k] = v end
             end
             renderLine(id)
