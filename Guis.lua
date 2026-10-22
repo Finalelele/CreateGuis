@@ -46,6 +46,9 @@ function createInfoGui(config)
     local position  = pick(config, "Position", "position") or UDim2.new(0.05, 0, 0.15, 0)
     local textSize  = pick(config, "TextSize", "textSize") or 14
 
+    local reload    = pick(config, "Reload", "reload")
+    if reload == nil then reload = true end
+
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
@@ -67,13 +70,20 @@ function createInfoGui(config)
     local tweenInfo     = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local lineFadeInfo  = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-    local screen = CoreGui:FindFirstChild(guiName)
-    if screen then screen:Destroy() end
+    -- НОВАЯ ЛОГИКА RELOAD
+    for _, old in ipairs(CoreGui:GetChildren()) do
+        if old.Name == guiName and old:IsA("ScreenGui") then
+            if old:GetAttribute("Reload") == true then
+                old:Destroy()
+            end
+        end
+    end
 
-    screen = Instance.new("ScreenGui")
+    local screen = Instance.new("ScreenGui")
     screen.Name = guiName
     screen.ResetOnSpawn = false
     screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screen:SetAttribute("Reload", reload)
     screen.Parent = CoreGui
 
     local frame = Instance.new("Frame")
@@ -268,10 +278,10 @@ function createInfoGui(config)
     end)
 
     local function setContentTransparency(transparency, instant)
-        for _, label in pairs(labels) do
-            if instant then label.TextTransparency = transparency
-            else TweenService:Create(label, tweenInfo, { TextTransparency = transparency }):Play() end
-            local stroke = label:FindFirstChild("Outline")
+        for _, ui in pairs(labels) do
+            if instant then ui.text.TextTransparency = transparency
+            else TweenService:Create(ui.text, tweenInfo, { TextTransparency = transparency }):Play() end
+            local stroke = ui.text:FindFirstChild("Outline")
             if stroke then
                 if instant then stroke.Transparency = transparency
                 else TweenService:Create(stroke, tweenInfo, { Transparency = transparency }):Play() end
@@ -309,27 +319,96 @@ function createInfoGui(config)
             local order = math.max(1, math.floor(data.order))
             while used[order] do order = order + 1 end
             used[order] = true
-            labels[data.id].LayoutOrder = order
+            labels[data.id].frame.LayoutOrder = order
         end
         local current = 1
         for _, data in ipairs(withoutOrder) do
             while used[current] do current = current + 1 end
             used[current] = true
-            labels[data.id].LayoutOrder = current
+            labels[data.id].frame.LayoutOrder = current
             current = current + 1
+        end
+    end
+
+    local renderLine
+    renderLine = function(id)
+        local ui = labels[id]
+        local saved = lineData[id]
+        if not ui or not saved then return end
+
+        ui.text.Text = saved.text.text or ""
+        ui.text.TextColor3 = saved.text.color or lineTextColor
+        applyOutline(ui.text, saved.text)
+
+        if saved.toggle then
+            ui.track.Visible = true
+            local isLeft = (saved.toggle.side == "left")
+            if isLeft then
+                ui.track.Position = UDim2.new(0, 0, 0.5, -7)
+                ui.text.Position = UDim2.new(0, 34, 0, 0)
+                ui.text.Size = UDim2.new(1, -34, 0, 0)
+            else
+                ui.track.Position = UDim2.new(1, -28, 0.5, -7)
+                ui.text.Position = UDim2.new(0, 0, 0, 0)
+                ui.text.Size = UDim2.new(1, -34, 0, 0)
+            end
+
+            local isActive = saved.toggle.value == true
+            local trackStroke = ui.track:FindFirstChildOfClass("UIStroke")
+            
+            if isActive then
+                ui.track.BackgroundColor3 = saved.toggle.enabledColor or saved.toggle.color or Color3.fromRGB(70, 130, 180)
+                if trackStroke then trackStroke.Color = saved.toggle.outlineColor or saved.toggle.color or Color3.fromRGB(70, 130, 180) end
+            else
+                ui.track.BackgroundColor3 = saved.toggle.disabledColor or Color3.fromRGB(200, 200, 200)
+                if trackStroke then trackStroke.Color = saved.toggle.outlineColor or Color3.fromRGB(150, 150, 150) end
+            end
+
+            local targetPos = isActive and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
+            TweenService:Create(ui.knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+
+            -- ИЗМЕНЕНО: кружок всегда белый
+            if saved.toggle.image then
+                ui.knob.BackgroundTransparency = 1
+                ui.knob.Image = saved.toggle.image
+                ui.knob.ImageColor3 = Color3.new(1, 1, 1)
+            else
+                ui.knob.BackgroundTransparency = 0
+                ui.knob.Image = ""
+                ui.knob.BackgroundColor3 = Color3.new(1, 1, 1)
+            end
+        else
+            ui.track.Visible = false
+            ui.text.Position = UDim2.new(0, 0, 0, 0)
+            ui.text.Size = UDim2.new(1, 0, 0, 0)
         end
     end
 
     local function setLine(data)
         if not data or not data.id then return end
         local id = data.id
-        local label = labels[id]
-        local isNew = label == nil
+        local ui = labels[id]
+        local isNew = ui == nil
 
         if isNew then
             creationCounter = creationCounter + 1
-            label = Instance.new("TextLabel")
-            label.Name = id
+            
+            local lineFrame = Instance.new("Frame")
+            lineFrame.Name = id
+            lineFrame.Size = UDim2.new(1, 0, 0, 0)
+            lineFrame.AutomaticSize = Enum.AutomaticSize.Y
+            lineFrame.BackgroundTransparency = 1
+            lineFrame.Parent = scrolling
+
+            local padding = Instance.new("UIPadding")
+            padding.PaddingLeft   = UDim.new(0, 8)
+            padding.PaddingRight  = UDim.new(0, 8)
+            padding.PaddingTop    = UDim.new(0, 2)
+            padding.PaddingBottom = UDim.new(0, 2)
+            padding.Parent = lineFrame
+
+            local label = Instance.new("TextLabel")
+            label.Name = "Text"
             label.Size = UDim2.new(1, 0, 0, 0)
             label.AutomaticSize = Enum.AutomaticSize.Y
             label.TextWrapped = true
@@ -337,40 +416,100 @@ function createInfoGui(config)
             label.Font = font
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Left
-            label.TextYAlignment = Enum.TextYAlignment.Top
+            label.TextYAlignment = Enum.TextYAlignment.Center
             label.TextTransparency = 1
-            label.Parent = scrolling
+            label.Parent = lineFrame
 
-            local padding = Instance.new("UIPadding")
-            padding.PaddingLeft   = UDim.new(0, 8)
-            padding.PaddingRight  = UDim.new(0, 8)
-            padding.PaddingTop    = UDim.new(0, 1)
-            padding.PaddingBottom = UDim.new(0, 1)
-            padding.Parent = label
+            local track = Instance.new("Frame")
+            track.Name = "ToggleTrack"
+            track.Size = UDim2.fromOffset(28, 14)
+            track.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+            track.BorderSizePixel = 0
+            track.Visible = false
+            track.Parent = lineFrame
 
-            labels[id] = label
+            local trackCorner = Instance.new("UICorner")
+            trackCorner.CornerRadius = UDim.new(1, 0)
+            trackCorner.Parent = track
+
+            local trackStroke = Instance.new("UIStroke")
+            trackStroke.Thickness = 1
+            trackStroke.Color = Color3.fromRGB(150, 150, 150)
+            trackStroke.Parent = track
+
+            local knob = Instance.new("ImageButton")
+            knob.Name = "ToggleKnob"
+            knob.Size = UDim2.fromOffset(10, 10)
+            knob.Position = UDim2.new(0, 2, 0.5, -5)
+            knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            knob.BorderSizePixel = 0
+            knob.AutoButtonColor = false
+            knob.Parent = track
+
+            local knobCorner = Instance.new("UICorner")
+            knobCorner.CornerRadius = UDim.new(1, 0)
+            knobCorner.Parent = knob
+
+            local function onToggleClick()
+                local s = lineData[id]
+                if s and s.toggle then
+                    s.toggle.value = not (s.toggle.value or false)
+                    renderLine(id)
+                    if s.toggle.callback then
+                        s.toggle.callback(s.toggle.value)
+                    end
+                end
+            end
+
+            track.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    onToggleClick()
+                end
+            end)
+            
+            knob.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    onToggleClick()
+                end
+            end)
+
+            labels[id] = { frame = lineFrame, text = label, track = track, knob = knob }
             lineData[id] = {
-                id = id, text = "", color = lineTextColor,
-                outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize,
+                id = id, 
+                text = { text = "", color = lineTextColor, outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
+                toggle = nil,
                 order = nil, created = creationCounter,
             }
         end
 
         local saved = lineData[id]
-        if data.text         ~= nil then saved.text         = data.text end
-        if data.color        ~= nil then saved.color        = data.color end
-        if data.outlineColor ~= nil then saved.outlineColor = data.outlineColor end
-        if data.outlineSize  ~= nil then saved.outlineSize  = data.outlineSize == false and nil or data.outlineSize end
-        if data.order        ~= nil then saved.order        = data.order == false and nil or data.order end
+        
+        if data.text ~= nil then
+            if type(data.text) == "string" then
+                saved.text.text = data.text
+            elseif type(data.text) == "table" then
+                for k, v in pairs(data.text) do saved.text[k] = v end
+            end
+        end
+        
+        if data.color ~= nil then saved.text.color = data.color end
+        if data.outlineColor ~= nil then saved.text.outlineColor = data.outlineColor end
+        if data.outlineSize ~= nil then saved.text.outlineSize = data.outlineSize == false and nil or data.outlineSize end
+        if data.order ~= nil then saved.order = data.order == false and nil or data.order end
 
-        label.Text = saved.text
-        label.TextColor3 = saved.color
-        applyOutline(label, saved)
+        if data.toggle ~= nil then
+            if saved.toggle == nil then saved.toggle = { value = false, side = "right" } end
+            for k, v in pairs(data.toggle) do
+                saved.toggle[k] = v
+            end
+        end
+
+        renderLine(id)
 
         if isNew and not collapsed then
-            local stroke = label:FindFirstChild("Outline")
+            local stroke = ui and ui.text:FindFirstChild("Outline")
             if stroke then stroke.Transparency = 1 end
-            TweenService:Create(label, lineFadeInfo, { TextTransparency = 0 }):Play()
+            TweenService:Create(labels[id].text, lineFadeInfo, { TextTransparency = 0 }):Play()
             if stroke then TweenService:Create(stroke, lineFadeInfo, { Transparency = 0 }):Play() end
         end
 
@@ -380,22 +519,22 @@ function createInfoGui(config)
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
-            local label = labels[id]
-            if label then
-                if patch.text         ~= nil then saved.text         = patch.text end
-                if patch.color        ~= nil then saved.color        = patch.color end
-                if patch.outlineColor ~= nil then saved.outlineColor = patch.outlineColor end
-                if patch.outlineSize  ~= nil then
-                    saved.outlineSize = patch.outlineSize == false and nil or patch.outlineSize
+            if patch.text ~= nil then
+                if type(patch.text) == "string" then
+                    saved.text.text = patch.text
+                elseif type(patch.text) == "table" then
+                    for k, v in pairs(patch.text) do saved.text[k] = v end
                 end
-                if patch.order        ~= nil then
-                    saved.order = patch.order == false and nil or patch.order
-                end
-
-                label.Text = saved.text
-                label.TextColor3 = saved.color
-                applyOutline(label, saved)
             end
+            if patch.color ~= nil then saved.text.color = patch.color end
+            if patch.outlineColor ~= nil then saved.text.outlineColor = patch.outlineColor end
+            if patch.outlineSize ~= nil then saved.text.outlineSize = patch.outlineSize == false and nil or patch.outlineSize end
+            if patch.order ~= nil then saved.order = patch.order == false and nil or patch.order end
+            if patch.toggle ~= nil then
+                if saved.toggle == nil then saved.toggle = { value = false, side = "right" } end
+                for k, v in pairs(patch.toggle) do saved.toggle[k] = v end
+            end
+            renderLine(id)
         end
     end
 
@@ -474,12 +613,12 @@ function createInfoGui(config)
 
     local api = {}
 
-    function api:SetText(lines) setText(lines) end
+    function api:SetLine(lines) setText(lines) end
 
     function api:RemoveLine(id)
-        local label = labels[id]
-        if label then
-            label:Destroy()
+        local ui = labels[id]
+        if ui then
+            ui.frame:Destroy()
             labels[id] = nil
             lineData[id] = nil
             updateOrder()
@@ -489,7 +628,7 @@ function createInfoGui(config)
     end
 
     function api:Clear()
-        for _, label in pairs(labels) do label:Destroy() end
+        for _, ui in pairs(labels) do ui.frame:Destroy() end
         labels, lineData = {}, {}
         updateOrder()
         updateFrameSize(true)
@@ -528,7 +667,7 @@ function createInfoGui(config)
         if v ~= nil then
             textSize = v
             titleLabel.TextSize = textSize + 2
-            for _, label in pairs(labels) do label.TextSize = textSize end
+            for _, ui in pairs(labels) do ui.text.TextSize = textSize end
             updateFrameSize(true)
         end
 
@@ -536,9 +675,9 @@ function createInfoGui(config)
         if v ~= nil then
             defaultOutlineColor = v
             for id, data in pairs(lineData) do
-                if data.outlineSize then
-                    data.outlineColor = v
-                    applyOutline(labels[id], data)
+                if data.text.outlineSize then
+                    data.text.outlineColor = v
+                    applyOutline(labels[id].text, data.text)
                 end
             end
         end
@@ -547,9 +686,9 @@ function createInfoGui(config)
         if v ~= nil then
             defaultOutlineSize = v
             for id, data in pairs(lineData) do
-                if data.outlineSize ~= nil then
-                    data.outlineSize = v
-                    applyOutline(labels[id], data)
+                if data.text.outlineSize ~= nil then
+                    data.text.outlineSize = v
+                    applyOutline(labels[id].text, data.text)
                 end
             end
         end
@@ -636,7 +775,7 @@ function createInfoGui(config)
         v = pick(tbl, "Font", "font")
         if v ~= nil then
             font = v
-            for _, label in pairs(labels) do label.Font = v end
+            for _, ui in pairs(labels) do ui.text.Font = v end
         end
 
         v = pick(tbl, "TitleFont", "titleFont")
@@ -653,7 +792,6 @@ function createInfoGui(config)
 
     return api
 end
-
 
 function createInfoText(config)
     config = config or {}
@@ -845,6 +983,15 @@ function createInfoText(config)
         end
     end
 
+    local function renderTextLine(id)
+        local label = labels[id]
+        local saved = lineData[id]
+        if not label or not saved then return end
+        label.Text = saved.text.text or ""
+        label.TextColor3 = saved.text.color or Color3.fromRGB(255, 255, 255)
+        applyOutline(label, saved.text)
+    end
+
     setLine = function(data)
         if not data or not data.id then return end
         if not billboard or not billboard.Parent then
@@ -875,43 +1022,45 @@ function createInfoText(config)
 
             labels[id] = label
             lineData[id] = {
-                id = id, text = "", color = Color3.fromRGB(255, 255, 255),
-                outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize,
+                id = id, 
+                text = { text = "", color = Color3.fromRGB(255, 255, 255), outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
                 order = nil, created = creationCounter,
             }
         end
 
         local saved = lineData[id]
-        if data.text         ~= nil then saved.text         = data.text end
-        if data.color        ~= nil then saved.color        = data.color end
-        if data.outlineColor ~= nil then saved.outlineColor = data.outlineColor end
-        if data.outlineSize  ~= nil then saved.outlineSize  = data.outlineSize == false and nil or data.outlineSize end
-        if data.order        ~= nil then saved.order        = data.order == false and nil or data.order end
+        
+        if data.text ~= nil then
+            if type(data.text) == "string" then
+                saved.text.text = data.text
+            elseif type(data.text) == "table" then
+                for k, v in pairs(data.text) do saved.text[k] = v end
+            end
+        end
 
-        label.Text = saved.text
-        label.TextColor3 = saved.color
-        applyOutline(label, saved)
+        if data.color ~= nil then saved.text.color = data.color end
+        if data.outlineColor ~= nil then saved.text.outlineColor = data.outlineColor end
+        if data.outlineSize ~= nil then saved.text.outlineSize = data.outlineSize == false and nil or data.outlineSize end
+        if data.order ~= nil then saved.order = data.order == false and nil or data.order end
+
+        renderTextLine(id)
     end
 
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
-            local label = labels[id]
-            if label then
-                if patch.text         ~= nil then saved.text         = patch.text end
-                if patch.color        ~= nil then saved.color        = patch.color end
-                if patch.outlineColor ~= nil then saved.outlineColor = patch.outlineColor end
-                if patch.outlineSize  ~= nil then
-                    saved.outlineSize = patch.outlineSize == false and nil or patch.outlineSize
+            if patch.text ~= nil then
+                if type(patch.text) == "string" then
+                    saved.text.text = patch.text
+                elseif type(patch.text) == "table" then
+                    for k, v in pairs(patch.text) do saved.text[k] = v end
                 end
-                if patch.order        ~= nil then
-                    saved.order = patch.order == false and nil or patch.order
-                end
-
-                label.Text = saved.text
-                label.TextColor3 = saved.color
-                applyOutline(label, saved)
             end
+            if patch.color ~= nil then saved.text.color = patch.color end
+            if patch.outlineColor ~= nil then saved.text.outlineColor = patch.outlineColor end
+            if patch.outlineSize ~= nil then saved.text.outlineSize = patch.outlineSize == false and nil or patch.outlineSize end
+            if patch.order ~= nil then saved.order = patch.order == false and nil or patch.order end
+            renderTextLine(id)
         end
     end
 
@@ -943,7 +1092,7 @@ function createInfoText(config)
 
     local api = {}
 
-    function api:SetText(lines) setText(lines) end
+    function api:SetLine(lines) setText(lines) end
 
     function api:RemoveLine(id)
         pendingData[id] = nil
@@ -1043,9 +1192,9 @@ function createInfoText(config)
         if v ~= nil then
             defaultOutlineColor = v
             for id, data in pairs(lineData) do
-                if data.outlineSize then
-                    data.outlineColor = v
-                    applyOutline(labels[id], data)
+                if data.text.outlineSize then
+                    data.text.outlineColor = v
+                    applyOutline(labels[id], data.text)
                 end
             end
         end
@@ -1054,9 +1203,9 @@ function createInfoText(config)
         if v ~= nil then
             defaultOutlineSize = v
             for id, data in pairs(lineData) do
-                if data.outlineSize ~= nil then
-                    data.outlineSize = v
-                    applyOutline(labels[id], data)
+                if data.text.outlineSize ~= nil then
+                    data.text.outlineSize = v
+                    applyOutline(labels[id], data.text)
                 end
             end
         end
