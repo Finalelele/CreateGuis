@@ -70,9 +70,13 @@ function createInfoGui(config)
     local tweenInfo     = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local lineFadeInfo  = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-    if reload then
-        local old = CoreGui:FindFirstChild(guiName)
-        if old then old:Destroy() end
+    -- НОВАЯ ЛОГИКА RELOAD
+    for _, old in ipairs(CoreGui:GetChildren()) do
+        if old.Name == guiName and old:IsA("ScreenGui") then
+            if old:GetAttribute("Reload") == true then
+                old:Destroy()
+            end
+        end
     end
 
     local screen = Instance.new("ScreenGui")
@@ -352,6 +356,7 @@ function createInfoGui(config)
             local isActive = saved.toggle.value == true
             local trackStroke = ui.track:FindFirstChildOfClass("UIStroke")
             
+            -- Настройка трека (фона тогла)
             if isActive then
                 ui.track.BackgroundColor3 = saved.toggle.color or Color3.fromRGB(70, 130, 180)
                 if trackStroke then trackStroke.Color = saved.toggle.outlineColor or saved.toggle.color or Color3.fromRGB(70, 130, 180) end
@@ -363,14 +368,17 @@ function createInfoGui(config)
             local targetPos = isActive and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
             TweenService:Create(ui.knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
 
+            -- Настройка кружочка (Knob) с использованием enabledColor/disabledColor
+            local knobColor = isActive and (saved.toggle.enabledColor or Color3.fromRGB(255, 255, 255)) or (saved.toggle.disabledColor or Color3.fromRGB(150, 150, 150))
+
             if saved.toggle.image then
                 ui.knob.BackgroundTransparency = 1
                 ui.knob.Image = saved.toggle.image
-                ui.knob.ImageColor3 = isActive and (saved.toggle.color or Color3.new(1,1,1)) or Color3.new(1,1,1)
+                ui.knob.ImageColor3 = knobColor
             else
                 ui.knob.BackgroundTransparency = 0
                 ui.knob.Image = ""
-                ui.knob.BackgroundColor3 = Color3.new(1, 1, 1)
+                ui.knob.BackgroundColor3 = knobColor
             end
         else
             ui.track.Visible = false
@@ -415,7 +423,6 @@ function createInfoGui(config)
             label.TextTransparency = 1
             label.Parent = lineFrame
 
-            -- Новый тогл (Track)
             local track = Instance.new("Frame")
             track.Name = "ToggleTrack"
             track.Size = UDim2.fromOffset(28, 14)
@@ -433,7 +440,6 @@ function createInfoGui(config)
             trackStroke.Color = Color3.fromRGB(150, 150, 150)
             trackStroke.Parent = track
 
-            -- Квадратик внутри тогла (Knob)
             local knob = Instance.new("ImageButton")
             knob.Name = "ToggleKnob"
             knob.Size = UDim2.fromOffset(10, 10)
@@ -789,7 +795,6 @@ function createInfoGui(config)
 
     return api
 end
-
 
 function createInfoText(config)
     config = config or {}
