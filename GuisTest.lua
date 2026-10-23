@@ -818,6 +818,10 @@ function createInfoText(config)
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
+    -- 🆕 Читаем FixedSize
+    local fixedSize    = pick(config, "FixedSize", "fixedSize")
+    if fixedSize == nil then fixedSize = false end
+
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
     local font = pick(cw, "Font", "font") or pick(config, "Font", "font") or Enum.Font.GothamMedium
@@ -905,12 +909,19 @@ function createInfoText(config)
 
     local function updateSize(animate)
         if not billboard then return end
-        local layout = container and container:FindFirstChildOfClass("UIListLayout")
-        local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
-        local extra = showWindow and (windowPadding * 2) or 0
-        local autoHeight = math.max(textSize + extra, layoutHeight + extra)
-        local targetHeight = (size.Y.Offset and size.Y.Offset > 0) and size.Y.Offset or autoHeight
-        local targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, targetHeight)
+        
+        local targetSize
+        -- 🆕 Если FixedSize включен, мы НЕ пересчитываем высоту по строкам, а держим заданный Size
+        if fixedSize then
+            targetSize = size
+        else
+            local layout = container and container:FindFirstChildOfClass("UIListLayout")
+            local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
+            local extra = showWindow and (windowPadding * 2) or 0
+            local autoHeight = math.max(textSize + extra, layoutHeight + extra)
+            local targetHeight = (size.Y.Offset and size.Y.Offset > 0) and size.Y.Offset or autoHeight
+            targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, targetHeight)
+        end
 
         if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
         if animate then
@@ -960,6 +971,8 @@ function createInfoText(config)
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
+        -- 🆕 Включаем обрезку, если FixedSize (чтобы текст не вылезал за границы фиксированного окна)
+        container.ClipsDescendants = fixedSize
         container.Parent = billboard
 
         local layout = Instance.new("UIListLayout")
@@ -1022,8 +1035,8 @@ function createInfoText(config)
 
             labels[id] = label
             lineData[id] = {
-                id = id, 
-                text = { text = "", color = Color3.fromRGB(255, 255, 255), outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
+                id = id, text = "", color = Color3.fromRGB(255, 255, 255),
+                outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize,
                 order = nil, created = creationCounter,
             }
         end
@@ -1188,13 +1201,21 @@ function createInfoText(config)
             for _, label in pairs(labels) do label.ZIndex = zIndex + 2 end
         end
 
+        -- 🆕 Поддержка FixedSize в SetParameter
+        v = pick(tbl, "FixedSize", "fixedSize")
+        if v ~= nil then
+            fixedSize = v == true
+            if container then container.ClipsDescendants = fixedSize end
+            updateSize(true)
+        end
+
         v = pick(tbl, "OutlineColor", "outlineColor")
         if v ~= nil then
             defaultOutlineColor = v
             for id, data in pairs(lineData) do
-                if data.text.outlineSize then
-                    data.text.outlineColor = v
-                    applyOutline(labels[id], data.text)
+                if data.outlineSize then
+                    data.outlineColor = v
+                    applyOutline(labels[id], data)
                 end
             end
         end
@@ -1203,9 +1224,9 @@ function createInfoText(config)
         if v ~= nil then
             defaultOutlineSize = v
             for id, data in pairs(lineData) do
-                if data.text.outlineSize ~= nil then
-                    data.text.outlineSize = v
-                    applyOutline(labels[id], data.text)
+                if data.outlineSize ~= nil then
+                    data.outlineSize = v
+                    applyOutline(labels[id], data)
                 end
             end
         end
