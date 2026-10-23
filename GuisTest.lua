@@ -70,7 +70,6 @@ function createInfoGui(config)
     local tweenInfo     = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local lineFadeInfo  = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-    -- НОВАЯ ЛОГИКА RELOAD
     for _, old in ipairs(CoreGui:GetChildren()) do
         if old.Name == guiName and old:IsA("ScreenGui") then
             if old:GetAttribute("Reload") == true then
@@ -367,7 +366,6 @@ function createInfoGui(config)
             local targetPos = isActive and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
             TweenService:Create(ui.knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
 
-            -- ИЗМЕНЕНО: кружок всегда белый
             if saved.toggle.image then
                 ui.knob.BackgroundTransparency = 1
                 ui.knob.Image = saved.toggle.image
@@ -484,6 +482,16 @@ function createInfoGui(config)
 
         local saved = lineData[id]
         
+        -- 🆕 АВТО-КОНВЕРТАЦИЯ: Если вдруг saved.text это строка (старый формат), делаем из нее таблицу
+        if type(saved.text) ~= "table" then
+            saved.text = { 
+                text = tostring(saved.text or ""),
+                color = saved.color or lineTextColor,
+                outlineColor = saved.outlineColor or defaultOutlineColor,
+                outlineSize = saved.outlineSize
+            }
+        end
+
         if data.text ~= nil then
             if type(data.text) == "string" then
                 saved.text.text = data.text
@@ -519,6 +527,16 @@ function createInfoGui(config)
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
+            -- 🆕 АВТО-КОНВЕРТАЦИЯ
+            if type(saved.text) ~= "table" then
+                saved.text = { 
+                    text = tostring(saved.text or ""),
+                    color = saved.color or lineTextColor,
+                    outlineColor = saved.outlineColor or defaultOutlineColor,
+                    outlineSize = saved.outlineSize
+                }
+            end
+
             if patch.text ~= nil then
                 if type(patch.text) == "string" then
                     saved.text.text = patch.text
@@ -639,6 +657,12 @@ function createInfoGui(config)
     function api:Collapse(state) setCollapsed(state, true) end
     function api:Toggle() setCollapsed(not collapsed, true) end
     function api:IsCollapsed() return collapsed end
+    function api:GetLines() 
+        local list = {}
+        for id, _ in pairs(lineData) do table.insert(list, id) end
+        table.sort(list)
+        return list
+    end
 
     function api:SetParameter(tbl)
         if type(tbl) ~= "table" then return end
@@ -818,7 +842,6 @@ function createInfoText(config)
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
-    -- 🆕 Читаем FixedSize
     local fixedSize    = pick(config, "FixedSize", "fixedSize")
     if fixedSize == nil then fixedSize = false end
 
@@ -911,7 +934,6 @@ function createInfoText(config)
         if not billboard then return end
         
         local targetSize
-        -- 🆕 Если FixedSize включен, мы НЕ пересчитываем высоту по строкам, а держим заданный Size
         if fixedSize then
             targetSize = size
         else
@@ -971,7 +993,6 @@ function createInfoText(config)
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
-        -- 🆕 Включаем обрезку, если FixedSize (чтобы текст не вылезал за границы фиксированного окна)
         container.ClipsDescendants = fixedSize
         container.Parent = billboard
 
@@ -1035,14 +1056,23 @@ function createInfoText(config)
 
             labels[id] = label
             lineData[id] = {
-                id = id, text = "", color = Color3.fromRGB(255, 255, 255),
-                outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize,
+                id = id, text = { text = "", color = Color3.fromRGB(255, 255, 255), outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
                 order = nil, created = creationCounter,
             }
         end
 
         local saved = lineData[id]
         
+        -- 🆕 АВТО-КОНВЕРТАЦИЯ
+        if type(saved.text) ~= "table" then
+            saved.text = { 
+                text = tostring(saved.text or ""),
+                color = saved.color or Color3.fromRGB(255, 255, 255),
+                outlineColor = saved.outlineColor or defaultOutlineColor,
+                outlineSize = saved.outlineSize
+            }
+        end
+
         if data.text ~= nil then
             if type(data.text) == "string" then
                 saved.text.text = data.text
@@ -1062,6 +1092,16 @@ function createInfoText(config)
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
+            -- 🆕 АВТО-КОНВЕРТАЦИЯ
+            if type(saved.text) ~= "table" then
+                saved.text = { 
+                    text = tostring(saved.text or ""),
+                    color = saved.color or Color3.fromRGB(255, 255, 255),
+                    outlineColor = saved.outlineColor or defaultOutlineColor,
+                    outlineSize = saved.outlineSize
+                }
+            end
+
             if patch.text ~= nil then
                 if type(patch.text) == "string" then
                     saved.text.text = patch.text
@@ -1201,7 +1241,6 @@ function createInfoText(config)
             for _, label in pairs(labels) do label.ZIndex = zIndex + 2 end
         end
 
-        -- 🆕 Поддержка FixedSize в SetParameter
         v = pick(tbl, "FixedSize", "fixedSize")
         if v ~= nil then
             fixedSize = v == true
@@ -1213,9 +1252,9 @@ function createInfoText(config)
         if v ~= nil then
             defaultOutlineColor = v
             for id, data in pairs(lineData) do
-                if data.outlineSize then
-                    data.outlineColor = v
-                    applyOutline(labels[id], data)
+                if data.text.outlineSize then
+                    data.text.outlineColor = v
+                    applyOutline(labels[id], data.text)
                 end
             end
         end
@@ -1224,9 +1263,9 @@ function createInfoText(config)
         if v ~= nil then
             defaultOutlineSize = v
             for id, data in pairs(lineData) do
-                if data.outlineSize ~= nil then
-                    data.outlineSize = v
-                    applyOutline(labels[id], data)
+                if data.text.outlineSize ~= nil then
+                    data.text.outlineSize = v
+                    applyOutline(labels[id], data.text)
                 end
             end
         end
@@ -1308,7 +1347,6 @@ function createInfoText(config)
 
     return api
 end
-
 
 local function createRadar(config)
     config = config or {}
