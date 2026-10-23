@@ -842,6 +842,7 @@ function createInfoText(config)
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
+    -- 🆕 FixedSize
     local fixedSize    = pick(config, "FixedSize", "fixedSize")
     if fixedSize == nil then fixedSize = false end
 
@@ -934,7 +935,8 @@ function createInfoText(config)
         if not billboard then return end
         
         local targetSize
-        if fixedSize then
+        -- 🆕 Если FixedSize и задан Y.Offset > 0, жестко фиксируем. Иначе считаем авто-высоту.
+        if fixedSize and (size.Y.Offset and size.Y.Offset > 0) then
             targetSize = size
         else
             local layout = container and container:FindFirstChildOfClass("UIListLayout")
@@ -993,7 +995,8 @@ function createInfoText(config)
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
-        container.ClipsDescendants = fixedSize
+        -- Обрезка работает только если FixedSize имеет заданную высоту
+        container.ClipsDescendants = fixedSize and (size.Y.Offset and size.Y.Offset > 0)
         container.Parent = billboard
 
         local layout = Instance.new("UIListLayout")
@@ -1063,7 +1066,6 @@ function createInfoText(config)
 
         local saved = lineData[id]
         
-        -- 🆕 АВТО-КОНВЕРТАЦИЯ
         if type(saved.text) ~= "table" then
             saved.text = { 
                 text = tostring(saved.text or ""),
@@ -1092,7 +1094,6 @@ function createInfoText(config)
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
-            -- 🆕 АВТО-КОНВЕРТАЦИЯ
             if type(saved.text) ~= "table" then
                 saved.text = { 
                     text = tostring(saved.text or ""),
@@ -1204,19 +1205,26 @@ function createInfoText(config)
             if billboard then billboard.StudsOffset = v end
         end
 
+        -- 🆕 Поддержка UDim2 и чисел для Size
         v = pick(tbl, "Size", "size")
-        if v ~= nil and type(v) == "number" then
-            local scaleFactor = math.max(v, 0.1)
-            textSize = baseTextSize * scaleFactor
-            size = UDim2.new(
-                baseSize.X.Scale, baseSize.X.Offset * scaleFactor,
-                baseSize.Y.Scale, baseSize.Y.Offset * scaleFactor
-            )
-            for _, label in pairs(labels) do
-                label.TextSize = textSize
-                label.Size = UDim2.new(1, 0, 0, 0)
+        if v ~= nil then
+            if type(v) == "number" then
+                local scaleFactor = math.max(v, 0.1)
+                textSize = baseTextSize * scaleFactor
+                size = UDim2.new(
+                    baseSize.X.Scale, baseSize.X.Offset * scaleFactor,
+                    baseSize.Y.Scale, baseSize.Y.Offset * scaleFactor
+                )
+                for _, label in pairs(labels) do
+                    label.TextSize = textSize
+                    label.Size = UDim2.new(1, 0, 0, 0)
+                end
+                if billboard then billboard.Size = size end
+            elseif typeof(v) == "UDim2" then
+                size = v
+                if billboard then billboard.Size = size end
             end
-            if billboard then billboard.Size = size updateSize(true) end
+            updateSize(true)
         end
 
         v = pick(tbl, "TextSize", "textSize")
@@ -1244,7 +1252,9 @@ function createInfoText(config)
         v = pick(tbl, "FixedSize", "fixedSize")
         if v ~= nil then
             fixedSize = v == true
-            if container then container.ClipsDescendants = fixedSize end
+            if container then 
+                container.ClipsDescendants = fixedSize and (size.Y.Offset and size.Y.Offset > 0) 
+            end
             updateSize(true)
         end
 
