@@ -842,7 +842,6 @@ function createInfoText(config)
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
 
-    -- 🆕 FixedSize
     local fixedSize    = pick(config, "FixedSize", "fixedSize")
     if fixedSize == nil then fixedSize = false end
 
@@ -935,9 +934,20 @@ function createInfoText(config)
         if not billboard then return end
         
         local targetSize
-        -- 🆕 Если FixedSize и задан Y.Offset > 0, жестко фиксируем. Иначе считаем авто-высоту.
-        if fixedSize and (size.Y.Offset and size.Y.Offset > 0) then
-            targetSize = size
+        -- Если FixedSize включен, мы используем только Offset для Y, чтобы окно не масштабировалось от расстояния
+        if fixedSize then
+            local yOffset = size.Y.Offset
+            if yOffset > 0 then
+                -- Принудительно используем Offset для Y, чтобы избежать масштабирования по расстоянию
+                targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, yOffset)
+            else
+                -- Если Y.Offset равен 0, вычисляем высоту автоматически, но все равно используем Offset
+                local layout = container and container:FindFirstChildOfClass("UIListLayout")
+                local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
+                local extra = showWindow and (windowPadding * 2) or 0
+                local autoHeight = math.max(textSize + extra, layoutHeight + extra)
+                targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, autoHeight)
+            end
         else
             local layout = container and container:FindFirstChildOfClass("UIListLayout")
             local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
@@ -995,8 +1005,7 @@ function createInfoText(config)
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
-        -- Обрезка работает только если FixedSize имеет заданную высоту
-        container.ClipsDescendants = fixedSize and (size.Y.Offset and size.Y.Offset > 0)
+        container.ClipsDescendants = fixedSize
         container.Parent = billboard
 
         local layout = Instance.new("UIListLayout")
@@ -1205,7 +1214,6 @@ function createInfoText(config)
             if billboard then billboard.StudsOffset = v end
         end
 
-        -- 🆕 Поддержка UDim2 и чисел для Size
         v = pick(tbl, "Size", "size")
         if v ~= nil then
             if type(v) == "number" then
@@ -1253,7 +1261,7 @@ function createInfoText(config)
         if v ~= nil then
             fixedSize = v == true
             if container then 
-                container.ClipsDescendants = fixedSize and (size.Y.Offset and size.Y.Offset > 0) 
+                container.ClipsDescendants = fixedSize 
             end
             updateSize(true)
         end
