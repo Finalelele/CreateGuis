@@ -1833,3 +1833,9 @@ local function createRadar(config)
 
     return api
 end
+
+return {
+    createInfoGui  = createInfoGui,
+    createInfoText = createInfoText,
+    createRadar     = createRadar
+}
