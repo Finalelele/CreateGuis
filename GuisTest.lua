@@ -878,8 +878,10 @@ function createInfoText(config)
     if widthAuto == nil then widthAuto = true end
     local widthSize = pick(widthCfg, "size", "Size") or 300
 
+    -- Настройки постоянного размера (по умолчанию выключено, чтобы не перекрывать экран)
     local constantSize = pick(config, "ConstantSize", "constantSize")
-    if constantSize == nil then constantSize = true end
+    if constantSize == nil then constantSize = false end 
+    local maxScale = pick(config, "MaxScale", "maxScale") or 1.5 -- Ограничитель роста (в 1.5 раза)
 
     local showWindow = false
     local swConfig = pick(config, "ShowWindow", "showWindow")
@@ -893,7 +895,6 @@ function createInfoText(config)
     )
 
     local billboard, container, windowFrame
-    local containerScale
     local windowCornerObj, windowStrokeObj
     local labels, lineData = {}, {}
     local creationCounter = 0
@@ -966,7 +967,7 @@ function createInfoText(config)
         if windowFrame then windowFrame.Visible = showWindow end
     end
 
-    -- ★ ИЗМЕРЕНИЕ ЧЕРЕЗ TextService (стабильно, без feedback loop) ★
+    -- Измерение через TextService (исключает баги с бесконечным ростом)
     local function measureContent()
         local p = showWindow and getPadding() or 0
         local spacing = 2
@@ -995,7 +996,6 @@ function createInfoText(config)
         end
 
         if count > 0 then totalH = totalH - spacing end
-
         return Vector2.new(maxW + p * 2, totalH + p * 2)
     end
 
@@ -1005,7 +1005,6 @@ function createInfoText(config)
         local measured = measureContent()
 
         local targetW, targetH
-
         if widthAuto then
             targetW = math.max(measured.X, textSize + 4)
         else
@@ -1019,9 +1018,9 @@ function createInfoText(config)
         end
 
         targetH = math.max(measured.Y, textSize + (showWindow and getPadding() * 2 or 0))
-
         basePixelSize = Vector2.new(targetW, targetH)
 
+        -- Если ConstantSize выключен, ставим жесткий размер
         if not constantSize then
             local targetSize = UDim2.new(0, targetW, 0, targetH)
             if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
@@ -1073,11 +1072,6 @@ function createInfoText(config)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
         container.Parent = billboard
-
-        -- ★ UIScale для пропорционального масштабирования контента ★
-        containerScale = Instance.new("UIScale")
-        containerScale.Scale = 1
-        containerScale.Parent = container
 
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -1182,13 +1176,9 @@ function createInfoText(config)
                     outlineSize = saved.outlineSize
                 }
             end
-
             if patch.text ~= nil then
-                if type(patch.text) == "string" then
-                    saved.text.text = patch.text
-                elseif type(patch.text) == "table" then
-                    for k, v in pairs(patch.text) do saved.text[k] = v end
-                end
+                if type(patch.text) == "string" then saved.text.text = patch.text
+                elseif type(patch.text) == "table" then for k, v in pairs(patch.text) do saved.text[k] = v end end
             end
             if patch.color ~= nil then saved.text.color = patch.color end
             if patch.outlineColor ~= nil then saved.text.outlineColor = patch.outlineColor end
@@ -1200,23 +1190,17 @@ function createInfoText(config)
 
     local function setText(lines)
         if not lines then return end
-
         if lines.id then
             setLine(lines)
         elseif #lines > 0 and type(lines[1]) == "table" then
             for _, data in ipairs(lines) do
                 if type(data) == "table" then
-                    if data.id then
-                        setLine(data)
-                    else
-                        applyGlobalPatch(data)
-                    end
+                    if data.id then setLine(data) else applyGlobalPatch(data) end
                 end
             end
         else
             applyGlobalPatch(lines)
         end
-
         updateOrder()
         updateSize(true)
     end
@@ -1224,12 +1208,14 @@ function createInfoText(config)
     for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
     if billboard then updateOrder() updateSize(false) end
 
-    -- ===== Constant Size Loop (безопасный, без feedback) =====
+    -- ===== Цикл поддержания размера (ConstantSize) =====
     local renderName = "InfoText_" .. name .. "_" .. tostring(math.random(1000, 9999))
     RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
         if not billboard or not billboard.Parent or not billboard.Adornee then return end
+        
+        -- Если ConstantSize выключен, размер уже зафиксирован в updateSize
         if not constantSize then return end
-
+        
         local camera = workspace.CurrentCamera
         if not camera then return end
 
@@ -1247,12 +1233,11 @@ function createInfoText(config)
         end
 
         local dist = (camera.CFrame.Position - adorneePos).Magnitude
-        local scaleFactor = math.max(dist, 1) / 10
-
+        
+        -- Ограничиваем масштаб (например, максимум в 1.5 или 2 раза), чтобы окно не закрывало весь экран
+        local scaleFactor = math.clamp(dist / 10, 1, maxScale)
+        
         billboard.Size = UDim2.new(0, basePixelSize.X * scaleFactor, 0, basePixelSize.Y * scaleFactor)
-        if containerScale then
-            containerScale.Scale = scaleFactor
-        end
     end)
 
     local api = {}
@@ -1328,7 +1313,6 @@ function createInfoText(config)
                 label.TextWrapped = not widthAuto
                 if not widthAuto then label.Size = UDim2.new(1, 0, 0, 0) else label.Size = UDim2.new(0, 0, 0, 0) end
             end
-
             if container then applyWindowLayout() end
             updateSize(true)
         end
@@ -1358,11 +1342,11 @@ function createInfoText(config)
         v = pick(tbl, "ConstantSize", "constantSize")
         if v ~= nil then
             constantSize = v == true
-            if not constantSize then
-                if containerScale then containerScale.Scale = 1 end
-                updateSize(true)
-            end
+            if not constantSize then updateSize(true) end
         end
+        
+        v = pick(tbl, "MaxScale", "maxScale")
+        if v ~= nil then maxScale = tonumber(v) or maxScale end
 
         v = pick(tbl, "OutlineColor", "outlineColor")
         if v ~= nil then
@@ -1439,7 +1423,6 @@ function createInfoText(config)
             windowFrame = nil
             windowCornerObj = nil
             windowStrokeObj = nil
-            containerScale = nil
         end
         labels, lineData = {}, {}
         pendingOrder, pendingData = {}, {}
