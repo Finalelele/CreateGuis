@@ -843,6 +843,7 @@ function createInfoText(config)
     config = config or {}
 
     local TweenService = game:GetService("TweenService")
+    local RunService = game:GetService("RunService")
 
     local function pick(tbl, ...)
         if type(tbl) ~= "table" then return nil end
@@ -854,7 +855,6 @@ function createInfoText(config)
 
     -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
-
     local bg        = pick(cw, "Background", "background") or {}
     local borderCfg = pick(cw, "Border", "border") or {}
     local cornerCfg = pick(cw, "Corner", "corner") or {}
@@ -867,15 +867,18 @@ function createInfoText(config)
     local offset       = pick(config, "Offset", "offset")     or Vector3.new(0, 3, 0)
     local baseTextSize = pick(config, "TextSize", "textSize") or 20
     local textSize     = baseTextSize
-    local baseSize     = pick(config, "Size", "size")         or UDim2.new(0, 300, 0, 0)
-    local size         = baseSize
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
-
-    local fixedSize    = pick(config, "FixedSize", "fixedSize")
-    if fixedSize == nil then fixedSize = false end
-
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
+
+    -- ========= Ширина =========
+    local widthCfg = pick(config, "Width", "width") or {}
+    local widthAuto = pick(widthCfg, "auto", "Auto")
+    if widthAuto == nil then widthAuto = true end
+    local widthSize = pick(widthCfg, "size", "Size") or 300
+
+    local constantSize = pick(config, "ConstantSize", "constantSize")
+    if constantSize == nil then constantSize = true end
 
     local showWindow = false
     local swConfig = pick(config, "ShowWindow", "showWindow")
@@ -895,6 +898,7 @@ function createInfoText(config)
     local isActive = true
     local activeSizeTween
     local pendingOrder, pendingData = {}, {}
+    local basePixelSize = Vector2.new(100, 50)
 
     local function getPadding() return pick(paddingCfg, "value", "Value") or 8 end
 
@@ -947,32 +951,59 @@ function createInfoText(config)
     local function applyWindowLayout()
         if not container then return end
         local p = showWindow and getPadding() or 0
+        
         container.Position = UDim2.new(0, p, 0, p)
-        container.Size     = UDim2.new(1, -p * 2, 1, -p * 2)
+        
+        if widthAuto then
+            container.Size = UDim2.new(0, 0, 0, 0)
+            container.AutomaticSize = Enum.AutomaticSize.XY
+        else
+            container.Size = UDim2.new(1, -p * 2, 0, 0)
+            container.AutomaticSize = Enum.AutomaticSize.Y
+        end
+        
         if windowFrame then windowFrame.Visible = showWindow end
     end
 
     local function updateSize(animate)
         if not billboard then return end
 
-        local targetSize
-        if fixedSize and (size.Y.Offset and size.Y.Offset > 0) then
-            targetSize = size
+        local layout = container and container:FindFirstChildOfClass("UIListLayout")
+        local contentW = layout and layout.AbsoluteContentSize.X or 0
+        local contentH = layout and layout.AbsoluteContentSize.Y or 0
+        local p = getPadding()
+        local extra = showWindow and (p * 2) or 0
+
+        local targetW, targetH
+
+        -- 1. Логика ШИРИНЫ
+        if widthAuto then
+            targetW = math.max(contentW + extra, 10)
         else
-            local layout = container and container:FindFirstChildOfClass("UIListLayout")
-            local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
-            local extra = showWindow and (getPadding() * 2) or 0
-            local autoHeight = math.max(textSize + extra, layoutHeight + extra)
-            local targetHeight = (size.Y.Offset and size.Y.Offset > 0) and size.Y.Offset or autoHeight
-            targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, targetHeight)
+            local fixedWidth = 300
+            if typeof(widthSize) == "UDim2" then
+                fixedWidth = widthSize.X.Offset
+            elseif type(widthSize) == "number" then
+                fixedWidth = widthSize
+            end
+            targetW = fixedWidth
         end
 
-        if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
-        if animate then
-            activeSizeTween = TweenService:Create(billboard, sizeTweenInfo, { Size = targetSize })
-            activeSizeTween:Play()
-        else
-            billboard.Size = targetSize
+        -- 2. Логика ВЫСОТЫ (Всегда авто)
+        targetH = math.max(textSize + extra, contentH + extra)
+
+        basePixelSize = Vector2.new(targetW, targetH)
+
+        -- 3. Применение размера
+        if not constantSize then
+            local targetSize = UDim2.new(0, targetW, 0, targetH)
+            if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
+            if animate then
+                activeSizeTween = TweenService:Create(billboard, sizeTweenInfo, { Size = targetSize })
+                activeSizeTween:Play()
+            else
+                billboard.Size = targetSize
+            end
         end
     end
 
@@ -983,7 +1014,7 @@ function createInfoText(config)
         billboard = Instance.new("BillboardGui")
         billboard.Name = name
         billboard.Adornee = adornee
-        billboard.Size = size
+        billboard.Size = UDim2.new(0, 100, 0, 100) -- Заглушка
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
         billboard.Enabled = isActive
@@ -1012,10 +1043,9 @@ function createInfoText(config)
 
         container = Instance.new("Frame")
         container.Name = "Container"
-        container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
-        container.ClipsDescendants = fixedSize
+        container.ClipsDescendants = false -- Скролл и обрезка больше не нужны
         container.Parent = billboard
 
         local layout = Instance.new("UIListLayout")
@@ -1024,8 +1054,10 @@ function createInfoText(config)
         layout.Parent = container
 
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() updateSize(true) end)
+        container:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() updateSize(true) end)
 
         applyWindowLayout()
+        updateSize(false)
         return true
     end
 
@@ -1065,9 +1097,9 @@ function createInfoText(config)
             creationCounter = creationCounter + 1
             label = Instance.new("TextLabel")
             label.Name = id
-            label.Size = UDim2.new(1, 0, 0, 0)
-            label.AutomaticSize = Enum.AutomaticSize.Y
-            label.TextWrapped = true
+            label.AutomaticSize = widthAuto and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+            label.Size = widthAuto and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+            label.TextWrapped = not widthAuto
             label.BackgroundTransparency = 1
             label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
             label.TextSize = textSize
@@ -1108,6 +1140,7 @@ function createInfoText(config)
         if data.order ~= nil then saved.order = data.order == false and nil or data.order end
 
         renderTextLine(id)
+        updateSize(true)
     end
 
     local function applyGlobalPatch(patch)
@@ -1162,6 +1195,33 @@ function createInfoText(config)
 
     for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
     if billboard then updateOrder() updateSize(false) end
+
+    -- ===== Constant Size Loop =====
+    local renderName = "InfoText_" .. name .. "_" .. tostring(math.random(1000, 9999))
+    RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
+        if not billboard or not billboard.Parent or not constantSize or not billboard.Adornee then return end
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        
+        local adornee = billboard.Adornee
+        local adorneePos
+        if adornee:IsA("Model") then
+            local primary = adornee.PrimaryPart or adornee:FindFirstChild("HumanoidRootPart") or adornee:FindFirstChildWhichIsA("BasePart")
+            if primary then adorneePos = primary.Position else return end
+        elseif adornee:IsA("BasePart") then
+            adorneePos = adornee.Position
+        elseif adornee:IsA("Attachment") then
+            adorneePos = adornee.WorldPosition
+        else
+            return
+        end
+        
+        -- Компенсация дистанции (масштаб 1:1 на дистанции 10 стадов)
+        local dist = (camera.CFrame.Position - adorneePos).Magnitude
+        local scaleFactor = math.max(dist, 1) / 10 
+        
+        billboard.Size = UDim2.new(0, basePixelSize.X * scaleFactor, 0, basePixelSize.Y * scaleFactor)
+    end)
 
     local api = {}
 
@@ -1224,24 +1284,20 @@ function createInfoText(config)
             if billboard then billboard.StudsOffset = v end
         end
 
-        v = pick(tbl, "Size", "size")
-        if v ~= nil then
-            if type(v) == "number" then
-                local scaleFactor = math.max(v, 0.1)
-                textSize = baseTextSize * scaleFactor
-                size = UDim2.new(
-                    baseSize.X.Scale, baseSize.X.Offset * scaleFactor,
-                    baseSize.Y.Scale, baseSize.Y.Offset * scaleFactor
-                )
-                for _, label in pairs(labels) do
-                    label.TextSize = textSize
-                    label.Size = UDim2.new(1, 0, 0, 0)
-                end
-                if billboard then billboard.Size = size end
-            elseif typeof(v) == "UDim2" then
-                size = v
-                if billboard then billboard.Size = size end
+        v = pick(tbl, "Width", "width")
+        if type(v) == "table" then
+            local wa = pick(v, "auto", "Auto")
+            if wa ~= nil then widthAuto = wa == true end
+            local ws = pick(v, "size", "Size")
+            if ws ~= nil then widthSize = ws end
+            
+            for _, label in pairs(labels) do
+                label.AutomaticSize = widthAuto and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+                label.TextWrapped = not widthAuto
+                if not widthAuto then label.Size = UDim2.new(1, 0, 0, 0) else label.Size = UDim2.new(0, 0, 0, 0) end
             end
+            
+            if container then applyWindowLayout() end
             updateSize(true)
         end
 
@@ -1251,7 +1307,7 @@ function createInfoText(config)
             textSize = baseTextSize
             for _, label in pairs(labels) do
                 label.TextSize = textSize
-                label.Size = UDim2.new(1, 0, 0, 0)
+                if not widthAuto then label.Size = UDim2.new(1, 0, 0, 0) end
             end
             updateSize(true)
         end
@@ -1267,14 +1323,8 @@ function createInfoText(config)
             for _, label in pairs(labels) do label.ZIndex = zIndex + 2 end
         end
 
-        v = pick(tbl, "FixedSize", "fixedSize")
-        if v ~= nil then
-            fixedSize = v == true
-            if container then
-                container.ClipsDescendants = fixedSize and (size.Y.Offset and size.Y.Offset > 0)
-            end
-            updateSize(true)
-        end
+        v = pick(tbl, "ConstantSize", "constantSize")
+        if v ~= nil then constantSize = v == true end
 
         v = pick(tbl, "OutlineColor", "outlineColor")
         if v ~= nil then
@@ -1343,6 +1393,7 @@ function createInfoText(config)
 
     function api:Remove()
         if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
+        RunService:UnbindFromRenderStep(renderName)
         if billboard then
             billboard:Destroy()
             billboard = nil
