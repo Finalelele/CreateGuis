@@ -13,32 +13,65 @@ function createInfoGui(config)
         return nil
     end
 
+    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
 
-    local windowColor        = pick(cw, "WindowColor", "windowColor")               or Color3.fromRGB(30, 30, 35)
-    local windowTransparency = pick(cw, "WindowTransparency", "windowTransparency")
+    -- Background
+    local bg = pick(cw, "Background", "background") or {}
+    local windowColor = pick(bg, "color", "Color") or Color3.fromRGB(30, 30, 35)
+    local windowTransparency = pick(bg, "transparency", "Transparency")
     if windowTransparency == nil then windowTransparency = 0 end
-    local headerColor        = pick(cw, "HeaderColor", "headerColor")               or Color3.fromRGB(35, 35, 42)
-    local headerTransparency = pick(cw, "HeaderTransparency", "headerTransparency")
+
+    -- Topbar
+    local topbar = pick(cw, "Topbar", "topbar") or {}
+    local headerColor = pick(topbar, "color", "Color") or Color3.fromRGB(35, 35, 42)
+    local headerTransparency = pick(topbar, "transparency", "Transparency")
     if headerTransparency == nil then headerTransparency = 0 end
-    local borderColor        = pick(cw, "BorderColor", "borderColor")               or Color3.fromRGB(65, 65, 75)
-    local borderThickness    = pick(cw, "BorderThickness", "borderThickness") or 1
-    local borderTransparency = pick(cw, "BorderTransparency", "borderTransparency")
+
+    -- TopbarLine
+    local topbarLine = pick(cw, "TopbarLine", "topbarLine") or {}
+    local accentColor = pick(topbarLine, "color", "Color") or Color3.fromRGB(90, 145, 255)
+
+    -- Title
+    local titleCfg = pick(cw, "Title", "title") or {}
+    local titleColor = pick(titleCfg, "color", "Color") or Color3.fromRGB(245, 245, 248)
+
+    -- Border
+    local borderCfg = pick(cw, "Border", "border") or {}
+    local borderColor = pick(borderCfg, "color", "Color") or Color3.fromRGB(65, 65, 75)
+    local borderThickness = pick(borderCfg, "thickness", "Thickness") or 1
+    local borderTransparency = pick(borderCfg, "transparency", "Transparency")
     if borderTransparency == nil then borderTransparency = 0.15 end
-    local cornerRadius       = pick(cw, "CornerRadius", "cornerRadius") or 8
-    local accentColor        = pick(cw, "AccentColor", "accentColor")               or Color3.fromRGB(90, 145, 255)
-    local titleColor         = pick(cw, "TitleColor", "titleColor")                 or Color3.fromRGB(245, 245, 248)
-    local shadowColor        = pick(cw, "ShadowColor", "shadowColor")               or Color3.new(0, 0, 0)
-    local shadowTransparency = pick(cw, "ShadowTransparency", "shadowTransparency")
+
+    -- Corner
+    local cornerCfg = pick(cw, "Corner", "corner") or {}
+    local cornerRadius = pick(cornerCfg, "radius", "Radius") or 8
+
+    -- Shadow
+    local shadowCfg = pick(cw, "Shadow", "shadow") or {}
+    local shadowColor = pick(shadowCfg, "color", "Color") or Color3.new(0, 0, 0)
+    local shadowTransparency = pick(shadowCfg, "transparency", "Transparency")
     if shadowTransparency == nil then shadowTransparency = 0.65 end
-    local toggleColor        = pick(cw, "ToggleColor", "toggleColor")               or Color3.fromRGB(48, 48, 58)
-    local toggleTextColor    = pick(cw, "ToggleTextColor", "toggleTextColor")       or Color3.fromRGB(210, 210, 220)
-    local scrollbarColor     = pick(cw, "ScrollbarColor", "scrollbarColor")         or accentColor
-    local lineTextColor      = pick(cw, "LineTextColor", "lineTextColor")           or Color3.fromRGB(255, 255, 255)
 
-    local font      = pick(cw, "Font", "font")           or pick(config, "Font", "font")           or Enum.Font.GothamMedium
-    local titleFont = pick(cw, "TitleFont", "titleFont") or pick(config, "TitleFont", "titleFont") or Enum.Font.GothamSemibold
+    -- LineToggle
+    local lineToggleCfg = pick(cw, "LineToggle", "lineToggle") or {}
+    local toggleColor = pick(lineToggleCfg, "color", "Color") or Color3.fromRGB(48, 48, 58)
+    local toggleTextColor = pick(lineToggleCfg, "textColor", "TextColor") or Color3.fromRGB(210, 210, 220)
 
+    -- Scrollbar
+    local scrollbarCfg = pick(cw, "Scrollbar", "scrollbar") or {}
+    local scrollbarColor = pick(scrollbarCfg, "color", "Color") or accentColor
+
+    -- LineText
+    local lineTextCfg = pick(cw, "LineText", "lineText") or {}
+    local lineTextColor = pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255)
+
+    -- Font
+    local fontCfg = pick(cw, "Font", "font") or {}
+    local font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
+    local titleFont = pick(fontCfg, "title", "Title") or Enum.Font.GothamSemibold
+
+    -- ========= Основные =========
     local guiName   = pick(config, "Name", "name") or "CustomWindow"
     local title     = pick(config, "Title", "title") or "Window"
     local width     = pick(config, "Width", "width") or 200
@@ -482,7 +515,6 @@ function createInfoGui(config)
 
         local saved = lineData[id]
         
-        -- 🆕 АВТО-КОНВЕРТАЦИЯ: Если вдруг saved.text это строка (старый формат), делаем из нее таблицу
         if type(saved.text) ~= "table" then
             saved.text = { 
                 text = tostring(saved.text or ""),
@@ -527,7 +559,6 @@ function createInfoGui(config)
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
-            -- 🆕 АВТО-КОНВЕРТАЦИЯ
             if type(saved.text) ~= "table" then
                 saved.text = { 
                     text = tostring(saved.text or ""),
@@ -747,65 +778,93 @@ function createInfoGui(config)
 
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
-        local v
-
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then windowColor = v frame.BackgroundColor3 = v end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then windowTransparency = v frame.BackgroundTransparency = v end
-
-        v = pick(tbl, "HeaderColor", "headerColor")
-        if v ~= nil then headerColor = v header.BackgroundColor3 = v end
-        v = pick(tbl, "HeaderTransparency", "headerTransparency")
-        if v ~= nil then headerTransparency = v header.BackgroundTransparency = v end
-
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then borderColor = v frameStroke.Color = v end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then borderThickness = v frameStroke.Thickness = v end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then borderTransparency = v frameStroke.Transparency = v end
-
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then
-            cornerRadius = v
-            corner.CornerRadius = UDim.new(0, v)
-            headerCorner.CornerRadius = UDim.new(0, v)
-            shadowCorner.CornerRadius = UDim.new(0, v + 1)
+        
+        local bg = pick(tbl, "Background", "background")
+        if bg then
+            local c = pick(bg, "color", "Color")
+            if c then windowColor = c frame.BackgroundColor3 = c end
+            local t = pick(bg, "transparency", "Transparency")
+            if t then windowTransparency = t frame.BackgroundTransparency = t end
         end
 
-        v = pick(tbl, "AccentColor", "accentColor")
-        if v ~= nil then accentColor = v accent.BackgroundColor3 = v end
-
-        v = pick(tbl, "TitleColor", "titleColor")
-        if v ~= nil then titleColor = v titleLabel.TextColor3 = v end
-
-        v = pick(tbl, "ShadowColor", "shadowColor")
-        if v ~= nil then shadowColor = v shadow.BackgroundColor3 = v end
-        v = pick(tbl, "ShadowTransparency", "shadowTransparency")
-        if v ~= nil then shadowTransparency = v shadow.BackgroundTransparency = v end
-
-        v = pick(tbl, "ToggleColor", "toggleColor")
-        if v ~= nil then toggleColor = v toggle.BackgroundColor3 = v end
-        v = pick(tbl, "ToggleTextColor", "toggleTextColor")
-        if v ~= nil then toggleTextColor = v toggle.TextColor3 = v end
-
-        v = pick(tbl, "ScrollbarColor", "scrollbarColor")
-        if v ~= nil then scrollbarColor = v scrolling.ScrollBarImageColor3 = v end
-
-        v = pick(tbl, "LineTextColor", "lineTextColor")
-        if v ~= nil then lineTextColor = v end
-
-        v = pick(tbl, "Font", "font")
-        if v ~= nil then
-            font = v
-            for _, ui in pairs(labels) do ui.text.Font = v end
+        local topbar = pick(tbl, "Topbar", "topbar")
+        if topbar then
+            local c = pick(topbar, "color", "Color")
+            if c then headerColor = c header.BackgroundColor3 = c end
+            local t = pick(topbar, "transparency", "Transparency")
+            if t then headerTransparency = t header.BackgroundTransparency = t end
         end
 
-        v = pick(tbl, "TitleFont", "titleFont")
-        if v ~= nil then
-            titleFont = v
-            titleLabel.Font = v
+        local topbarLine = pick(tbl, "TopbarLine", "topbarLine")
+        if topbarLine then
+            local c = pick(topbarLine, "color", "Color")
+            if c then accentColor = c accent.BackgroundColor3 = c end
+        end
+
+        local titleCfg = pick(tbl, "Title", "title")
+        if titleCfg then
+            local c = pick(titleCfg, "color", "Color")
+            if c then titleColor = c titleLabel.TextColor3 = c end
+        end
+
+        local borderCfg = pick(tbl, "Border", "border")
+        if borderCfg then
+            local c = pick(borderCfg, "color", "Color")
+            if c then borderColor = c frameStroke.Color = c end
+            local th = pick(borderCfg, "thickness", "Thickness")
+            if th then borderThickness = th frameStroke.Thickness = th end
+            local t = pick(borderCfg, "transparency", "Transparency")
+            if t then borderTransparency = t frameStroke.Transparency = t end
+        end
+
+        local cornerCfg = pick(tbl, "Corner", "corner")
+        if cornerCfg then
+            local r = pick(cornerCfg, "radius", "Radius")
+            if r then
+                cornerRadius = r
+                corner.CornerRadius = UDim.new(0, r)
+                headerCorner.CornerRadius = UDim.new(0, r)
+                shadowCorner.CornerRadius = UDim.new(0, r + 1)
+            end
+        end
+
+        local shadowCfg = pick(tbl, "Shadow", "shadow")
+        if shadowCfg then
+            local c = pick(shadowCfg, "color", "Color")
+            if c then shadowColor = c shadow.BackgroundColor3 = c end
+            local t = pick(shadowCfg, "transparency", "Transparency")
+            if t then shadowTransparency = t shadow.BackgroundTransparency = t end
+        end
+
+        local lineToggleCfg = pick(tbl, "LineToggle", "lineToggle")
+        if lineToggleCfg then
+            local c = pick(lineToggleCfg, "color", "Color")
+            if c then toggleColor = c toggle.BackgroundColor3 = c end
+            local tc = pick(lineToggleCfg, "textColor", "TextColor")
+            if tc then toggleTextColor = tc toggle.TextColor3 = tc end
+        end
+
+        local scrollbarCfg = pick(tbl, "Scrollbar", "scrollbar")
+        if scrollbarCfg then
+            local c = pick(scrollbarCfg, "color", "Color")
+            if c then scrollbarColor = c scrolling.ScrollBarImageColor3 = c end
+        end
+
+        local lineTextCfg = pick(tbl, "LineText", "lineText")
+        if lineTextCfg then
+            local c = pick(lineTextCfg, "color", "Color")
+            if c then lineTextColor = c end
+        end
+
+        local fontCfg = pick(tbl, "Font", "font")
+        if fontCfg then
+            local f = pick(fontCfg, "text", "Text")
+            if f then 
+                font = f 
+                for _, ui in pairs(labels) do ui.text.Font = f end
+            end
+            local tf = pick(fontCfg, "title", "Title")
+            if tf then titleFont = tf titleLabel.Font = tf end
         end
     end
 
@@ -830,8 +889,35 @@ function createInfoText(config)
         return nil
     end
 
+    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
 
+    -- Background
+    local bg = pick(cw, "Background", "background") or {}
+    local windowBackground = pick(bg, "color", "Color") or Color3.fromRGB(30, 30, 35)
+    local windowBackgroundTransparency = pick(bg, "transparency", "Transparency")
+    if windowBackgroundTransparency == nil then windowBackgroundTransparency = 0.15 end
+
+    -- Border
+    local borderCfg = pick(cw, "Border", "border") or {}
+    local windowBorderColor = pick(borderCfg, "color", "Color") or Color3.fromRGB(65, 65, 75)
+    local windowBorderThickness = pick(borderCfg, "thickness", "Thickness") or 1
+    local windowBorderTransparency = pick(borderCfg, "transparency", "Transparency")
+    if windowBorderTransparency == nil then windowBorderTransparency = 0.15 end
+
+    -- Corner
+    local cornerCfg = pick(cw, "Corner", "corner") or {}
+    local windowCorner = pick(cornerCfg, "radius", "Radius") or 8
+    
+    -- Padding
+    local paddingCfg = pick(cw, "Padding", "padding") or {}
+    local windowPadding = pick(paddingCfg, "value", "Value") or 8
+
+    -- Font
+    local fontCfg = pick(cw, "Font", "font") or {}
+    local font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
+
+    -- ========= Основные =========
     local name         = pick(config, "Name", "name")         or "GhostRoomESP"
     local center       = pick(config, "Center", "center")
     local offset       = pick(config, "Offset", "offset")     or Vector3.new(0, 3, 0)
@@ -847,23 +933,11 @@ function createInfoText(config)
 
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
-    local font = pick(cw, "Font", "font") or pick(config, "Font", "font") or Enum.Font.GothamMedium
-
     local showWindow = false
     local swConfig = pick(config, "ShowWindow", "showWindow")
     local swCustom = pick(cw, "ShowWindow", "showWindow")
     if swCustom ~= nil then showWindow = swCustom == true
     elseif swConfig ~= nil then showWindow = swConfig == true end
-
-    local windowBackground             = pick(cw, "WindowColor", "windowColor") or Color3.fromRGB(30, 30, 35)
-    local windowBackgroundTransparency = pick(cw, "WindowTransparency", "windowTransparency")
-    if windowBackgroundTransparency == nil then windowBackgroundTransparency = 0.15 end
-    local windowBorderColor            = pick(cw, "BorderColor", "borderColor") or Color3.fromRGB(65, 65, 75)
-    local windowBorderThickness        = pick(cw, "BorderThickness", "borderThickness") or 1
-    local windowBorderTransparency     = pick(cw, "BorderTransparency", "borderTransparency")
-    if windowBorderTransparency == nil then windowBorderTransparency = 0.15 end
-    local windowCorner                 = pick(cw, "CornerRadius", "cornerRadius") or 8
-    local windowPadding                = pick(cw, "Padding", "padding") or 8
 
     local sizeTweenInfo = TweenInfo.new(
         pick(config, "TweenTime", "tweenTime") or 0.22,
@@ -877,7 +951,6 @@ function createInfoText(config)
     local activeSizeTween
     local pendingOrder, pendingData = {}, {}
 
-    -- 🆕 ИСПРАВЛЕНО: теперь возвращает Model, BasePart или Attachment напрямую, без PrimaryPart
     local function resolveAdornee(target)
         if not target then return nil end
         if target:IsA("Model") or target:IsA("BasePart") or target:IsA("Attachment") then
@@ -967,7 +1040,7 @@ function createInfoText(config)
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
         billboard.Enabled = isActive
-        billboard.Parent = adornee -- 🆕 Родителем будет сама Модель
+        billboard.Parent = adornee
 
         windowFrame = Instance.new("Frame")
         windowFrame.Name = "Window"
@@ -1286,59 +1359,39 @@ function createInfoText(config)
 
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
-        local v
-
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then
-            windowBackground = v
-            if windowFrame then windowFrame.BackgroundColor3 = v end
-        end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then
-            windowBackgroundTransparency = v
-            if windowFrame then windowFrame.BackgroundTransparency = v end
-        end
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then
-            windowBorderColor = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Color = v end
-            end
-        end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then
-            windowBorderThickness = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Thickness = v end
-            end
-        end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then
-            windowBorderTransparency = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Transparency = v end
-            end
-        end
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then
-            windowCorner = v
-            if windowFrame then
-                local wc = windowFrame:FindFirstChildOfClass("UICorner")
-                if wc then wc.CornerRadius = UDim.new(0, v) end
-            end
+        
+        local bg = pick(tbl, "Background", "background")
+        if bg then
+            local c = pick(bg, "color", "Color")
+            if c then windowBackground = c windowFrame.BackgroundColor3 = c end
+            local t = pick(bg, "transparency", "Transparency")
+            if t then windowBackgroundTransparency = t windowFrame.BackgroundTransparency = t end
         end
 
-        v = pick(tbl, "Font", "font")
-        if v ~= nil then
-            font = v
-            for _, label in pairs(labels) do label.Font = v end
+        local borderCfg = pick(tbl, "Border", "border")
+        if borderCfg then
+            local c = pick(borderCfg, "color", "Color")
+            if c then windowBorderColor = c ws.Color = c end
+            local th = pick(borderCfg, "thickness", "Thickness")
+            if th then windowBorderThickness = th ws.Thickness = th end
+            local t = pick(borderCfg, "transparency", "Transparency")
+            if t then windowBorderTransparency = t ws.Transparency = t end
         end
 
-        v = pick(tbl, "ShowWindow", "showWindow")
-        if v ~= nil then api:ShowWindow(v) end
+        local cornerCfg = pick(tbl, "Corner", "corner")
+        if cornerCfg then
+            local r = pick(cornerCfg, "radius", "Radius")
+            if r then windowCorner = r wc.CornerRadius = UDim.new(0, r) end
+        end
+
+        local fontCfg = pick(tbl, "Font", "font")
+        if fontCfg then
+            local f = pick(fontCfg, "text", "Text")
+            if f then 
+                font = f 
+                for _, label in pairs(labels) do label.Font = f end
+            end
+        end
     end
 
     function api:Remove()
@@ -1372,24 +1425,48 @@ local function createRadar(config)
         return nil
     end
 
+    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
 
-    local BackgroundColor    = pick(cw, "WindowColor", "windowColor")             or Color3.fromRGB(10, 10, 15)
-    local BackTransparency   = pick(cw, "WindowTransparency", "windowTransparency") or 0
-    local BorderColor        = pick(cw, "BorderColor", "borderColor")             or Color3.fromRGB(80, 80, 90)
-    local BorderThickness    = pick(cw, "BorderThickness", "borderThickness") or 4
-    local BorderTransparency = pick(cw, "BorderTransparency", "borderTransparency") or 0
-    local CornerRadius       = pick(cw, "CornerRadius", "cornerRadius") or 16
-    local TitleColor         = pick(cw, "TitleColor", "titleColor")               or Color3.fromRGB(235, 235, 235)
-    local TitleTransparency  = pick(cw, "TitleTransparency", "titleTransparency") or 0
-    local RadarColor         = pick(cw, "RadarColor", "radarColor")               or Color3.fromRGB(5, 5, 8)
-    local RadarTransparency  = pick(cw, "RadarTransparency", "radarTransparency") or 0
-    local GridColor          = pick(cw, "GridColor", "gridColor")                 or Color3.fromRGB(70, 70, 80)
-    local CrosshairColor     = pick(cw, "CrosshairColor", "crosshairColor")       or Color3.fromRGB(45, 45, 50)
+    -- Background
+    local bg = pick(cw, "Background", "background") or {}
+    local BackgroundColor = pick(bg, "color", "Color") or Color3.fromRGB(10, 10, 15)
+    local BackTransparency = pick(bg, "transparency", "Transparency") or 0
 
-    local titleFont = pick(cw, "TitleFont", "titleFont") or pick(config, "TitleFont", "titleFont") or Enum.Font.GothamBold
-    local textFont  = pick(cw, "Font", "font")           or pick(config, "Font", "font")           or Enum.Font.Gotham
+    -- Border
+    local borderCfg = pick(cw, "Border", "border") or {}
+    local BorderColor = pick(borderCfg, "color", "Color") or Color3.fromRGB(80, 80, 90)
+    local BorderThickness = pick(borderCfg, "thickness", "Thickness") or 4
+    local BorderTransparency = pick(borderCfg, "transparency", "Transparency") or 0
 
+    -- Corner
+    local cornerCfg = pick(cw, "Corner", "corner") or {}
+    local CornerRadius = pick(cornerCfg, "radius", "Radius") or 16
+
+    -- Title
+    local titleCfg = pick(cw, "Title", "title") or {}
+    local TitleColor = pick(titleCfg, "color", "Color") or Color3.fromRGB(235, 235, 235)
+    local TitleTransparency = pick(titleCfg, "transparency", "Transparency") or 0
+
+    -- Radar
+    local radarCfg = pick(cw, "Radar", "radar") or {}
+    local RadarColor = pick(radarCfg, "color", "Color") or Color3.fromRGB(5, 5, 8)
+    local RadarTransparency = pick(radarCfg, "transparency", "Transparency") or 0
+
+    -- Grid
+    local gridCfg = pick(cw, "Grid", "grid") or {}
+    local GridColor = pick(gridCfg, "color", "Color") or Color3.fromRGB(70, 70, 80)
+
+    -- Crosshair
+    local crosshairCfg = pick(cw, "Crosshair", "crosshair") or {}
+    local CrosshairColor = pick(crosshairCfg, "color", "Color") or Color3.fromRGB(45, 45, 50)
+
+    -- Font
+    local fontCfg = pick(cw, "Font", "font") or {}
+    local titleFont = pick(fontCfg, "title", "Title") or Enum.Font.GothamBold
+    local textFont = pick(fontCfg, "text", "Text") or Enum.Font.Gotham
+
+    -- ========= Основные =========
     local Name         = pick(config, "Name", "name")         or "CustomRadar"
     local Title        = pick(config, "Title", "title")       or "Radar"
     local Position     = pick(config, "Position", "position") or UDim2.new(0.03, 0, 0.3, 0)
@@ -1753,53 +1830,80 @@ local function createRadar(config)
 
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
-        local v
+        
+        local bg = pick(tbl, "Background", "background")
+        if bg then
+            local c = pick(bg, "color", "Color")
+            if c then BackgroundColor = c frame.BackgroundColor3 = c end
+            local t = pick(bg, "transparency", "Transparency")
+            if t then BackTransparency = t frame.BackgroundTransparency = t end
+        end
 
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then BackgroundColor = v frame.BackgroundColor3 = v end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then BackTransparency = v frame.BackgroundTransparency = v end
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then BorderColor = v frameStroke.Color = v radarStroke.Color = v end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then BorderThickness = v frameStroke.Thickness = v end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then BorderTransparency = v frameStroke.Transparency = v radarStroke.Transparency = v end
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then CornerRadius = v frameCorner.CornerRadius = UDim.new(0, v) end
-        v = pick(tbl, "TitleColor", "titleColor")
-        if v ~= nil then TitleColor = v title.TextColor3 = v end
-        v = pick(tbl, "TitleTransparency", "titleTransparency")
-        if v ~= nil then TitleTransparency = v title.TextTransparency = v end
-        v = pick(tbl, "RadarColor", "radarColor")
-        if v ~= nil then RadarColor = v radar.BackgroundColor3 = v end
-        v = pick(tbl, "RadarTransparency", "radarTransparency")
-        if v ~= nil then RadarTransparency = v radar.BackgroundTransparency = v end
-        v = pick(tbl, "GridColor", "gridColor")
-        if v ~= nil then
-            GridColor = v
-            for _, child in ipairs(radar:GetChildren()) do
-                if child:IsA("Frame") then
-                    local s = child:FindFirstChildOfClass("UIStroke")
-                    if s then s.Color = v end
+        local borderCfg = pick(tbl, "Border", "border")
+        if borderCfg then
+            local c = pick(borderCfg, "color", "Color")
+            if c then BorderColor = c frameStroke.Color = c radarStroke.Color = c end
+            local th = pick(borderCfg, "thickness", "Thickness")
+            if th then BorderThickness = th frameStroke.Thickness = th end
+            local t = pick(borderCfg, "transparency", "Transparency")
+            if t then BorderTransparency = t frameStroke.Transparency = t radarStroke.Transparency = t end
+        end
+
+        local cornerCfg = pick(tbl, "Corner", "corner")
+        if cornerCfg then
+            local r = pick(cornerCfg, "radius", "Radius")
+            if r then CornerRadius = r frameCorner.CornerRadius = UDim.new(0, r) end
+        end
+
+        local titleCfg = pick(tbl, "Title", "title")
+        if titleCfg then
+            local c = pick(titleCfg, "color", "Color")
+            if c then TitleColor = c title.TextColor3 = c end
+            local t = pick(titleCfg, "transparency", "Transparency")
+            if t then TitleTransparency = t title.TextTransparency = t end
+        end
+
+        local radarCfg = pick(tbl, "Radar", "radar")
+        if radarCfg then
+            local c = pick(radarCfg, "color", "Color")
+            if c then RadarColor = c radar.BackgroundColor3 = c end
+            local t = pick(radarCfg, "transparency", "Transparency")
+            if t then RadarTransparency = t radar.BackgroundTransparency = t end
+        end
+
+        local gridCfg = pick(tbl, "Grid", "grid")
+        if gridCfg then
+            local c = pick(gridCfg, "color", "Color")
+            if c then
+                GridColor = c
+                for _, child in ipairs(radar:GetChildren()) do
+                    if child:IsA("Frame") then
+                        local s = child:FindFirstChildOfClass("UIStroke")
+                        if s then s.Color = c end
+                    end
                 end
             end
         end
-        v = pick(tbl, "CrosshairColor", "crosshairColor")
-        if v ~= nil then
-            CrosshairColor = v
-            horizontalLine.BackgroundColor3 = v
-            verticalLine.BackgroundColor3 = v
+
+        local crosshairCfg = pick(tbl, "Crosshair", "crosshair")
+        if crosshairCfg then
+            local c = pick(crosshairCfg, "color", "Color")
+            if c then
+                CrosshairColor = c
+                horizontalLine.BackgroundColor3 = c
+                verticalLine.BackgroundColor3 = c
+            end
         end
 
-        v = pick(tbl, "TitleFont", "titleFont")
-        if v ~= nil then titleFont = v title.Font = v end
-        v = pick(tbl, "Font", "font")
-        if v ~= nil then
-            textFont = v
-            for _, obj in pairs(targetObjects) do
-                if obj.text then obj.text.Font = v end
+        local fontCfg = pick(tbl, "Font", "font")
+        if fontCfg then
+            local f = pick(fontCfg, "text", "Text")
+            if f then 
+                textFont = f 
+                for _, obj in pairs(targetObjects) do if obj.text then obj.text.Font = f end end
             end
+            local tf = pick(fontCfg, "title", "Title")
+            if tf then titleFont = tf title.Font = tf end
         end
     end
 
@@ -1810,9 +1914,3 @@ local function createRadar(config)
 
     return api
 end
-
-return {
-    createInfoGui  = createInfoGui,
-    createInfoText = createInfoText,
-    createRadar     = createRadar
-}
