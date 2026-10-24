@@ -877,11 +877,13 @@ function createInfoText(config)
     local activeSizeTween
     local pendingOrder, pendingData = {}, {}
 
+    -- 🆕 ИСПРАВЛЕНО: теперь возвращает Model, BasePart или Attachment напрямую, без PrimaryPart
     local function resolveAdornee(target)
         if not target then return nil end
-        if target:IsA("Model") then target = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart") end
-        if not target or not target:IsA("BasePart") then return nil end
-        return target
+        if target:IsA("Model") or target:IsA("BasePart") or target:IsA("Attachment") then
+            return target
+        end
+        return nil
     end
 
     local function applyOutline(label, data)
@@ -934,20 +936,8 @@ function createInfoText(config)
         if not billboard then return end
         
         local targetSize
-        -- Если FixedSize включен, мы используем только Offset для Y, чтобы окно не масштабировалось от расстояния
-        if fixedSize then
-            local yOffset = size.Y.Offset
-            if yOffset > 0 then
-                -- Принудительно используем Offset для Y, чтобы избежать масштабирования по расстоянию
-                targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, yOffset)
-            else
-                -- Если Y.Offset равен 0, вычисляем высоту автоматически, но все равно используем Offset
-                local layout = container and container:FindFirstChildOfClass("UIListLayout")
-                local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
-                local extra = showWindow and (windowPadding * 2) or 0
-                local autoHeight = math.max(textSize + extra, layoutHeight + extra)
-                targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, autoHeight)
-            end
+        if fixedSize and (size.Y.Offset and size.Y.Offset > 0) then
+            targetSize = size
         else
             local layout = container and container:FindFirstChildOfClass("UIListLayout")
             local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
@@ -977,7 +967,7 @@ function createInfoText(config)
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
         billboard.Enabled = isActive
-        billboard.Parent = adornee
+        billboard.Parent = adornee -- 🆕 Родителем будет сама Модель
 
         windowFrame = Instance.new("Frame")
         windowFrame.Name = "Window"
@@ -1261,7 +1251,7 @@ function createInfoText(config)
         if v ~= nil then
             fixedSize = v == true
             if container then 
-                container.ClipsDescendants = fixedSize 
+                container.ClipsDescendants = fixedSize and (size.Y.Offset and size.Y.Offset > 0) 
             end
             updateSize(true)
         end
