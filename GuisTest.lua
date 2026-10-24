@@ -843,7 +843,8 @@ function createInfoText(config)
     config = config or {}
 
     local TweenService = game:GetService("TweenService")
-    local RunService = game:GetService("RunService")
+    local RunService   = game:GetService("RunService")
+    local TextService  = game:GetService("TextService")
 
     local function pick(tbl, ...)
         if type(tbl) ~= "table" then return nil end
@@ -871,7 +872,7 @@ function createInfoText(config)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
-    -- ========= Ширина =========
+    -- Ширина
     local widthCfg = pick(config, "Width", "width") or {}
     local widthAuto = pick(widthCfg, "auto", "Auto")
     if widthAuto == nil then widthAuto = true end
@@ -892,6 +893,7 @@ function createInfoText(config)
     )
 
     local billboard, container, windowFrame
+    local containerScale
     local windowCornerObj, windowStrokeObj
     local labels, lineData = {}, {}
     local creationCounter = 0
@@ -951,7 +953,6 @@ function createInfoText(config)
     local function applyWindowLayout()
         if not container then return end
         local p = showWindow and getPadding() or 0
-        
         container.Position = UDim2.new(0, p, 0, p)
         
         if widthAuto then
@@ -965,20 +966,48 @@ function createInfoText(config)
         if windowFrame then windowFrame.Visible = showWindow end
     end
 
+    -- ★ ИЗМЕРЕНИЕ ЧЕРЕЗ TextService (стабильно, без feedback loop) ★
+    local function measureContent()
+        local p = showWindow and getPadding() or 0
+        local spacing = 2
+        local maxW = 0
+        local totalH = 0
+        local count = 0
+
+        for _, label in pairs(labels) do
+            if label and label.Parent then
+                local text = label.Text
+                if text == "" then text = " " end
+                local tSize = TextService:GetTextSize(
+                    text,
+                    label.TextSize,
+                    label.Font,
+                    Vector2.new(10000, 10000)
+                )
+                local strokePad = 0
+                local outline = label:FindFirstChild("Outline")
+                if outline then strokePad = outline.Thickness end
+
+                maxW = math.max(maxW, tSize.X + strokePad * 2)
+                totalH = totalH + tSize.Y + strokePad * 2 + spacing
+                count = count + 1
+            end
+        end
+
+        if count > 0 then totalH = totalH - spacing end
+
+        return Vector2.new(maxW + p * 2, totalH + p * 2)
+    end
+
     local function updateSize(animate)
         if not billboard then return end
 
-        local layout = container and container:FindFirstChildOfClass("UIListLayout")
-        local contentW = layout and layout.AbsoluteContentSize.X or 0
-        local contentH = layout and layout.AbsoluteContentSize.Y or 0
-        local p = getPadding()
-        local extra = showWindow and (p * 2) or 0
+        local measured = measureContent()
 
         local targetW, targetH
 
-        -- 1. Логика ШИРИНЫ
         if widthAuto then
-            targetW = math.max(contentW + extra, 10)
+            targetW = math.max(measured.X, textSize + 4)
         else
             local fixedWidth = 300
             if typeof(widthSize) == "UDim2" then
@@ -989,12 +1018,10 @@ function createInfoText(config)
             targetW = fixedWidth
         end
 
-        -- 2. Логика ВЫСОТЫ (Всегда авто)
-        targetH = math.max(textSize + extra, contentH + extra)
+        targetH = math.max(measured.Y, textSize + (showWindow and getPadding() * 2 or 0))
 
         basePixelSize = Vector2.new(targetW, targetH)
 
-        -- 3. Применение размера
         if not constantSize then
             local targetSize = UDim2.new(0, targetW, 0, targetH)
             if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
@@ -1014,7 +1041,7 @@ function createInfoText(config)
         billboard = Instance.new("BillboardGui")
         billboard.Name = name
         billboard.Adornee = adornee
-        billboard.Size = UDim2.new(0, 100, 0, 100) -- Заглушка
+        billboard.Size = UDim2.new(0, 100, 0, 100)
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
         billboard.Enabled = isActive
@@ -1045,16 +1072,17 @@ function createInfoText(config)
         container.Name = "Container"
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
-        container.ClipsDescendants = false -- Скролл и обрезка больше не нужны
         container.Parent = billboard
+
+        -- ★ UIScale для пропорционального масштабирования контента ★
+        containerScale = Instance.new("UIScale")
+        containerScale.Scale = 1
+        containerScale.Parent = container
 
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
         layout.Parent = container
-
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() updateSize(true) end)
-        container:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() updateSize(true) end)
 
         applyWindowLayout()
         updateSize(false)
@@ -1196,13 +1224,15 @@ function createInfoText(config)
     for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
     if billboard then updateOrder() updateSize(false) end
 
-    -- ===== Constant Size Loop =====
+    -- ===== Constant Size Loop (безопасный, без feedback) =====
     local renderName = "InfoText_" .. name .. "_" .. tostring(math.random(1000, 9999))
     RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
-        if not billboard or not billboard.Parent or not constantSize or not billboard.Adornee then return end
+        if not billboard or not billboard.Parent or not billboard.Adornee then return end
+        if not constantSize then return end
+
         local camera = workspace.CurrentCamera
         if not camera then return end
-        
+
         local adornee = billboard.Adornee
         local adorneePos
         if adornee:IsA("Model") then
@@ -1215,12 +1245,14 @@ function createInfoText(config)
         else
             return
         end
-        
-        -- Компенсация дистанции (масштаб 1:1 на дистанции 10 стадов)
+
         local dist = (camera.CFrame.Position - adorneePos).Magnitude
-        local scaleFactor = math.max(dist, 1) / 10 
-        
+        local scaleFactor = math.max(dist, 1) / 10
+
         billboard.Size = UDim2.new(0, basePixelSize.X * scaleFactor, 0, basePixelSize.Y * scaleFactor)
+        if containerScale then
+            containerScale.Scale = scaleFactor
+        end
     end)
 
     local api = {}
@@ -1290,13 +1322,13 @@ function createInfoText(config)
             if wa ~= nil then widthAuto = wa == true end
             local ws = pick(v, "size", "Size")
             if ws ~= nil then widthSize = ws end
-            
+
             for _, label in pairs(labels) do
                 label.AutomaticSize = widthAuto and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
                 label.TextWrapped = not widthAuto
                 if not widthAuto then label.Size = UDim2.new(1, 0, 0, 0) else label.Size = UDim2.new(0, 0, 0, 0) end
             end
-            
+
             if container then applyWindowLayout() end
             updateSize(true)
         end
@@ -1324,7 +1356,13 @@ function createInfoText(config)
         end
 
         v = pick(tbl, "ConstantSize", "constantSize")
-        if v ~= nil then constantSize = v == true end
+        if v ~= nil then
+            constantSize = v == true
+            if not constantSize then
+                if containerScale then containerScale.Scale = 1 end
+                updateSize(true)
+            end
+        end
 
         v = pick(tbl, "OutlineColor", "outlineColor")
         if v ~= nil then
@@ -1401,6 +1439,7 @@ function createInfoText(config)
             windowFrame = nil
             windowCornerObj = nil
             windowStrokeObj = nil
+            containerScale = nil
         end
         labels, lineData = {}, {}
         pendingOrder, pendingData = {}, {}
