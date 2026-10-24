@@ -878,10 +878,13 @@ function createInfoText(config)
     if widthAuto == nil then widthAuto = true end
     local widthSize = pick(widthCfg, "size", "Size") or 300
 
-    -- Настройки постоянного размера (по умолчанию выключено, чтобы не перекрывать экран)
+    -- Настройки масштабирования от расстояния (ConstantSize)
     local constantSize = pick(config, "ConstantSize", "constantSize")
-    if constantSize == nil then constantSize = false end 
-    local maxScale = pick(config, "MaxScale", "maxScale") or 1.5 -- Ограничитель роста (в 1.5 раза)
+    if constantSize == nil then constantSize = false end
+    
+    local referenceDistance = pick(config, "ReferenceDistance", "referenceDistance") or 10
+    local maxScale = pick(config, "MaxScale", "maxScale") or 1.5
+    local minScale = pick(config, "MinScale", "minScale") or 0.1
 
     local showWindow = false
     local swConfig = pick(config, "ShowWindow", "showWindow")
@@ -967,7 +970,6 @@ function createInfoText(config)
         if windowFrame then windowFrame.Visible = showWindow end
     end
 
-    -- Измерение через TextService (исключает баги с бесконечным ростом)
     local function measureContent()
         local p = showWindow and getPadding() or 0
         local spacing = 2
@@ -1020,7 +1022,6 @@ function createInfoText(config)
         targetH = math.max(measured.Y, textSize + (showWindow and getPadding() * 2 or 0))
         basePixelSize = Vector2.new(targetW, targetH)
 
-        -- Если ConstantSize выключен, ставим жесткий размер
         if not constantSize then
             local targetSize = UDim2.new(0, targetW, 0, targetH)
             if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
@@ -1208,37 +1209,50 @@ function createInfoText(config)
     for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
     if billboard then updateOrder() updateSize(false) end
 
-    -- ===== Цикл поддержания размера (ConstantSize) =====
+    -- ===== Динамический размер окна (Исправленная логика) =====
     local renderName = "InfoText_" .. name .. "_" .. tostring(math.random(1000, 9999))
-    RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
-        if not billboard or not billboard.Parent or not billboard.Adornee then return end
-        
-        -- Если ConstantSize выключен, размер уже зафиксирован в updateSize
-        if not constantSize then return end
-        
-        local camera = workspace.CurrentCamera
-        if not camera then return end
 
-        local adornee = billboard.Adornee
-        local adorneePos
-        if adornee:IsA("Model") then
-            local primary = adornee.PrimaryPart or adornee:FindFirstChild("HumanoidRootPart") or adornee:FindFirstChildWhichIsA("BasePart")
-            if primary then adorneePos = primary.Position else return end
-        elseif adornee:IsA("BasePart") then
-            adorneePos = adornee.Position
-        elseif adornee:IsA("Attachment") then
-            adorneePos = adornee.WorldPosition
-        else
-            return
+    RunService:BindToRenderStep(
+        renderName,
+        Enum.RenderPriority.Camera.Value + 1,
+        function()
+            if not billboard or not billboard.Parent or not billboard.Adornee then return end
+            if not constantSize then return end
+
+            local camera = workspace.CurrentCamera
+            if not camera then return end
+
+            local adornee = billboard.Adornee
+            local adorneePos
+
+            if adornee:IsA("Model") then
+                local primary = adornee.PrimaryPart or adornee:FindFirstChild("HumanoidRootPart") or adornee:FindFirstChildWhichIsA("BasePart")
+                if not primary then return end
+                adorneePos = primary.Position
+            elseif adornee:IsA("BasePart") then
+                adorneePos = adornee.Position
+            elseif adornee:IsA("Attachment") then
+                adorneePos = adornee.WorldPosition
+            else
+                return
+            end
+
+            local distance = (camera.CFrame.Position - adorneePos).Magnitude
+            distance = math.max(distance, 0.1)
+            referenceDistance = math.max(referenceDistance, 0.1)
+            minScale = math.max(minScale, 0.01)
+            maxScale = math.max(maxScale, minScale)
+
+            -- Инвертированная формула (чем дальше, тем меньше)
+            local scaleFactor = referenceDistance / distance
+            scaleFactor = math.clamp(scaleFactor, minScale, maxScale)
+
+            billboard.Size = UDim2.fromOffset(
+                math.max(1, basePixelSize.X * scaleFactor),
+                math.max(1, basePixelSize.Y * scaleFactor)
+            )
         end
-
-        local dist = (camera.CFrame.Position - adorneePos).Magnitude
-        
-        -- Ограничиваем масштаб (например, максимум в 1.5 или 2 раза), чтобы окно не закрывало весь экран
-        local scaleFactor = math.clamp(dist / 10, 1, maxScale)
-        
-        billboard.Size = UDim2.new(0, basePixelSize.X * scaleFactor, 0, basePixelSize.Y * scaleFactor)
-    end)
+    )
 
     local api = {}
 
@@ -1345,8 +1359,14 @@ function createInfoText(config)
             if not constantSize then updateSize(true) end
         end
         
+        v = pick(tbl, "ReferenceDistance", "referenceDistance")
+        if v ~= nil then referenceDistance = tonumber(v) or referenceDistance end
+
         v = pick(tbl, "MaxScale", "maxScale")
         if v ~= nil then maxScale = tonumber(v) or maxScale end
+
+        v = pick(tbl, "MinScale", "minScale")
+        if v ~= nil then minScale = tonumber(v) or minScale end
 
         v = pick(tbl, "OutlineColor", "outlineColor")
         if v ~= nil then
