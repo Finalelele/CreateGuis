@@ -872,18 +872,29 @@ function createInfoText(config)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
-    -- Ширина
+    -- Ширина (по умолчанию auto = true)
     local widthCfg = pick(config, "Width", "width") or {}
-    local widthAuto = pick(widthCfg, "auto", "Auto")
-    if widthAuto == nil then widthAuto = true end
+    local widthAuto = true 
+    local wa = pick(widthCfg, "auto", "Auto")
+    if wa ~= nil then widthAuto = wa == true end
     local widthSize = pick(widthCfg, "size", "Size") or 300
 
-    -- Настройки масштабирования (ConstantSize)
-    local constantCfg = pick(config, "ConstantSize", "constantSize") or {}
-    local constantEnabled = pick(constantCfg, "enabled", "Enabled")
-    if constantEnabled == nil then constantEnabled = false end
-    local minScale = pick(constantCfg, "MinScale", "minScale") or 0.1
-    local maxScale = pick(constantCfg, "MaxScale", "maxScale") or 1.5
+    -- Настройки масштабирования (по умолчанию enabled = false)
+    local constantCfg = pick(config, "ConstantSize", "constantSize")
+    local constantEnabled = false
+    local minScale = 0.1
+    local maxScale = 1.5
+    
+    if type(constantCfg) == "table" then
+        local ce = pick(constantCfg, "enabled", "Enabled")
+        if ce ~= nil then constantEnabled = ce == true end
+        local ms = pick(constantCfg, "MinScale", "minScale")
+        if ms ~= nil then minScale = tonumber(ms) or minScale end
+        local mxs = pick(constantCfg, "MaxScale", "maxScale")
+        if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
+    elseif type(constantCfg) == "boolean" then
+        constantEnabled = constantCfg
+    end
 
     -- Жестко зашитая дистанция (не настраивается)
     local REFERENCE_DISTANCE = 10
@@ -958,7 +969,7 @@ function createInfoText(config)
     end
 
     local function applyWindowLayout()
-        if not container then return end
+        -- Показываем или скрываем только ФОН. Текст остается видимым всегда.
         if windowFrame then windowFrame.Visible = showWindow end
     end
 
@@ -1032,6 +1043,9 @@ function createInfoText(config)
         local distance = (camera.CFrame.Position - adorneePos).Magnitude
         distance = math.max(distance, 0.1)
         
+        minScale = math.max(minScale, 0.01)
+        maxScale = math.max(maxScale, minScale)
+
         local scaleFactor = math.clamp(REFERENCE_DISTANCE / distance, minScale, maxScale)
         
         if uiScale then uiScale.Scale = scaleFactor end
@@ -1041,10 +1055,6 @@ function createInfoText(config)
     local function updateSize(animate)
         if not billboard then return end
         basePixelSize = measureContent()
-
-        if container then
-            container.Size = UDim2.fromOffset(basePixelSize.X, basePixelSize.Y)
-        end
 
         if not constantEnabled then
             if uiScale then uiScale.Scale = 1 end
@@ -1074,6 +1084,7 @@ function createInfoText(config)
         billboard.Enabled = isActive
         billboard.Parent = adornee
 
+        -- Фон (отдельно от текста)
         windowFrame = Instance.new("Frame")
         windowFrame.Name = "Window"
         windowFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -1095,14 +1106,13 @@ function createInfoText(config)
         windowStrokeObj.Transparency = pick(borderCfg, "transparency", "Transparency") or 0.15
         windowStrokeObj.Parent = windowFrame
 
+        -- Текст (крепится напрямую к billboard, не зависит от фона)
         container = Instance.new("Frame")
         container.Name = "Container"
+        container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
-        -- Выравниваем контейнер по центру, чтобы он сжимался к середине, а не в левый верхний угол
-        container.AnchorPoint = Vector2.new(0.5, 0.5)
-        container.Position = UDim2.new(0.5, 0, 0.5, 0)
-        container.Parent = windowFrame -- Крепим к окну, а не к билборду
+        container.Parent = billboard 
 
         uiScale = Instance.new("UIScale")
         uiScale.Parent = container
@@ -1110,6 +1120,7 @@ function createInfoText(config)
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Выравниваем по центру
         layout.Parent = container
 
         applyWindowLayout()
@@ -1314,8 +1325,8 @@ function createInfoText(config)
 
         v = pick(tbl, "Width", "width")
         if type(v) == "table" then
-            local wa = pick(v, "auto", "Auto")
-            if wa ~= nil then widthAuto = wa == true end
+            local newWa = pick(v, "auto", "Auto")
+            if newWa ~= nil then widthAuto = newWa == true end
             local ws = pick(v, "size", "Size")
             if ws ~= nil then widthSize = ws end
 
@@ -1355,6 +1366,9 @@ function createInfoText(config)
             local mxs = pick(v, "MaxScale", "maxScale")
             if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
             
+            if not constantEnabled then updateSize(true) end
+        elseif type(v) == "boolean" then
+            constantEnabled = v
             if not constantEnabled then updateSize(true) end
         end
 
