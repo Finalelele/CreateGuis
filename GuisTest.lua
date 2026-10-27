@@ -1514,6 +1514,482 @@ function createInfoText(config)
     return api
 end
 
+function createRadar(config)
+    config = config or {}
+
+    local Players          = game:GetService("Players")
+    local RunService       = game:GetService("RunService")
+    local CoreGui          = game:GetService("CoreGui")
+    local UserInputService = game:GetService("UserInputService")
+
+    local function pick(tbl, ...)
+        if type(tbl) ~= "table" then return nil end
+        for _, key in ipairs({...}) do
+            if tbl[key] ~= nil then return tbl[key] end
+        end
+        return nil
+    end
+
+    -- ========= CustomWindow =========
+    local cw = pick(config, "CustomWindow", "customWindow") or {}
+
+    local bg           = pick(cw, "Background", "background") or {}
+    local borderCfg    = pick(cw, "Border", "border") or {}
+    local cornerCfg    = pick(cw, "Corner", "corner") or {}
+    local titleCfg     = pick(cw, "Title", "title") or {}
+    local radarCfg     = pick(cw, "Radar", "radar") or {}
+    local gridCfg      = pick(cw, "Grid", "grid") or {}
+    local crosshairCfg = pick(cw, "Crosshair", "crosshair") or {}
+    local fontCfg      = pick(cw, "Font", "font") or {}
+
+    -- ========= Основные =========
+    local Name         = pick(config, "Name", "name")         or "CustomRadar"
+    local Title        = pick(config, "Title", "title")       or "Radar"
+    local Position     = pick(config, "Position", "position") or UDim2.new(0.03, 0, 0.3, 0)
+    local Size         = math.max(tonumber(pick(config, "Size", "size")) or 100, 0.01)
+    local Scale        = tonumber(pick(config, "Scale", "scale")) or 1
+    local Range        = math.max(tonumber(pick(config, "Range", "range")) or 100, 0)
+    local Center       = pick(config, "Center", "center") or Players.LocalPlayer
+    local CenterOffset = pick(config, "CenterOffset", "centerOffset") or Vector3.zero
+    local EDGE_TEXT_HIDE_THRESHOLD = tonumber(pick(config, "TextHideThreshold", "textHideThreshold")) or 0.95
+
+    local enabled = true
+    local targets = {}
+    local WINDOW_SIZE, WINDOW_HEIGHT = 220, 260
+    local RADAR_SIZE  = 190
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = Name
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.Parent = (gethui and gethui()) or CoreGui
+
+    local scaleObject = Instance.new("UIScale")
+    scaleObject.Scale = Scale
+    scaleObject.Parent = gui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "MainFrame"
+    frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_HEIGHT)
+    frame.Position = Position
+    frame.BackgroundColor3 = pick(bg, "color", "Color") or Color3.fromRGB(10, 10, 15)
+    frame.BackgroundTransparency = pick(bg, "transparency", "Transparency") or 0
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+
+    local frameCorner = Instance.new("UICorner")
+    frameCorner.CornerRadius = UDim.new(0, pick(cornerCfg, "radius", "Radius") or 16)
+    frameCorner.Parent = frame
+
+    local frameStroke = Instance.new("UIStroke")
+    frameStroke.Color = pick(borderCfg, "color", "Color") or Color3.fromRGB(80, 80, 90)
+    frameStroke.Thickness = pick(borderCfg, "thickness", "Thickness") or 4
+    frameStroke.Transparency = pick(borderCfg, "transparency", "Transparency") or 0
+    frameStroke.Parent = frame
+
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.BackgroundTransparency = 1
+    title.Position = UDim2.fromOffset(12, 4)
+    title.Size = UDim2.new(1, -24, 0, 28)
+    title.Font = pick(fontCfg, "title", "Title") or Enum.Font.GothamBold
+    title.Text = Title
+    title.TextColor3 = pick(titleCfg, "color", "Color") or Color3.fromRGB(235, 235, 235)
+    title.TextTransparency = pick(titleCfg, "transparency", "Transparency") or 0
+    title.TextSize = 17
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = frame
+
+    local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+
+    title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true dragStart = input.Position startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+
+    local radar = Instance.new("Frame")
+    radar.Name = "Radar"
+    radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
+    radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 42)
+    radar.BackgroundColor3 = pick(radarCfg, "color", "Color") or Color3.fromRGB(5, 5, 8)
+    radar.BackgroundTransparency = pick(radarCfg, "transparency", "Transparency") or 0
+    radar.BorderSizePixel = 0
+    radar.ClipsDescendants = true
+    radar.Parent = frame
+
+    local radarCorner = Instance.new("UICorner")
+    radarCorner.CornerRadius = UDim.new(1, 0)
+    radarCorner.Parent = radar
+
+    local radarStroke = Instance.new("UIStroke")
+    radarStroke.Color = pick(borderCfg, "color", "Color") or Color3.fromRGB(80, 80, 90)
+    radarStroke.Thickness = 3
+    radarStroke.Transparency = pick(borderCfg, "transparency", "Transparency") or 0
+    radarStroke.Parent = radar
+
+    local function createCircle(csize, transparency)
+        local circle = Instance.new("Frame")
+        circle.BackgroundTransparency = 1
+        circle.Size = UDim2.new(csize, 0, csize, 0)
+        circle.Position = UDim2.new(0.5, 0, 0.5, 0)
+        circle.AnchorPoint = Vector2.new(0.5, 0.5)
+        circle.Parent = radar
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = circle
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = pick(gridCfg, "color", "Color") or Color3.fromRGB(70, 70, 80)
+        stroke.Thickness = 1
+        stroke.Transparency = transparency or 0
+        stroke.Parent = circle
+    end
+
+    createCircle(0.66, 0)
+    createCircle(0.42, 0)
+
+    local horizontalLine = Instance.new("Frame")
+    horizontalLine.BackgroundColor3 = pick(crosshairCfg, "color", "Color") or Color3.fromRGB(45, 45, 50)
+    horizontalLine.BackgroundTransparency = 0.35
+    horizontalLine.BorderSizePixel = 0
+    horizontalLine.AnchorPoint = Vector2.new(0, 0.5)
+    horizontalLine.Position = UDim2.new(0, 0, 0.5, 0)
+    horizontalLine.Size = UDim2.new(1, 0, 0, 1)
+    horizontalLine.Parent = radar
+
+    local verticalLine = Instance.new("Frame")
+    verticalLine.BackgroundColor3 = pick(crosshairCfg, "color", "Color") or Color3.fromRGB(45, 45, 50)
+    verticalLine.BackgroundTransparency = 0.35
+    verticalLine.BorderSizePixel = 0
+    verticalLine.AnchorPoint = Vector2.new(0.5, 0)
+    verticalLine.Position = UDim2.new(0.5, 0, 0, 0)
+    verticalLine.Size = UDim2.new(0, 1, 1, 0)
+    verticalLine.Parent = radar
+
+    local targetObjects = {}
+
+    local function getRoot(target)
+        if not target then return nil end
+        if target:IsA("Player") then
+            return target.Character and (target.Character:FindFirstChild("HumanoidRootPart") or target.Character.PrimaryPart)
+        end
+        if target:IsA("Model") then
+            return target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+        end
+        if target:IsA("BasePart") then return target end
+        return nil
+    end
+
+    local function ensureText(old)
+        if old.text then return old.text end
+        old.text = Instance.new("TextLabel")
+        old.text.Name = "Text"
+        old.text.BackgroundTransparency = 1
+        old.text.AnchorPoint = Vector2.new(0.5, 1)
+        old.text.Position = UDim2.new(0.5, 0, 0, -4)
+        old.text.Size = UDim2.fromOffset(140, 18)
+        old.text.Font = pick(fontCfg, "text", "Text") or Enum.Font.Gotham
+        old.text.TextSize = 13
+        old.text.TextXAlignment = Enum.TextXAlignment.Center
+        old.text.ZIndex = 11
+        old.text.Parent = old.point
+        return old.text
+    end
+
+    local function createTarget(data)
+        local point = Instance.new("Frame")
+        point.Name = tostring(data.id)
+        point.AnchorPoint = Vector2.new(0.5, 0.5)
+        point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
+        point.BorderSizePixel = 0
+        point.ZIndex = 10
+        point.Size = UDim2.fromOffset(data.size or 8, data.size or 8)
+        point.Parent = radar
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = point
+        local obj = { point = point, text = nil, data = data }
+        if data.text ~= nil then
+            local tl = ensureText(obj)
+            tl.Text = tostring(data.text)
+            tl.TextColor3 = data.color or Color3.new(1, 1, 1)
+        end
+        targetObjects[data.id] = obj
+    end
+
+    if config.Targets then
+        for _, data in ipairs(config.Targets) do
+            local finalData = {
+                id      = data.id,
+                target  = data.target,
+                text    = data.text,
+                color   = data.color or Color3.new(1, 1, 1),
+                size    = data.size or 8,
+                visible = data.visible ~= false,
+            }
+            targets[data.id] = finalData
+            createTarget(finalData)
+        end
+    end
+
+    local function getCenterPosition()
+        local root = getRoot(Center)
+        if root then return root.Position + CenterOffset end
+        if typeof(Center) == "Vector3" then return Center + CenterOffset end
+        if typeof(Center) == "CFrame" then return Center.Position + CenterOffset end
+        return nil
+    end
+
+    local function updateTarget(id, object)
+        local data = object.data
+        local targetRoot = getRoot(data.target)
+        local centerPosition = getCenterPosition()
+        if not targetRoot or not centerPosition or data.visible == false then
+            object.point.Visible = false
+            if object.text then object.text.Visible = false end
+            return
+        end
+        local offset = targetRoot.Position - centerPosition
+        local distance = offset.Magnitude
+        if distance > Range then
+            object.point.Visible = false
+            if object.text then object.text.Visible = false end
+            return
+        end
+        object.point.Visible = true
+        if distance < 0.01 then
+            object.point.Position = UDim2.new(0.5, 0, 0.5, 0)
+            if object.text then object.text.Visible = true end
+            return
+        end
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+        local right   = Vector3.new(camera.CFrame.RightVector.X, 0, camera.CFrame.RightVector.Z)
+        if forward.Magnitude < 0.001 or right.Magnitude < 0.001 then return end
+        forward = forward.Unit right = right.Unit
+        local x = offset:Dot(right)
+        local y = offset:Dot(forward)
+        local normalizedDistance = distance / Size
+        if normalizedDistance > 1 then normalizedDistance = 1 end
+        local direction = Vector2.new(x, y)
+        if direction.Magnitude > 0 then direction = direction.Unit * normalizedDistance end
+        object.point.Position = UDim2.new(0.5 + direction.X * 0.5, 0, 0.5 - direction.Y * 0.5, 0)
+        if object.text then object.text.Visible = normalizedDistance < EDGE_TEXT_HIDE_THRESHOLD end
+    end
+
+    local renderName = Name .. "_RadarUpdate"
+    RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
+        if not enabled then return end
+        for id, object in pairs(targetObjects) do updateTarget(id, object) end
+    end)
+
+    local api = {}
+
+    function api:Set(listOrData)
+        if type(listOrData) ~= "table" then return end
+
+        local function applyOne(data)
+            if not data or not data.id then return end
+
+            local id = data.id
+            local old = targetObjects[id]
+
+            local finalData = {
+                id      = id,
+                target  = data.target,
+                text    = data.text,
+                color   = data.color or Color3.new(1, 1, 1),
+                size    = data.size or 8,
+                visible = data.visible ~= false,
+            }
+
+            if not old then
+                targets[id] = finalData
+                createTarget(finalData)
+                return
+            end
+
+            old.data = finalData
+            targets[id] = finalData
+
+            old.point.BackgroundColor3 = finalData.color
+            old.point.Size = UDim2.fromOffset(finalData.size, finalData.size)
+
+            if finalData.text ~= nil then
+                local tl = ensureText(old)
+                tl.Text = tostring(finalData.text)
+                tl.TextColor3 = finalData.color
+            elseif old.text then
+                old.text:Destroy()
+                old.text = nil
+            end
+
+            if finalData.visible == false then
+                old.point.Visible = false
+            end
+        end
+
+        if listOrData.id then
+            applyOne(listOrData)
+        else
+            for _, data in ipairs(listOrData) do
+                applyOne(data)
+            end
+        end
+    end
+
+    function api:RemoveTarget(id)
+        targets[id] = nil
+        local object = targetObjects[id]
+        if object then object.point:Destroy() targetObjects[id] = nil end
+    end
+
+    function api:Clear()
+        for id, object in pairs(targetObjects) do
+            object.point:Destroy()
+            targetObjects[id] = nil
+            targets[id] = nil
+        end
+    end
+
+    function api:Visible(state) enabled = state ~= false gui.Enabled = enabled end
+
+    function api:SetParameter(tbl)
+        if type(tbl) ~= "table" then return end
+        local v
+
+        v = pick(tbl, "Title", "title")
+        if v ~= nil then Title = tostring(v) title.Text = Title end
+
+        v = pick(tbl, "Position", "position")
+        if v ~= nil then Position = v frame.Position = v end
+
+        v = pick(tbl, "Scale", "scale")
+        if v ~= nil then Scale = tonumber(v) or Scale scaleObject.Scale = Scale end
+
+        v = pick(tbl, "Size", "size")
+        if v ~= nil then Size = math.max(tonumber(v) or Size, 0.01) end
+
+        v = pick(tbl, "Range", "range")
+        if v ~= nil then Range = math.max(tonumber(v) or Range, 0) end
+
+        v = pick(tbl, "Center", "center")
+        if v ~= nil then Center = v end
+
+        v = pick(tbl, "CenterOffset", "centerOffset")
+        if v ~= nil then CenterOffset = v or Vector3.zero end
+
+        v = pick(tbl, "TextHideThreshold", "textHideThreshold")
+        if v ~= nil then EDGE_TEXT_HIDE_THRESHOLD = tonumber(v) or EDGE_TEXT_HIDE_THRESHOLD end
+    end
+
+    function api:SetCustomWindow(tbl)
+        if type(tbl) ~= "table" then return end
+
+        local newBg = pick(tbl, "Background", "background")
+        if newBg then
+            local c = pick(newBg, "color", "Color")
+            if c then bg.color = c frame.BackgroundColor3 = c end
+            local t = pick(newBg, "transparency", "Transparency")
+            if t then bg.transparency = t frame.BackgroundTransparency = t end
+        end
+
+        local newBorderCfg = pick(tbl, "Border", "border")
+        if newBorderCfg then
+            local c = pick(newBorderCfg, "color", "Color")
+            if c then borderCfg.color = c frameStroke.Color = c radarStroke.Color = c end
+            local th = pick(newBorderCfg, "thickness", "Thickness")
+            if th then borderCfg.thickness = th frameStroke.Thickness = th end
+            local t = pick(newBorderCfg, "transparency", "Transparency")
+            if t then borderCfg.transparency = t frameStroke.Transparency = t radarStroke.Transparency = t end
+        end
+
+        local newCornerCfg = pick(tbl, "Corner", "corner")
+        if newCornerCfg then
+            local r = pick(newCornerCfg, "radius", "Radius")
+            if r then cornerCfg.radius = r frameCorner.CornerRadius = UDim.new(0, r) end
+        end
+
+        local newTitleCfg = pick(tbl, "Title", "title")
+        if newTitleCfg then
+            local c = pick(newTitleCfg, "color", "Color")
+            if c then titleCfg.color = c title.TextColor3 = c end
+            local t = pick(newTitleCfg, "transparency", "Transparency")
+            if t then titleCfg.transparency = t title.TextTransparency = t end
+        end
+
+        local newRadarCfg = pick(tbl, "Radar", "radar")
+        if newRadarCfg then
+            local c = pick(newRadarCfg, "color", "Color")
+            if c then radarCfg.color = c radar.BackgroundColor3 = c end
+            local t = pick(newRadarCfg, "transparency", "Transparency")
+            if t then radarCfg.transparency = t radar.BackgroundTransparency = t end
+        end
+
+        local newGridCfg = pick(tbl, "Grid", "grid")
+        if newGridCfg then
+            local c = pick(newGridCfg, "color", "Color")
+            if c then
+                gridCfg.color = c
+                for _, child in ipairs(radar:GetChildren()) do
+                    if child:IsA("Frame") then
+                        local s = child:FindFirstChildOfClass("UIStroke")
+                        if s then s.Color = c end
+                    end
+                end
+            end
+        end
+
+        local newCrosshairCfg = pick(tbl, "Crosshair", "crosshair")
+        if newCrosshairCfg then
+            local c = pick(newCrosshairCfg, "color", "Color")
+            if c then
+                crosshairCfg.color = c
+                horizontalLine.BackgroundColor3 = c
+                verticalLine.BackgroundColor3 = c
+            end
+        end
+
+        local newFontCfg = pick(tbl, "Font", "font")
+        if newFontCfg then
+            local f = pick(newFontCfg, "text", "Text")
+            if f then
+                fontCfg.text = f
+                for _, obj in pairs(targetObjects) do if obj.text then obj.text.Font = f end end
+            end
+            local tf = pick(newFontCfg, "title", "Title")
+            if tf then fontCfg.title = tf title.Font = tf end
+        end
+    end
+
+    function api:Remove()
+        RunService:UnbindFromRenderStep(renderName)
+        gui:Destroy()
+    end
+
+    return api
+end
+
 return {
     createInfoGui  = createInfoGui,
     createInfoText = createInfoText,
