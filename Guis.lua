@@ -13,32 +13,22 @@ function createInfoGui(config)
         return nil
     end
 
+    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
 
-    local windowColor        = pick(cw, "WindowColor", "windowColor")               or Color3.fromRGB(30, 30, 35)
-    local windowTransparency = pick(cw, "WindowTransparency", "windowTransparency")
-    if windowTransparency == nil then windowTransparency = 0 end
-    local headerColor        = pick(cw, "HeaderColor", "headerColor")               or Color3.fromRGB(35, 35, 42)
-    local headerTransparency = pick(cw, "HeaderTransparency", "headerTransparency")
-    if headerTransparency == nil then headerTransparency = 0 end
-    local borderColor        = pick(cw, "BorderColor", "borderColor")               or Color3.fromRGB(65, 65, 75)
-    local borderThickness    = pick(cw, "BorderThickness", "borderThickness") or 1
-    local borderTransparency = pick(cw, "BorderTransparency", "borderTransparency")
-    if borderTransparency == nil then borderTransparency = 0.15 end
-    local cornerRadius       = pick(cw, "CornerRadius", "cornerRadius") or 8
-    local accentColor        = pick(cw, "AccentColor", "accentColor")               or Color3.fromRGB(90, 145, 255)
-    local titleColor         = pick(cw, "TitleColor", "titleColor")                 or Color3.fromRGB(245, 245, 248)
-    local shadowColor        = pick(cw, "ShadowColor", "shadowColor")               or Color3.new(0, 0, 0)
-    local shadowTransparency = pick(cw, "ShadowTransparency", "shadowTransparency")
-    if shadowTransparency == nil then shadowTransparency = 0.65 end
-    local toggleColor        = pick(cw, "ToggleColor", "toggleColor")               or Color3.fromRGB(48, 48, 58)
-    local toggleTextColor    = pick(cw, "ToggleTextColor", "toggleTextColor")       or Color3.fromRGB(210, 210, 220)
-    local scrollbarColor     = pick(cw, "ScrollbarColor", "scrollbarColor")         or accentColor
-    local lineTextColor      = pick(cw, "LineTextColor", "lineTextColor")           or Color3.fromRGB(255, 255, 255)
+    local bg            = pick(cw, "Background", "background") or {}
+    local topbar        = pick(cw, "Topbar", "topbar") or {}
+    local topbarLine    = pick(cw, "TopbarLine", "topbarLine") or {}
+    local titleCfg      = pick(cw, "Title", "title") or {}
+    local borderCfg     = pick(cw, "Border", "border") or {}
+    local cornerCfg     = pick(cw, "Corner", "corner") or {}
+    local shadowCfg     = pick(cw, "Shadow", "shadow") or {}
+    local lineToggleCfg = pick(cw, "LineToggle", "lineToggle") or {}
+    local scrollbarCfg  = pick(cw, "Scrollbar", "scrollbar") or {}
+    local lineTextCfg   = pick(cw, "LineText", "lineText") or {}
+    local fontCfg       = pick(cw, "Font", "font") or {}
 
-    local font      = pick(cw, "Font", "font")           or pick(config, "Font", "font")           or Enum.Font.GothamMedium
-    local titleFont = pick(cw, "TitleFont", "titleFont") or pick(config, "TitleFont", "titleFont") or Enum.Font.GothamSemibold
-
+    -- ========= Основные =========
     local guiName   = pick(config, "Name", "name") or "CustomWindow"
     local title     = pick(config, "Title", "title") or "Window"
     local width     = pick(config, "Width", "width") or 200
@@ -70,7 +60,6 @@ function createInfoGui(config)
     local tweenInfo     = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local lineFadeInfo  = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-    -- НОВАЯ ЛОГИКА RELOAD
     for _, old in ipairs(CoreGui:GetChildren()) do
         if old.Name == guiName and old:IsA("ScreenGui") then
             if old:GetAttribute("Reload") == true then
@@ -90,22 +79,22 @@ function createInfoGui(config)
     frame.Name = "MainFrame"
     frame.Size = UDim2.new(0, width, 0, headerHeight)
     frame.Position = position
-    frame.BackgroundColor3 = windowColor
-    frame.BackgroundTransparency = windowTransparency
+    frame.BackgroundColor3 = pick(bg, "color", "Color") or Color3.fromRGB(30, 30, 35)
+    frame.BackgroundTransparency = pick(bg, "transparency", "Transparency") or 0
     frame.BorderSizePixel = 0
     frame.Active = true
     frame.ClipsDescendants = true
     frame.Parent = screen
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, cornerRadius)
+    corner.CornerRadius = UDim.new(0, pick(cornerCfg, "radius", "Radius") or 8)
     corner.Parent = frame
 
     local frameStroke = Instance.new("UIStroke")
     frameStroke.Name = "Border"
-    frameStroke.Color = borderColor
-    frameStroke.Thickness = borderThickness
-    frameStroke.Transparency = borderTransparency
+    frameStroke.Color = pick(borderCfg, "color", "Color") or Color3.fromRGB(65, 65, 75)
+    frameStroke.Thickness = pick(borderCfg, "thickness", "Thickness") or 1
+    frameStroke.Transparency = pick(borderCfg, "transparency", "Transparency") or 0.15
     frameStroke.Parent = frame
 
     local uiScale = Instance.new("UIScale")
@@ -117,35 +106,35 @@ function createInfoGui(config)
     shadow.AnchorPoint = Vector2.new(0.5, 0.5)
     shadow.Position = UDim2.new(0.5, 0, 0.5, 2)
     shadow.Size = UDim2.new(1, 6, 1, 6)
-    shadow.BackgroundColor3 = shadowColor
-    shadow.BackgroundTransparency = shadowTransparency
+    shadow.BackgroundColor3 = pick(shadowCfg, "color", "Color") or Color3.new(0, 0, 0)
+    shadow.BackgroundTransparency = pick(shadowCfg, "transparency", "Transparency") or 0.65
     shadow.BorderSizePixel = 0
     shadow.ZIndex = -1
     shadow.Parent = frame
 
     local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, cornerRadius + 1)
+    shadowCorner.CornerRadius = UDim.new(0, (pick(cornerCfg, "radius", "Radius") or 8) + 1)
     shadowCorner.Parent = shadow
 
     local header = Instance.new("Frame")
     header.Name = "Header"
     header.Size = UDim2.new(1, 0, 0, headerHeight)
-    header.BackgroundColor3 = headerColor
-    header.BackgroundTransparency = headerTransparency
+    header.BackgroundColor3 = pick(topbar, "color", "Color") or Color3.fromRGB(35, 35, 42)
+    header.BackgroundTransparency = pick(topbar, "transparency", "Transparency") or 0
     header.BorderSizePixel = 0
     header.Active = true
     header.ZIndex = 2
     header.Parent = frame
 
     local headerCorner = Instance.new("UICorner")
-    headerCorner.CornerRadius = UDim.new(0, cornerRadius)
+    headerCorner.CornerRadius = UDim.new(0, pick(cornerCfg, "radius", "Radius") or 8)
     headerCorner.Parent = header
 
     local accent = Instance.new("Frame")
     accent.Name = "Accent"
     accent.Position = UDim2.new(0, 7, 0.5, -7)
     accent.Size = UDim2.fromOffset(3, 14)
-    accent.BackgroundColor3 = accentColor
+    accent.BackgroundColor3 = pick(topbarLine, "color", "Color") or Color3.fromRGB(90, 145, 255)
     accent.BorderSizePixel = 0
     accent.ZIndex = 3
     accent.Parent = header
@@ -160,8 +149,8 @@ function createInfoGui(config)
     titleLabel.Size = UDim2.new(1, -51, 1, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
-    titleLabel.TextColor3 = titleColor
-    titleLabel.Font = titleFont
+    titleLabel.TextColor3 = pick(titleCfg, "color", "Color") or Color3.fromRGB(245, 245, 248)
+    titleLabel.Font = pick(fontCfg, "title", "Title") or Enum.Font.GothamSemibold
     titleLabel.TextSize = textSize + 2
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
@@ -173,12 +162,12 @@ function createInfoGui(config)
     toggle.AnchorPoint = Vector2.new(1, 0.5)
     toggle.Position = UDim2.new(1, -7, 0.5, 0)
     toggle.Size = UDim2.fromOffset(24, 24)
-    toggle.BackgroundColor3 = toggleColor
+    toggle.BackgroundColor3 = pick(lineToggleCfg, "color", "Color") or Color3.fromRGB(48, 48, 58)
     toggle.BackgroundTransparency = 0.15
     toggle.BorderSizePixel = 0
     toggle.AutoButtonColor = false
     toggle.Text = "⌃"
-    toggle.TextColor3 = toggleTextColor
+    toggle.TextColor3 = pick(lineToggleCfg, "textColor", "TextColor") or Color3.fromRGB(210, 210, 220)
     toggle.Font = Enum.Font.GothamBold
     toggle.TextSize = 15
     toggle.ZIndex = 4
@@ -195,7 +184,7 @@ function createInfoGui(config)
     scrolling.BackgroundTransparency = 1
     scrolling.BorderSizePixel = 0
     scrolling.ScrollBarThickness = 0
-    scrolling.ScrollBarImageColor3 = scrollbarColor
+    scrolling.ScrollBarImageColor3 = pick(scrollbarCfg, "color", "Color") or pick(topbarLine, "color", "Color") or Color3.fromRGB(90, 145, 255)
     scrolling.ScrollBarImageTransparency = 0.3
     scrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
     scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -337,7 +326,7 @@ function createInfoGui(config)
         if not ui or not saved then return end
 
         ui.text.Text = saved.text.text or ""
-        ui.text.TextColor3 = saved.text.color or lineTextColor
+        ui.text.TextColor3 = saved.text.color or pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255)
         applyOutline(ui.text, saved.text)
 
         if saved.toggle then
@@ -355,7 +344,7 @@ function createInfoGui(config)
 
             local isActive = saved.toggle.value == true
             local trackStroke = ui.track:FindFirstChildOfClass("UIStroke")
-            
+
             if isActive then
                 ui.track.BackgroundColor3 = saved.toggle.enabledColor or saved.toggle.color or Color3.fromRGB(70, 130, 180)
                 if trackStroke then trackStroke.Color = saved.toggle.outlineColor or saved.toggle.color or Color3.fromRGB(70, 130, 180) end
@@ -367,7 +356,6 @@ function createInfoGui(config)
             local targetPos = isActive and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
             TweenService:Create(ui.knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
 
-            -- ИЗМЕНЕНО: кружок всегда белый
             if saved.toggle.image then
                 ui.knob.BackgroundTransparency = 1
                 ui.knob.Image = saved.toggle.image
@@ -392,7 +380,7 @@ function createInfoGui(config)
 
         if isNew then
             creationCounter = creationCounter + 1
-            
+
             local lineFrame = Instance.new("Frame")
             lineFrame.Name = id
             lineFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -413,7 +401,7 @@ function createInfoGui(config)
             label.AutomaticSize = Enum.AutomaticSize.Y
             label.TextWrapped = true
             label.BackgroundTransparency = 1
-            label.Font = font
+            label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.TextYAlignment = Enum.TextYAlignment.Center
@@ -466,7 +454,7 @@ function createInfoGui(config)
                     onToggleClick()
                 end
             end)
-            
+
             knob.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     onToggleClick()
@@ -475,15 +463,24 @@ function createInfoGui(config)
 
             labels[id] = { frame = lineFrame, text = label, track = track, knob = knob }
             lineData[id] = {
-                id = id, 
-                text = { text = "", color = lineTextColor, outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
+                id = id,
+                text = { text = "", color = pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255), outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
                 toggle = nil,
                 order = nil, created = creationCounter,
             }
         end
 
         local saved = lineData[id]
-        
+
+        if type(saved.text) ~= "table" then
+            saved.text = {
+                text = tostring(saved.text or ""),
+                color = saved.color or pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255),
+                outlineColor = saved.outlineColor or defaultOutlineColor,
+                outlineSize = saved.outlineSize
+            }
+        end
+
         if data.text ~= nil then
             if type(data.text) == "string" then
                 saved.text.text = data.text
@@ -491,7 +488,7 @@ function createInfoGui(config)
                 for k, v in pairs(data.text) do saved.text[k] = v end
             end
         end
-        
+
         if data.color ~= nil then saved.text.color = data.color end
         if data.outlineColor ~= nil then saved.text.outlineColor = data.outlineColor end
         if data.outlineSize ~= nil then saved.text.outlineSize = data.outlineSize == false and nil or data.outlineSize end
@@ -519,6 +516,15 @@ function createInfoGui(config)
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
+            if type(saved.text) ~= "table" then
+                saved.text = {
+                    text = tostring(saved.text or ""),
+                    color = saved.color or pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255),
+                    outlineColor = saved.outlineColor or defaultOutlineColor,
+                    outlineSize = saved.outlineSize
+                }
+            end
+
             if patch.text ~= nil then
                 if type(patch.text) == "string" then
                     saved.text.text = patch.text
@@ -556,7 +562,7 @@ function createInfoGui(config)
         else
             applyGlobalPatch(lines)
         end
-        
+
         updateOrder()
         updateFrameSize(true)
         if not collapsed then setContentTransparency(0, false) end
@@ -604,10 +610,16 @@ function createInfoGui(config)
     end)
 
     toggle.MouseEnter:Connect(function()
-        TweenService:Create(toggle, TweenInfo.new(0.12), { BackgroundColor3 = accentColor, TextColor3 = Color3.new(1, 1, 1) }):Play()
+        TweenService:Create(toggle, TweenInfo.new(0.12), {
+            BackgroundColor3 = pick(topbarLine, "color", "Color") or Color3.fromRGB(90, 145, 255),
+            TextColor3 = Color3.new(1, 1, 1)
+        }):Play()
     end)
     toggle.MouseLeave:Connect(function()
-        TweenService:Create(toggle, TweenInfo.new(0.12), { BackgroundColor3 = toggleColor, TextColor3 = toggleTextColor }):Play()
+        TweenService:Create(toggle, TweenInfo.new(0.12), {
+            BackgroundColor3 = pick(lineToggleCfg, "color", "Color") or Color3.fromRGB(48, 48, 58),
+            TextColor3 = pick(lineToggleCfg, "textColor", "TextColor") or Color3.fromRGB(210, 210, 220)
+        }):Play()
     end)
     toggle.MouseButton1Click:Connect(function() setCollapsed(not collapsed, true) end)
 
@@ -639,6 +651,12 @@ function createInfoGui(config)
     function api:Collapse(state) setCollapsed(state, true) end
     function api:Toggle() setCollapsed(not collapsed, true) end
     function api:IsCollapsed() return collapsed end
+    function api:GetLines()
+        local list = {}
+        for id, _ in pairs(lineData) do table.insert(list, id) end
+        table.sort(list)
+        return list
+    end
 
     function api:SetParameter(tbl)
         if type(tbl) ~= "table" then return end
@@ -723,65 +741,93 @@ function createInfoGui(config)
 
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
-        local v
 
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then windowColor = v frame.BackgroundColor3 = v end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then windowTransparency = v frame.BackgroundTransparency = v end
-
-        v = pick(tbl, "HeaderColor", "headerColor")
-        if v ~= nil then headerColor = v header.BackgroundColor3 = v end
-        v = pick(tbl, "HeaderTransparency", "headerTransparency")
-        if v ~= nil then headerTransparency = v header.BackgroundTransparency = v end
-
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then borderColor = v frameStroke.Color = v end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then borderThickness = v frameStroke.Thickness = v end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then borderTransparency = v frameStroke.Transparency = v end
-
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then
-            cornerRadius = v
-            corner.CornerRadius = UDim.new(0, v)
-            headerCorner.CornerRadius = UDim.new(0, v)
-            shadowCorner.CornerRadius = UDim.new(0, v + 1)
+        local newBg = pick(tbl, "Background", "background")
+        if newBg then
+            local c = pick(newBg, "color", "Color")
+            if c then bg.color = c frame.BackgroundColor3 = c end
+            local t = pick(newBg, "transparency", "Transparency")
+            if t then bg.transparency = t frame.BackgroundTransparency = t end
         end
 
-        v = pick(tbl, "AccentColor", "accentColor")
-        if v ~= nil then accentColor = v accent.BackgroundColor3 = v end
-
-        v = pick(tbl, "TitleColor", "titleColor")
-        if v ~= nil then titleColor = v titleLabel.TextColor3 = v end
-
-        v = pick(tbl, "ShadowColor", "shadowColor")
-        if v ~= nil then shadowColor = v shadow.BackgroundColor3 = v end
-        v = pick(tbl, "ShadowTransparency", "shadowTransparency")
-        if v ~= nil then shadowTransparency = v shadow.BackgroundTransparency = v end
-
-        v = pick(tbl, "ToggleColor", "toggleColor")
-        if v ~= nil then toggleColor = v toggle.BackgroundColor3 = v end
-        v = pick(tbl, "ToggleTextColor", "toggleTextColor")
-        if v ~= nil then toggleTextColor = v toggle.TextColor3 = v end
-
-        v = pick(tbl, "ScrollbarColor", "scrollbarColor")
-        if v ~= nil then scrollbarColor = v scrolling.ScrollBarImageColor3 = v end
-
-        v = pick(tbl, "LineTextColor", "lineTextColor")
-        if v ~= nil then lineTextColor = v end
-
-        v = pick(tbl, "Font", "font")
-        if v ~= nil then
-            font = v
-            for _, ui in pairs(labels) do ui.text.Font = v end
+        local newTopbar = pick(tbl, "Topbar", "topbar")
+        if newTopbar then
+            local c = pick(newTopbar, "color", "Color")
+            if c then topbar.color = c header.BackgroundColor3 = c end
+            local t = pick(newTopbar, "transparency", "Transparency")
+            if t then topbar.transparency = t header.BackgroundTransparency = t end
         end
 
-        v = pick(tbl, "TitleFont", "titleFont")
-        if v ~= nil then
-            titleFont = v
-            titleLabel.Font = v
+        local newTopbarLine = pick(tbl, "TopbarLine", "topbarLine")
+        if newTopbarLine then
+            local c = pick(newTopbarLine, "color", "Color")
+            if c then topbarLine.color = c accent.BackgroundColor3 = c end
+        end
+
+        local newTitleCfg = pick(tbl, "Title", "title")
+        if newTitleCfg then
+            local c = pick(newTitleCfg, "color", "Color")
+            if c then titleCfg.color = c titleLabel.TextColor3 = c end
+        end
+
+        local newBorderCfg = pick(tbl, "Border", "border")
+        if newBorderCfg then
+            local c = pick(newBorderCfg, "color", "Color")
+            if c then borderCfg.color = c frameStroke.Color = c end
+            local th = pick(newBorderCfg, "thickness", "Thickness")
+            if th then borderCfg.thickness = th frameStroke.Thickness = th end
+            local t = pick(newBorderCfg, "transparency", "Transparency")
+            if t then borderCfg.transparency = t frameStroke.Transparency = t end
+        end
+
+        local newCornerCfg = pick(tbl, "Corner", "corner")
+        if newCornerCfg then
+            local r = pick(newCornerCfg, "radius", "Radius")
+            if r then
+                cornerCfg.radius = r
+                corner.CornerRadius = UDim.new(0, r)
+                headerCorner.CornerRadius = UDim.new(0, r)
+                shadowCorner.CornerRadius = UDim.new(0, r + 1)
+            end
+        end
+
+        local newShadowCfg = pick(tbl, "Shadow", "shadow")
+        if newShadowCfg then
+            local c = pick(newShadowCfg, "color", "Color")
+            if c then shadowCfg.color = c shadow.BackgroundColor3 = c end
+            local t = pick(newShadowCfg, "transparency", "Transparency")
+            if t then shadowCfg.transparency = t shadow.BackgroundTransparency = t end
+        end
+
+        local newLineToggleCfg = pick(tbl, "LineToggle", "lineToggle")
+        if newLineToggleCfg then
+            local c = pick(newLineToggleCfg, "color", "Color")
+            if c then lineToggleCfg.color = c toggle.BackgroundColor3 = c end
+            local tc = pick(newLineToggleCfg, "textColor", "TextColor")
+            if tc then lineToggleCfg.textColor = tc toggle.TextColor3 = tc end
+        end
+
+        local newScrollbarCfg = pick(tbl, "Scrollbar", "scrollbar")
+        if newScrollbarCfg then
+            local c = pick(newScrollbarCfg, "color", "Color")
+            if c then scrollbarCfg.color = c scrolling.ScrollBarImageColor3 = c end
+        end
+
+        local newLineTextCfg = pick(tbl, "LineText", "lineText")
+        if newLineTextCfg then
+            local c = pick(newLineTextCfg, "color", "Color")
+            if c then lineTextCfg.color = c end
+        end
+
+        local newFontCfg = pick(tbl, "Font", "font")
+        if newFontCfg then
+            local f = pick(newFontCfg, "text", "Text")
+            if f then
+                fontCfg.text = f
+                for _, ui in pairs(labels) do ui.text.Font = f end
+            end
+            local tf = pick(newFontCfg, "title", "Title")
+            if tf then fontCfg.title = tf titleLabel.Font = tf end
         end
     end
 
@@ -797,6 +843,8 @@ function createInfoText(config)
     config = config or {}
 
     local TweenService = game:GetService("TweenService")
+    local RunService   = game:GetService("RunService")
+    local TextService  = game:GetService("TextService")
 
     local function pick(tbl, ...)
         if type(tbl) ~= "table" then return nil end
@@ -806,21 +854,50 @@ function createInfoText(config)
         return nil
     end
 
+    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
+    local bg        = pick(cw, "Background", "background") or {}
+    local borderCfg = pick(cw, "Border", "border") or {}
+    local cornerCfg = pick(cw, "Corner", "corner") or {}
+    local paddingCfg = pick(cw, "Padding", "padding") or {}
+    local fontCfg   = pick(cw, "Font", "font") or {}
 
+    -- ========= Основные =========
     local name         = pick(config, "Name", "name")         or "GhostRoomESP"
     local center       = pick(config, "Center", "center")
     local offset       = pick(config, "Offset", "offset")     or Vector3.new(0, 3, 0)
     local baseTextSize = pick(config, "TextSize", "textSize") or 20
     local textSize     = baseTextSize
-    local baseSize     = pick(config, "Size", "size")         or UDim2.new(0, 300, 0, 0)
-    local size         = baseSize
     local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
-
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
-    local font = pick(cw, "Font", "font") or pick(config, "Font", "font") or Enum.Font.GothamMedium
+    -- Ширина (по умолчанию auto = true)
+    local widthCfg = pick(config, "Width", "width") or {}
+    local widthAuto = true 
+    local wa = pick(widthCfg, "auto", "Auto")
+    if wa ~= nil then widthAuto = wa == true end
+    local widthSize = pick(widthCfg, "size", "Size") or 300
+
+    -- Настройки масштабирования (по умолчанию enabled = false)
+    local constantCfg = pick(config, "ConstantSize", "constantSize")
+    local constantEnabled = false
+    local minScale = 0.1
+    local maxScale = 1.5
+    
+    if type(constantCfg) == "table" then
+        local ce = pick(constantCfg, "enabled", "Enabled")
+        if ce ~= nil then constantEnabled = ce == true end
+        local ms = pick(constantCfg, "MinScale", "minScale")
+        if ms ~= nil then minScale = tonumber(ms) or minScale end
+        local mxs = pick(constantCfg, "MaxScale", "maxScale")
+        if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
+    elseif type(constantCfg) == "boolean" then
+        constantEnabled = constantCfg
+    end
+
+    -- Жестко зашитая дистанция (не настраивается)
+    local REFERENCE_DISTANCE = 10
 
     local showWindow = false
     local swConfig = pick(config, "ShowWindow", "showWindow")
@@ -828,33 +905,29 @@ function createInfoText(config)
     if swCustom ~= nil then showWindow = swCustom == true
     elseif swConfig ~= nil then showWindow = swConfig == true end
 
-    local windowBackground             = pick(cw, "WindowColor", "windowColor") or Color3.fromRGB(30, 30, 35)
-    local windowBackgroundTransparency = pick(cw, "WindowTransparency", "windowTransparency")
-    if windowBackgroundTransparency == nil then windowBackgroundTransparency = 0.15 end
-    local windowBorderColor            = pick(cw, "BorderColor", "borderColor") or Color3.fromRGB(65, 65, 75)
-    local windowBorderThickness        = pick(cw, "BorderThickness", "borderThickness") or 1
-    local windowBorderTransparency     = pick(cw, "BorderTransparency", "borderTransparency")
-    if windowBorderTransparency == nil then windowBorderTransparency = 0.15 end
-    local windowCorner                 = pick(cw, "CornerRadius", "cornerRadius") or 8
-    local windowPadding                = pick(cw, "Padding", "padding") or 8
-
     local sizeTweenInfo = TweenInfo.new(
         pick(config, "TweenTime", "tweenTime") or 0.22,
         Enum.EasingStyle.Quint, Enum.EasingDirection.Out
     )
 
     local billboard, container, windowFrame
+    local uiScale
+    local windowCornerObj, windowStrokeObj
     local labels, lineData = {}, {}
     local creationCounter = 0
     local isActive = true
     local activeSizeTween
     local pendingOrder, pendingData = {}, {}
+    local basePixelSize = Vector2.new(100, 50)
+
+    local function getPadding() return pick(paddingCfg, "value", "Value") or 8 end
 
     local function resolveAdornee(target)
         if not target then return nil end
-        if target:IsA("Model") then target = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart") end
-        if not target or not target:IsA("BasePart") then return nil end
-        return target
+        if target:IsA("Model") or target:IsA("BasePart") or target:IsA("Attachment") then
+            return target
+        end
+        return nil
     end
 
     local function applyOutline(label, data)
@@ -896,28 +969,105 @@ function createInfoText(config)
     end
 
     local function applyWindowLayout()
-        if not container then return end
-        local p = showWindow and windowPadding or 0
-        container.Position = UDim2.new(0, p, 0, p)
-        container.Size     = UDim2.new(1, -p * 2, 1, -p * 2)
+        -- Показываем или скрываем только ФОН. Текст остается видимым всегда.
         if windowFrame then windowFrame.Visible = showWindow end
+    end
+
+    local function measureContent()
+        local p = showWindow and getPadding() or 0
+        local spacing = 2
+        local maxW = 0
+        local totalH = 0
+        local count = 0
+
+        local fixedW = 300
+        if typeof(widthSize) == "UDim2" then
+            fixedW = widthSize.X.Offset
+        elseif type(widthSize) == "number" then
+            fixedW = widthSize
+        end
+
+        for _, label in pairs(labels) do
+            if label and label.Parent then
+                local text = label.Text
+                if text == "" then text = " " end
+                
+                local bounds = Vector2.new(10000, 10000)
+                if not widthAuto then
+                    bounds = Vector2.new(fixedW - p * 2, 10000)
+                end
+
+                local tSize = TextService:GetTextSize(
+                    text,
+                    label.TextSize,
+                    label.Font,
+                    bounds
+                )
+                
+                local textW = widthAuto and tSize.X or (fixedW - p * 2)
+                
+                local strokePad = 0
+                local outline = label:FindFirstChild("Outline")
+                if outline then strokePad = outline.Thickness end
+
+                maxW = math.max(maxW, textW + strokePad * 2)
+                totalH = totalH + tSize.Y + strokePad * 2 + spacing
+                count = count + 1
+            end
+        end
+
+        if count > 0 then totalH = totalH - spacing end
+        local finalW = widthAuto and (maxW + p * 2) or fixedW
+        return Vector2.new(finalW, totalH + p * 2)
+    end
+
+    local function applyDynamicSize()
+        if not billboard or not billboard.Adornee or not constantEnabled then return end
+        
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+
+        local adornee = billboard.Adornee
+        local adorneePos
+        if adornee:IsA("Model") then
+            local primary = adornee.PrimaryPart or adornee:FindFirstChild("HumanoidRootPart") or adornee:FindFirstChildWhichIsA("BasePart")
+            if primary then adorneePos = primary.Position else return end
+        elseif adornee:IsA("BasePart") then
+            adorneePos = adornee.Position
+        elseif adornee:IsA("Attachment") then
+            adorneePos = adornee.WorldPosition
+        else
+            return
+        end
+
+        local distance = (camera.CFrame.Position - adorneePos).Magnitude
+        distance = math.max(distance, 0.1)
+        
+        minScale = math.max(minScale, 0.01)
+        maxScale = math.max(maxScale, minScale)
+
+        local scaleFactor = math.clamp(REFERENCE_DISTANCE / distance, minScale, maxScale)
+        
+        if uiScale then uiScale.Scale = scaleFactor end
+        billboard.Size = UDim2.fromOffset(basePixelSize.X * scaleFactor, basePixelSize.Y * scaleFactor)
     end
 
     local function updateSize(animate)
         if not billboard then return end
-        local layout = container and container:FindFirstChildOfClass("UIListLayout")
-        local layoutHeight = layout and layout.AbsoluteContentSize.Y or 0
-        local extra = showWindow and (windowPadding * 2) or 0
-        local autoHeight = math.max(textSize + extra, layoutHeight + extra)
-        local targetHeight = (size.Y.Offset and size.Y.Offset > 0) and size.Y.Offset or autoHeight
-        local targetSize = UDim2.new(size.X.Scale, size.X.Offset, 0, targetHeight)
+        basePixelSize = measureContent()
 
-        if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
-        if animate then
-            activeSizeTween = TweenService:Create(billboard, sizeTweenInfo, { Size = targetSize })
-            activeSizeTween:Play()
+        if not constantEnabled then
+            if uiScale then uiScale.Scale = 1 end
+            local targetSize = UDim2.fromOffset(basePixelSize.X, basePixelSize.Y)
+            if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
+            if animate then
+                activeSizeTween = TweenService:Create(billboard, sizeTweenInfo, { Size = targetSize })
+                activeSizeTween:Play()
+            else
+                billboard.Size = targetSize
+            end
         else
-            billboard.Size = targetSize
+            applyDynamicSize()
         end
     end
 
@@ -928,48 +1078,53 @@ function createInfoText(config)
         billboard = Instance.new("BillboardGui")
         billboard.Name = name
         billboard.Adornee = adornee
-        billboard.Size = size
+        billboard.Size = UDim2.new(0, 100, 0, 100)
         billboard.StudsOffset = offset
         billboard.AlwaysOnTop = true
         billboard.Enabled = isActive
         billboard.Parent = adornee
 
+        -- Фон (отдельно от текста)
         windowFrame = Instance.new("Frame")
         windowFrame.Name = "Window"
         windowFrame.Size = UDim2.new(1, 0, 1, 0)
-        windowFrame.BackgroundColor3 = windowBackground
-        windowFrame.BackgroundTransparency = windowBackgroundTransparency
+        windowFrame.BackgroundColor3 = pick(bg, "color", "Color") or Color3.fromRGB(30, 30, 35)
+        windowFrame.BackgroundTransparency = pick(bg, "transparency", "Transparency") or 0.15
         windowFrame.BorderSizePixel = 0
         windowFrame.Visible = showWindow
         windowFrame.ZIndex = zIndex
         windowFrame.Parent = billboard
 
-        local wc = Instance.new("UICorner")
-        wc.CornerRadius = UDim.new(0, windowCorner)
-        wc.Parent = windowFrame
+        windowCornerObj = Instance.new("UICorner")
+        windowCornerObj.CornerRadius = UDim.new(0, pick(cornerCfg, "radius", "Radius") or 8)
+        windowCornerObj.Parent = windowFrame
 
-        local ws = Instance.new("UIStroke")
-        ws.Name = "Border"
-        ws.Color = windowBorderColor
-        ws.Thickness = windowBorderThickness
-        ws.Transparency = windowBorderTransparency
-        ws.Parent = windowFrame
+        windowStrokeObj = Instance.new("UIStroke")
+        windowStrokeObj.Name = "Border"
+        windowStrokeObj.Color = pick(borderCfg, "color", "Color") or Color3.fromRGB(65, 65, 75)
+        windowStrokeObj.Thickness = pick(borderCfg, "thickness", "Thickness") or 1
+        windowStrokeObj.Transparency = pick(borderCfg, "transparency", "Transparency") or 0.15
+        windowStrokeObj.Parent = windowFrame
 
+        -- Текст (крепится напрямую к billboard, не зависит от фона)
         container = Instance.new("Frame")
         container.Name = "Container"
         container.Size = UDim2.new(1, 0, 1, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
-        container.Parent = billboard
+        container.Parent = billboard 
+
+        uiScale = Instance.new("UIScale")
+        uiScale.Parent = container
 
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Выравниваем по центру
         layout.Parent = container
 
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() updateSize(true) end)
-
         applyWindowLayout()
+        updateSize(false)
         return true
     end
 
@@ -1011,9 +1166,9 @@ function createInfoText(config)
             label.Name = id
             label.Size = UDim2.new(1, 0, 0, 0)
             label.AutomaticSize = Enum.AutomaticSize.Y
-            label.TextWrapped = true
+            label.TextWrapped = not widthAuto
             label.BackgroundTransparency = 1
-            label.Font = font
+            label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
             label.TextSize = textSize
             label.TextXAlignment = Enum.TextXAlignment.Center
             label.TextYAlignment = Enum.TextYAlignment.Top
@@ -1022,14 +1177,22 @@ function createInfoText(config)
 
             labels[id] = label
             lineData[id] = {
-                id = id, 
-                text = { text = "", color = Color3.fromRGB(255, 255, 255), outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
+                id = id, text = { text = "", color = Color3.fromRGB(255, 255, 255), outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
                 order = nil, created = creationCounter,
             }
         end
 
         local saved = lineData[id]
-        
+
+        if type(saved.text) ~= "table" then
+            saved.text = {
+                text = tostring(saved.text or ""),
+                color = saved.color or Color3.fromRGB(255, 255, 255),
+                outlineColor = saved.outlineColor or defaultOutlineColor,
+                outlineSize = saved.outlineSize
+            }
+        end
+
         if data.text ~= nil then
             if type(data.text) == "string" then
                 saved.text.text = data.text
@@ -1044,17 +1207,23 @@ function createInfoText(config)
         if data.order ~= nil then saved.order = data.order == false and nil or data.order end
 
         renderTextLine(id)
+        updateSize(true)
     end
 
     local function applyGlobalPatch(patch)
         if type(patch) ~= "table" then return end
         for id, saved in pairs(lineData) do
+            if type(saved.text) ~= "table" then
+                saved.text = {
+                    text = tostring(saved.text or ""),
+                    color = saved.color or Color3.fromRGB(255, 255, 255),
+                    outlineColor = saved.outlineColor or defaultOutlineColor,
+                    outlineSize = saved.outlineSize
+                }
+            end
             if patch.text ~= nil then
-                if type(patch.text) == "string" then
-                    saved.text.text = patch.text
-                elseif type(patch.text) == "table" then
-                    for k, v in pairs(patch.text) do saved.text[k] = v end
-                end
+                if type(patch.text) == "string" then saved.text.text = patch.text
+                elseif type(patch.text) == "table" then for k, v in pairs(patch.text) do saved.text[k] = v end end
             end
             if patch.color ~= nil then saved.text.color = patch.color end
             if patch.outlineColor ~= nil then saved.text.outlineColor = patch.outlineColor end
@@ -1066,29 +1235,32 @@ function createInfoText(config)
 
     local function setText(lines)
         if not lines then return end
-
         if lines.id then
             setLine(lines)
         elseif #lines > 0 and type(lines[1]) == "table" then
             for _, data in ipairs(lines) do
                 if type(data) == "table" then
-                    if data.id then
-                        setLine(data)
-                    else
-                        applyGlobalPatch(data)
-                    end
+                    if data.id then setLine(data) else applyGlobalPatch(data) end
                 end
             end
         else
             applyGlobalPatch(lines)
         end
-
         updateOrder()
         updateSize(true)
     end
 
     for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
     if billboard then updateOrder() updateSize(false) end
+
+    -- ===== Динамический размер окна =====
+    local renderName = "InfoText_" .. name .. "_" .. tostring(math.random(1000, 9999))
+    RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
+        if not billboard or not billboard.Parent or not billboard.Adornee then return end
+        if constantEnabled then
+            applyDynamicSize()
+        end
+    end)
 
     local api = {}
 
@@ -1151,19 +1323,17 @@ function createInfoText(config)
             if billboard then billboard.StudsOffset = v end
         end
 
-        v = pick(tbl, "Size", "size")
-        if v ~= nil and type(v) == "number" then
-            local scaleFactor = math.max(v, 0.1)
-            textSize = baseTextSize * scaleFactor
-            size = UDim2.new(
-                baseSize.X.Scale, baseSize.X.Offset * scaleFactor,
-                baseSize.Y.Scale, baseSize.Y.Offset * scaleFactor
-            )
+        v = pick(tbl, "Width", "width")
+        if type(v) == "table" then
+            local newWa = pick(v, "auto", "Auto")
+            if newWa ~= nil then widthAuto = newWa == true end
+            local ws = pick(v, "size", "Size")
+            if ws ~= nil then widthSize = ws end
+
             for _, label in pairs(labels) do
-                label.TextSize = textSize
-                label.Size = UDim2.new(1, 0, 0, 0)
+                label.TextWrapped = not widthAuto
             end
-            if billboard then billboard.Size = size updateSize(true) end
+            updateSize(true)
         end
 
         v = pick(tbl, "TextSize", "textSize")
@@ -1172,7 +1342,6 @@ function createInfoText(config)
             textSize = baseTextSize
             for _, label in pairs(labels) do
                 label.TextSize = textSize
-                label.Size = UDim2.new(1, 0, 0, 0)
             end
             updateSize(true)
         end
@@ -1186,6 +1355,21 @@ function createInfoText(config)
             if windowFrame then windowFrame.ZIndex = zIndex end
             if container   then container.ZIndex   = zIndex + 1 end
             for _, label in pairs(labels) do label.ZIndex = zIndex + 2 end
+        end
+
+        v = pick(tbl, "ConstantSize", "constantSize")
+        if type(v) == "table" then
+            local ce = pick(v, "enabled", "Enabled")
+            if ce ~= nil then constantEnabled = ce == true end
+            local ms = pick(v, "MinScale", "minScale")
+            if ms ~= nil then minScale = tonumber(ms) or minScale end
+            local mxs = pick(v, "MaxScale", "maxScale")
+            if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
+            
+            if not constantEnabled then updateSize(true) end
+        elseif type(v) == "boolean" then
+            constantEnabled = v
+            if not constantEnabled then updateSize(true) end
         end
 
         v = pick(tbl, "OutlineColor", "outlineColor")
@@ -1218,68 +1402,52 @@ function createInfoText(config)
 
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
-        local v
 
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then
-            windowBackground = v
-            if windowFrame then windowFrame.BackgroundColor3 = v end
-        end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then
-            windowBackgroundTransparency = v
-            if windowFrame then windowFrame.BackgroundTransparency = v end
-        end
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then
-            windowBorderColor = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Color = v end
-            end
-        end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then
-            windowBorderThickness = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Thickness = v end
-            end
-        end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then
-            windowBorderTransparency = v
-            if windowFrame then
-                local ws = windowFrame:FindFirstChild("Border")
-                if ws then ws.Transparency = v end
-            end
-        end
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then
-            windowCorner = v
-            if windowFrame then
-                local wc = windowFrame:FindFirstChildOfClass("UICorner")
-                if wc then wc.CornerRadius = UDim.new(0, v) end
-            end
+        local newBg = pick(tbl, "Background", "background")
+        if newBg then
+            local c = pick(newBg, "color", "Color")
+            if c then bg.color = c if windowFrame then windowFrame.BackgroundColor3 = c end end
+            local t = pick(newBg, "transparency", "Transparency")
+            if t then bg.transparency = t if windowFrame then windowFrame.BackgroundTransparency = t end end
         end
 
-        v = pick(tbl, "Font", "font")
-        if v ~= nil then
-            font = v
-            for _, label in pairs(labels) do label.Font = v end
+        local newBorderCfg = pick(tbl, "Border", "border")
+        if newBorderCfg then
+            local c = pick(newBorderCfg, "color", "Color")
+            if c then borderCfg.color = c if windowStrokeObj then windowStrokeObj.Color = c end end
+            local th = pick(newBorderCfg, "thickness", "Thickness")
+            if th then borderCfg.thickness = th if windowStrokeObj then windowStrokeObj.Thickness = th end end
+            local t = pick(newBorderCfg, "transparency", "Transparency")
+            if t then borderCfg.transparency = t if windowStrokeObj then windowStrokeObj.Transparency = t end end
         end
 
-        v = pick(tbl, "ShowWindow", "showWindow")
-        if v ~= nil then api:ShowWindow(v) end
+        local newCornerCfg = pick(tbl, "Corner", "corner")
+        if newCornerCfg then
+            local r = pick(newCornerCfg, "radius", "Radius")
+            if r then cornerCfg.radius = r if windowCornerObj then windowCornerObj.CornerRadius = UDim.new(0, r) end end
+        end
+
+        local newFontCfg = pick(tbl, "Font", "font")
+        if newFontCfg then
+            local f = pick(newFontCfg, "text", "Text")
+            if f then
+                fontCfg.text = f
+                for _, label in pairs(labels) do label.Font = f end
+            end
+        end
     end
 
     function api:Remove()
         if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
+        RunService:UnbindFromRenderStep(renderName)
         if billboard then
             billboard:Destroy()
             billboard = nil
             container = nil
             windowFrame = nil
+            uiScale = nil
+            windowCornerObj = nil
+            windowStrokeObj = nil
         end
         labels, lineData = {}, {}
         pendingOrder, pendingData = {}, {}
@@ -1287,7 +1455,6 @@ function createInfoText(config)
 
     return api
 end
-
 
 local function createRadar(config)
     config = config or {}
@@ -1305,24 +1472,19 @@ local function createRadar(config)
         return nil
     end
 
+    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
 
-    local BackgroundColor    = pick(cw, "WindowColor", "windowColor")             or Color3.fromRGB(10, 10, 15)
-    local BackTransparency   = pick(cw, "WindowTransparency", "windowTransparency") or 0
-    local BorderColor        = pick(cw, "BorderColor", "borderColor")             or Color3.fromRGB(80, 80, 90)
-    local BorderThickness    = pick(cw, "BorderThickness", "borderThickness") or 4
-    local BorderTransparency = pick(cw, "BorderTransparency", "borderTransparency") or 0
-    local CornerRadius       = pick(cw, "CornerRadius", "cornerRadius") or 16
-    local TitleColor         = pick(cw, "TitleColor", "titleColor")               or Color3.fromRGB(235, 235, 235)
-    local TitleTransparency  = pick(cw, "TitleTransparency", "titleTransparency") or 0
-    local RadarColor         = pick(cw, "RadarColor", "radarColor")               or Color3.fromRGB(5, 5, 8)
-    local RadarTransparency  = pick(cw, "RadarTransparency", "radarTransparency") or 0
-    local GridColor          = pick(cw, "GridColor", "gridColor")                 or Color3.fromRGB(70, 70, 80)
-    local CrosshairColor     = pick(cw, "CrosshairColor", "crosshairColor")       or Color3.fromRGB(45, 45, 50)
+    local bg           = pick(cw, "Background", "background") or {}
+    local borderCfg    = pick(cw, "Border", "border") or {}
+    local cornerCfg    = pick(cw, "Corner", "corner") or {}
+    local titleCfg     = pick(cw, "Title", "title") or {}
+    local radarCfg     = pick(cw, "Radar", "radar") or {}
+    local gridCfg      = pick(cw, "Grid", "grid") or {}
+    local crosshairCfg = pick(cw, "Crosshair", "crosshair") or {}
+    local fontCfg      = pick(cw, "Font", "font") or {}
 
-    local titleFont = pick(cw, "TitleFont", "titleFont") or pick(config, "TitleFont", "titleFont") or Enum.Font.GothamBold
-    local textFont  = pick(cw, "Font", "font")           or pick(config, "Font", "font")           or Enum.Font.Gotham
-
+    -- ========= Основные =========
     local Name         = pick(config, "Name", "name")         or "CustomRadar"
     local Title        = pick(config, "Title", "title")       or "Radar"
     local Position     = pick(config, "Position", "position") or UDim2.new(0.03, 0, 0.3, 0)
@@ -1337,7 +1499,6 @@ local function createRadar(config)
     local targets = {}
     local WINDOW_SIZE, WINDOW_HEIGHT = 220, 260
     local RADAR_SIZE  = 190
-    local BORDER_SIZE = BorderThickness
 
     local gui = Instance.new("ScreenGui")
     gui.Name = Name
@@ -1353,19 +1514,19 @@ local function createRadar(config)
     frame.Name = "MainFrame"
     frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_HEIGHT)
     frame.Position = Position
-    frame.BackgroundColor3 = BackgroundColor
-    frame.BackgroundTransparency = BackTransparency
+    frame.BackgroundColor3 = pick(bg, "color", "Color") or Color3.fromRGB(10, 10, 15)
+    frame.BackgroundTransparency = pick(bg, "transparency", "Transparency") or 0
     frame.BorderSizePixel = 0
     frame.Parent = gui
 
     local frameCorner = Instance.new("UICorner")
-    frameCorner.CornerRadius = UDim.new(0, CornerRadius)
+    frameCorner.CornerRadius = UDim.new(0, pick(cornerCfg, "radius", "Radius") or 16)
     frameCorner.Parent = frame
 
     local frameStroke = Instance.new("UIStroke")
-    frameStroke.Color = BorderColor
-    frameStroke.Thickness = BORDER_SIZE
-    frameStroke.Transparency = BorderTransparency
+    frameStroke.Color = pick(borderCfg, "color", "Color") or Color3.fromRGB(80, 80, 90)
+    frameStroke.Thickness = pick(borderCfg, "thickness", "Thickness") or 4
+    frameStroke.Transparency = pick(borderCfg, "transparency", "Transparency") or 0
     frameStroke.Parent = frame
 
     local title = Instance.new("TextLabel")
@@ -1373,10 +1534,10 @@ local function createRadar(config)
     title.BackgroundTransparency = 1
     title.Position = UDim2.fromOffset(12, 4)
     title.Size = UDim2.new(1, -24, 0, 28)
-    title.Font = titleFont
+    title.Font = pick(fontCfg, "title", "Title") or Enum.Font.GothamBold
     title.Text = Title
-    title.TextColor3 = TitleColor
-    title.TextTransparency = TitleTransparency
+    title.TextColor3 = pick(titleCfg, "color", "Color") or Color3.fromRGB(235, 235, 235)
+    title.TextTransparency = pick(titleCfg, "transparency", "Transparency") or 0
     title.TextSize = 17
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = frame
@@ -1412,8 +1573,8 @@ local function createRadar(config)
     radar.Name = "Radar"
     radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
     radar.Position = UDim2.new(0.5, -RADAR_SIZE / 2, 0, 42)
-    radar.BackgroundColor3 = RadarColor
-    radar.BackgroundTransparency = RadarTransparency
+    radar.BackgroundColor3 = pick(radarCfg, "color", "Color") or Color3.fromRGB(5, 5, 8)
+    radar.BackgroundTransparency = pick(radarCfg, "transparency", "Transparency") or 0
     radar.BorderSizePixel = 0
     radar.ClipsDescendants = true
     radar.Parent = frame
@@ -1423,9 +1584,9 @@ local function createRadar(config)
     radarCorner.Parent = radar
 
     local radarStroke = Instance.new("UIStroke")
-    radarStroke.Color = BorderColor
+    radarStroke.Color = pick(borderCfg, "color", "Color") or Color3.fromRGB(80, 80, 90)
     radarStroke.Thickness = 3
-    radarStroke.Transparency = BorderTransparency
+    radarStroke.Transparency = pick(borderCfg, "transparency", "Transparency") or 0
     radarStroke.Parent = radar
 
     local function createCircle(csize, transparency)
@@ -1439,7 +1600,7 @@ local function createRadar(config)
         corner.CornerRadius = UDim.new(1, 0)
         corner.Parent = circle
         local stroke = Instance.new("UIStroke")
-        stroke.Color = GridColor
+        stroke.Color = pick(gridCfg, "color", "Color") or Color3.fromRGB(70, 70, 80)
         stroke.Thickness = 1
         stroke.Transparency = transparency or 0
         stroke.Parent = circle
@@ -1449,7 +1610,7 @@ local function createRadar(config)
     createCircle(0.42, 0)
 
     local horizontalLine = Instance.new("Frame")
-    horizontalLine.BackgroundColor3 = CrosshairColor
+    horizontalLine.BackgroundColor3 = pick(crosshairCfg, "color", "Color") or Color3.fromRGB(45, 45, 50)
     horizontalLine.BackgroundTransparency = 0.35
     horizontalLine.BorderSizePixel = 0
     horizontalLine.AnchorPoint = Vector2.new(0, 0.5)
@@ -1458,7 +1619,7 @@ local function createRadar(config)
     horizontalLine.Parent = radar
 
     local verticalLine = Instance.new("Frame")
-    verticalLine.BackgroundColor3 = CrosshairColor
+    verticalLine.BackgroundColor3 = pick(crosshairCfg, "color", "Color") or Color3.fromRGB(45, 45, 50)
     verticalLine.BackgroundTransparency = 0.35
     verticalLine.BorderSizePixel = 0
     verticalLine.AnchorPoint = Vector2.new(0.5, 0)
@@ -1488,7 +1649,7 @@ local function createRadar(config)
         old.text.AnchorPoint = Vector2.new(0.5, 1)
         old.text.Position = UDim2.new(0.5, 0, 0, -4)
         old.text.Size = UDim2.fromOffset(140, 18)
-        old.text.Font = textFont
+        old.text.Font = pick(fontCfg, "text", "Text") or Enum.Font.Gotham
         old.text.TextSize = 13
         old.text.TextXAlignment = Enum.TextXAlignment.Center
         old.text.ZIndex = 11
@@ -1686,53 +1847,80 @@ local function createRadar(config)
 
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
-        local v
 
-        v = pick(tbl, "WindowColor", "windowColor")
-        if v ~= nil then BackgroundColor = v frame.BackgroundColor3 = v end
-        v = pick(tbl, "WindowTransparency", "windowTransparency")
-        if v ~= nil then BackTransparency = v frame.BackgroundTransparency = v end
-        v = pick(tbl, "BorderColor", "borderColor")
-        if v ~= nil then BorderColor = v frameStroke.Color = v radarStroke.Color = v end
-        v = pick(tbl, "BorderThickness", "borderThickness")
-        if v ~= nil then BorderThickness = v frameStroke.Thickness = v end
-        v = pick(tbl, "BorderTransparency", "borderTransparency")
-        if v ~= nil then BorderTransparency = v frameStroke.Transparency = v radarStroke.Transparency = v end
-        v = pick(tbl, "CornerRadius", "cornerRadius")
-        if v ~= nil then CornerRadius = v frameCorner.CornerRadius = UDim.new(0, v) end
-        v = pick(tbl, "TitleColor", "titleColor")
-        if v ~= nil then TitleColor = v title.TextColor3 = v end
-        v = pick(tbl, "TitleTransparency", "titleTransparency")
-        if v ~= nil then TitleTransparency = v title.TextTransparency = v end
-        v = pick(tbl, "RadarColor", "radarColor")
-        if v ~= nil then RadarColor = v radar.BackgroundColor3 = v end
-        v = pick(tbl, "RadarTransparency", "radarTransparency")
-        if v ~= nil then RadarTransparency = v radar.BackgroundTransparency = v end
-        v = pick(tbl, "GridColor", "gridColor")
-        if v ~= nil then
-            GridColor = v
-            for _, child in ipairs(radar:GetChildren()) do
-                if child:IsA("Frame") then
-                    local s = child:FindFirstChildOfClass("UIStroke")
-                    if s then s.Color = v end
+        local newBg = pick(tbl, "Background", "background")
+        if newBg then
+            local c = pick(newBg, "color", "Color")
+            if c then bg.color = c frame.BackgroundColor3 = c end
+            local t = pick(newBg, "transparency", "Transparency")
+            if t then bg.transparency = t frame.BackgroundTransparency = t end
+        end
+
+        local newBorderCfg = pick(tbl, "Border", "border")
+        if newBorderCfg then
+            local c = pick(newBorderCfg, "color", "Color")
+            if c then borderCfg.color = c frameStroke.Color = c radarStroke.Color = c end
+            local th = pick(newBorderCfg, "thickness", "Thickness")
+            if th then borderCfg.thickness = th frameStroke.Thickness = th end
+            local t = pick(newBorderCfg, "transparency", "Transparency")
+            if t then borderCfg.transparency = t frameStroke.Transparency = t radarStroke.Transparency = t end
+        end
+
+        local newCornerCfg = pick(tbl, "Corner", "corner")
+        if newCornerCfg then
+            local r = pick(newCornerCfg, "radius", "Radius")
+            if r then cornerCfg.radius = r frameCorner.CornerRadius = UDim.new(0, r) end
+        end
+
+        local newTitleCfg = pick(tbl, "Title", "title")
+        if newTitleCfg then
+            local c = pick(newTitleCfg, "color", "Color")
+            if c then titleCfg.color = c title.TextColor3 = c end
+            local t = pick(newTitleCfg, "transparency", "Transparency")
+            if t then titleCfg.transparency = t title.TextTransparency = t end
+        end
+
+        local newRadarCfg = pick(tbl, "Radar", "radar")
+        if newRadarCfg then
+            local c = pick(newRadarCfg, "color", "Color")
+            if c then radarCfg.color = c radar.BackgroundColor3 = c end
+            local t = pick(newRadarCfg, "transparency", "Transparency")
+            if t then radarCfg.transparency = t radar.BackgroundTransparency = t end
+        end
+
+        local newGridCfg = pick(tbl, "Grid", "grid")
+        if newGridCfg then
+            local c = pick(newGridCfg, "color", "Color")
+            if c then
+                gridCfg.color = c
+                for _, child in ipairs(radar:GetChildren()) do
+                    if child:IsA("Frame") then
+                        local s = child:FindFirstChildOfClass("UIStroke")
+                        if s then s.Color = c end
+                    end
                 end
             end
         end
-        v = pick(tbl, "CrosshairColor", "crosshairColor")
-        if v ~= nil then
-            CrosshairColor = v
-            horizontalLine.BackgroundColor3 = v
-            verticalLine.BackgroundColor3 = v
+
+        local newCrosshairCfg = pick(tbl, "Crosshair", "crosshair")
+        if newCrosshairCfg then
+            local c = pick(newCrosshairCfg, "color", "Color")
+            if c then
+                crosshairCfg.color = c
+                horizontalLine.BackgroundColor3 = c
+                verticalLine.BackgroundColor3 = c
+            end
         end
 
-        v = pick(tbl, "TitleFont", "titleFont")
-        if v ~= nil then titleFont = v title.Font = v end
-        v = pick(tbl, "Font", "font")
-        if v ~= nil then
-            textFont = v
-            for _, obj in pairs(targetObjects) do
-                if obj.text then obj.text.Font = v end
+        local newFontCfg = pick(tbl, "Font", "font")
+        if newFontCfg then
+            local f = pick(newFontCfg, "text", "Text")
+            if f then
+                fontCfg.text = f
+                for _, obj in pairs(targetObjects) do if obj.text then obj.text.Font = f end end
             end
+            local tf = pick(newFontCfg, "title", "Title")
+            if tf then fontCfg.title = tf title.Font = tf end
         end
     end
 
