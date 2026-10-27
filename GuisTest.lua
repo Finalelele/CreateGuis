@@ -1042,17 +1042,11 @@ function createInfoText(config)
         local distance = (camera.CFrame.Position - adorneePos).Magnitude
         distance = math.max(distance, 0.1)
         
-        -- Вычисляем, сколько процентов размера нужно скинуть
-        -- Например, при studs = 5, dropPerStud = 0.01 (1% за 1 студ)
         local dropPerStud = 0.05 / math.max(studs, 0.01)
-        
-        -- fraction = 1.0 на 100 студах (если studs = 5)
         local fraction = math.clamp(distance * dropPerStud, 0, 1)
         
-        -- Линейно интерполируем от MaxScale к MinScale
         local scaleFactor = maxScale - (maxScale - minScale) * fraction
         
-        -- Если окно стало слишком маленьким (0 или меньше), полностью скрываем его
         if scaleFactor <= 0.01 then
             billboard.Enabled = false
         else
@@ -1065,6 +1059,11 @@ function createInfoText(config)
     local function updateSize(animate)
         if not billboard then return end
         basePixelSize = measureContent()
+
+        -- ВАЖНО: Обновляем размер контейнера, чтобы UIListLayout знал свои границы
+        if container then
+            container.Size = UDim2.fromOffset(basePixelSize.X, basePixelSize.Y)
+        end
 
         if not constantEnabled then
             billboard.Enabled = isActive
@@ -1117,7 +1116,7 @@ function createInfoText(config)
         windowStrokeObj.Transparency = pick(borderCfg, "transparency", "Transparency") or 0.15
         windowStrokeObj.Parent = windowFrame
 
-        -- Контейнер с текстом (строго по центру)
+        -- Контейнер с текстом
         container = Instance.new("Frame")
         container.Name = "Container"
         container.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1132,7 +1131,8 @@ function createInfoText(config)
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Выравниваем текст по центру
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.VerticalAlignment = Enum.VerticalAlignment.Center -- ВАЖНО: Центрируем по вертикали
         layout.Parent = container
 
         applyWindowLayout()
