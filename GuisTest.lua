@@ -872,18 +872,19 @@ function createInfoText(config)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
-    -- Ширина (по умолчанию auto = true)
+    -- Ширина
     local widthCfg = pick(config, "Width", "width") or {}
     local widthAuto = true 
     local wa = pick(widthCfg, "auto", "Auto")
     if wa ~= nil then widthAuto = wa == true end
     local widthSize = pick(widthCfg, "size", "Size") or 300
 
-    -- Настройки масштабирования (по умолчанию enabled = false)
+    -- Настройки масштабирования
     local constantCfg = pick(config, "ConstantSize", "constantSize")
     local constantEnabled = false
     local minScale = 0.1
     local maxScale = 1.5
+    local studs = 5
     
     if type(constantCfg) == "table" then
         local ce = pick(constantCfg, "enabled", "Enabled")
@@ -892,12 +893,11 @@ function createInfoText(config)
         if ms ~= nil then minScale = tonumber(ms) or minScale end
         local mxs = pick(constantCfg, "MaxScale", "maxScale")
         if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
+        local st = pick(constantCfg, "studs", "Studs")
+        if st ~= nil then studs = tonumber(st) or studs end
     elseif type(constantCfg) == "boolean" then
         constantEnabled = constantCfg
     end
-
-    -- Жестко зашитая дистанция (не настраивается)
-    local REFERENCE_DISTANCE = 10
 
     local showWindow = false
     local swConfig = pick(config, "ShowWindow", "showWindow")
@@ -969,7 +969,6 @@ function createInfoText(config)
     end
 
     local function applyWindowLayout()
-        -- Показываем или скрываем только ФОН. Текст остается видимым всегда.
         if windowFrame then windowFrame.Visible = showWindow end
     end
 
@@ -1043,13 +1042,24 @@ function createInfoText(config)
         local distance = (camera.CFrame.Position - adorneePos).Magnitude
         distance = math.max(distance, 0.1)
         
-        minScale = math.max(minScale, 0.01)
-        maxScale = math.max(maxScale, minScale)
-
-        local scaleFactor = math.clamp(REFERENCE_DISTANCE / distance, minScale, maxScale)
+        -- Вычисляем, сколько процентов размера нужно скинуть
+        -- Например, при studs = 5, dropPerStud = 0.01 (1% за 1 студ)
+        local dropPerStud = 0.05 / math.max(studs, 0.01)
         
-        if uiScale then uiScale.Scale = scaleFactor end
-        billboard.Size = UDim2.fromOffset(basePixelSize.X * scaleFactor, basePixelSize.Y * scaleFactor)
+        -- fraction = 1.0 на 100 студах (если studs = 5)
+        local fraction = math.clamp(distance * dropPerStud, 0, 1)
+        
+        -- Линейно интерполируем от MaxScale к MinScale
+        local scaleFactor = maxScale - (maxScale - minScale) * fraction
+        
+        -- Если окно стало слишком маленьким (0 или меньше), полностью скрываем его
+        if scaleFactor <= 0.01 then
+            billboard.Enabled = false
+        else
+            billboard.Enabled = isActive
+            if uiScale then uiScale.Scale = scaleFactor end
+            billboard.Size = UDim2.fromOffset(basePixelSize.X * scaleFactor, basePixelSize.Y * scaleFactor)
+        end
     end
 
     local function updateSize(animate)
@@ -1057,6 +1067,7 @@ function createInfoText(config)
         basePixelSize = measureContent()
 
         if not constantEnabled then
+            billboard.Enabled = isActive
             if uiScale then uiScale.Scale = 1 end
             local targetSize = UDim2.fromOffset(basePixelSize.X, basePixelSize.Y)
             if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
@@ -1084,7 +1095,7 @@ function createInfoText(config)
         billboard.Enabled = isActive
         billboard.Parent = adornee
 
-        -- Фон (отдельно от текста)
+        -- Фон
         windowFrame = Instance.new("Frame")
         windowFrame.Name = "Window"
         windowFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -1106,10 +1117,11 @@ function createInfoText(config)
         windowStrokeObj.Transparency = pick(borderCfg, "transparency", "Transparency") or 0.15
         windowStrokeObj.Parent = windowFrame
 
-        -- Текст (крепится напрямую к billboard, не зависит от фона)
+        -- Контейнер с текстом (строго по центру)
         container = Instance.new("Frame")
         container.Name = "Container"
-        container.Size = UDim2.new(1, 0, 1, 0)
+        container.AnchorPoint = Vector2.new(0.5, 0.5)
+        container.Position = UDim2.new(0.5, 0, 0.5, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
         container.Parent = billboard 
@@ -1120,7 +1132,7 @@ function createInfoText(config)
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Выравниваем по центру
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Выравниваем текст по центру
         layout.Parent = container
 
         applyWindowLayout()
@@ -1286,7 +1298,16 @@ function createInfoText(config)
         updateSize(true)
     end
 
-    function api:Visible(state) isActive = state if billboard then billboard.Enabled = state end end
+    function api:Visible(state) 
+        isActive = state 
+        if billboard then 
+            if constantEnabled then
+                applyDynamicSize()
+            else
+                billboard.Enabled = isActive 
+            end
+        end 
+    end
 
     function api:ShowWindow(state)
         showWindow = state == true
@@ -1365,11 +1386,13 @@ function createInfoText(config)
             if ms ~= nil then minScale = tonumber(ms) or minScale end
             local mxs = pick(v, "MaxScale", "maxScale")
             if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
+            local st = pick(v, "studs", "Studs")
+            if st ~= nil then studs = tonumber(st) or studs end
             
-            if not constantEnabled then updateSize(true) end
+            if not constantEnabled then updateSize(true) else applyDynamicSize() end
         elseif type(v) == "boolean" then
             constantEnabled = v
-            if not constantEnabled then updateSize(true) end
+            if not constantEnabled then updateSize(true) else applyDynamicSize() end
         end
 
         v = pick(tbl, "OutlineColor", "outlineColor")
