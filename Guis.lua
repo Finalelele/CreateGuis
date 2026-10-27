@@ -327,6 +327,14 @@ function createInfoGui(config)
 
         ui.text.Text = saved.text.text or ""
         ui.text.TextColor3 = saved.text.color or pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255)
+        
+        -- Поддержка кастомного шрифта для строки
+        if saved.text.font then
+            ui.text.Font = saved.text.font
+        else
+            ui.text.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
+        end
+
         applyOutline(ui.text, saved.text)
 
         if saved.toggle then
@@ -493,6 +501,7 @@ function createInfoGui(config)
         if data.outlineColor ~= nil then saved.text.outlineColor = data.outlineColor end
         if data.outlineSize ~= nil then saved.text.outlineSize = data.outlineSize == false and nil or data.outlineSize end
         if data.order ~= nil then saved.order = data.order == false and nil or data.order end
+        if data.text and data.text.font ~= nil then saved.text.font = data.text.font end -- Кастомный шрифт
 
         if data.toggle ~= nil then
             if saved.toggle == nil then saved.toggle = { value = false, side = "right" } end
@@ -536,6 +545,8 @@ function createInfoGui(config)
             if patch.outlineColor ~= nil then saved.text.outlineColor = patch.outlineColor end
             if patch.outlineSize ~= nil then saved.text.outlineSize = patch.outlineSize == false and nil or patch.outlineSize end
             if patch.order ~= nil then saved.order = patch.order == false and nil or patch.order end
+            if patch.text and patch.text.font ~= nil then saved.text.font = patch.text.font end
+            
             if patch.toggle ~= nil then
                 if saved.toggle == nil then saved.toggle = { value = false, side = "right" } end
                 for k, v in pairs(patch.toggle) do saved.toggle[k] = v end
@@ -824,7 +835,11 @@ function createInfoGui(config)
             local f = pick(newFontCfg, "text", "Text")
             if f then
                 fontCfg.text = f
-                for _, ui in pairs(labels) do ui.text.Font = f end
+                for _, ui in pairs(labels) do 
+                    if not lineData[ui.frame.Name].text.font then
+                        ui.text.Font = f 
+                    end
+                end
             end
             local tf = pick(newFontCfg, "title", "Title")
             if tf then fontCfg.title = tf titleLabel.Font = tf end
@@ -872,18 +887,19 @@ function createInfoText(config)
     local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
     local zIndex = pick(config, "ZIndex", "zIndex") or 1
 
-    -- Ширина (по умолчанию auto = true)
+    -- Ширина
     local widthCfg = pick(config, "Width", "width") or {}
     local widthAuto = true 
     local wa = pick(widthCfg, "auto", "Auto")
     if wa ~= nil then widthAuto = wa == true end
     local widthSize = pick(widthCfg, "size", "Size") or 300
 
-    -- Настройки масштабирования (по умолчанию enabled = false)
+    -- Настройки масштабирования
     local constantCfg = pick(config, "ConstantSize", "constantSize")
     local constantEnabled = false
     local minScale = 0.1
     local maxScale = 1.5
+    local studs = 5
     
     if type(constantCfg) == "table" then
         local ce = pick(constantCfg, "enabled", "Enabled")
@@ -892,12 +908,11 @@ function createInfoText(config)
         if ms ~= nil then minScale = tonumber(ms) or minScale end
         local mxs = pick(constantCfg, "MaxScale", "maxScale")
         if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
+        local st = pick(constantCfg, "studs", "Studs")
+        if st ~= nil then studs = tonumber(st) or studs end
     elseif type(constantCfg) == "boolean" then
         constantEnabled = constantCfg
     end
-
-    -- Жестко зашитая дистанция (не настраивается)
-    local REFERENCE_DISTANCE = 10
 
     local showWindow = false
     local swConfig = pick(config, "ShowWindow", "showWindow")
@@ -969,7 +984,6 @@ function createInfoText(config)
     end
 
     local function applyWindowLayout()
-        -- Показываем или скрываем только ФОН. Текст остается видимым всегда.
         if windowFrame then windowFrame.Visible = showWindow end
     end
 
@@ -1031,7 +1045,12 @@ function createInfoText(config)
         local adorneePos
         if adornee:IsA("Model") then
             local primary = adornee.PrimaryPart or adornee:FindFirstChild("HumanoidRootPart") or adornee:FindFirstChildWhichIsA("BasePart")
-            if primary then adorneePos = primary.Position else return end
+            if primary then 
+                adorneePos = primary.Position 
+            else 
+                local success, pivot = pcall(function() return adornee:GetPivot().Position end)
+                if success then adorneePos = pivot else return end
+            end
         elseif adornee:IsA("BasePart") then
             adorneePos = adornee.Position
         elseif adornee:IsA("Attachment") then
@@ -1040,23 +1059,34 @@ function createInfoText(config)
             return
         end
 
+        -- ВАЖНО: Расстояние считается напрямую от позиции камеры (Spectate работает корректно)
         local distance = (camera.CFrame.Position - adorneePos).Magnitude
         distance = math.max(distance, 0.1)
         
-        minScale = math.max(minScale, 0.01)
-        maxScale = math.max(maxScale, minScale)
-
-        local scaleFactor = math.clamp(REFERENCE_DISTANCE / distance, minScale, maxScale)
+        local dropPerStud = 0.05 / math.max(studs, 0.01)
+        local fraction = math.clamp(distance * dropPerStud, 0, 1)
         
-        if uiScale then uiScale.Scale = scaleFactor end
-        billboard.Size = UDim2.fromOffset(basePixelSize.X * scaleFactor, basePixelSize.Y * scaleFactor)
+        local scaleFactor = maxScale - (maxScale - minScale) * fraction
+        
+        if scaleFactor <= 0.01 then
+            billboard.Enabled = false
+        else
+            billboard.Enabled = isActive
+            if uiScale then uiScale.Scale = scaleFactor end
+            billboard.Size = UDim2.fromOffset(basePixelSize.X * scaleFactor, basePixelSize.Y * scaleFactor)
+        end
     end
 
     local function updateSize(animate)
         if not billboard then return end
         basePixelSize = measureContent()
 
+        if container then
+            container.Size = UDim2.fromOffset(basePixelSize.X, basePixelSize.Y)
+        end
+
         if not constantEnabled then
+            billboard.Enabled = isActive
             if uiScale then uiScale.Scale = 1 end
             local targetSize = UDim2.fromOffset(basePixelSize.X, basePixelSize.Y)
             if activeSizeTween then activeSizeTween:Cancel() activeSizeTween = nil end
@@ -1084,7 +1114,7 @@ function createInfoText(config)
         billboard.Enabled = isActive
         billboard.Parent = adornee
 
-        -- Фон (отдельно от текста)
+        -- Фон
         windowFrame = Instance.new("Frame")
         windowFrame.Name = "Window"
         windowFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -1106,10 +1136,11 @@ function createInfoText(config)
         windowStrokeObj.Transparency = pick(borderCfg, "transparency", "Transparency") or 0.15
         windowStrokeObj.Parent = windowFrame
 
-        -- Текст (крепится напрямую к billboard, не зависит от фона)
+        -- Контейнер с текстом
         container = Instance.new("Frame")
         container.Name = "Container"
-        container.Size = UDim2.new(1, 0, 1, 0)
+        container.AnchorPoint = Vector2.new(0.5, 0.5)
+        container.Position = UDim2.new(0.5, 0, 0.5, 0)
         container.BackgroundTransparency = 1
         container.ZIndex = zIndex + 1
         container.Parent = billboard 
@@ -1120,7 +1151,8 @@ function createInfoText(config)
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 2)
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Выравниваем по центру
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.VerticalAlignment = Enum.VerticalAlignment.Center
         layout.Parent = container
 
         applyWindowLayout()
@@ -1142,8 +1174,17 @@ function createInfoText(config)
         local label = labels[id]
         local saved = lineData[id]
         if not label or not saved then return end
+        
         label.Text = saved.text.text or ""
         label.TextColor3 = saved.text.color or Color3.fromRGB(255, 255, 255)
+        
+        -- Поддержка кастомного шрифта для строки
+        if saved.text.font then
+            label.Font = saved.text.font
+        else
+            label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
+        end
+
         applyOutline(label, saved.text)
     end
 
@@ -1205,6 +1246,7 @@ function createInfoText(config)
         if data.outlineColor ~= nil then saved.text.outlineColor = data.outlineColor end
         if data.outlineSize ~= nil then saved.text.outlineSize = data.outlineSize == false and nil or data.outlineSize end
         if data.order ~= nil then saved.order = data.order == false and nil or data.order end
+        if data.text and data.text.font ~= nil then saved.text.font = data.text.font end -- Кастомный шрифт
 
         renderTextLine(id)
         updateSize(true)
@@ -1229,6 +1271,7 @@ function createInfoText(config)
             if patch.outlineColor ~= nil then saved.text.outlineColor = patch.outlineColor end
             if patch.outlineSize ~= nil then saved.text.outlineSize = patch.outlineSize == false and nil or patch.outlineSize end
             if patch.order ~= nil then saved.order = patch.order == false and nil or patch.order end
+            if patch.text and patch.text.font ~= nil then saved.text.font = patch.text.font end
             renderTextLine(id)
         end
     end
@@ -1286,7 +1329,16 @@ function createInfoText(config)
         updateSize(true)
     end
 
-    function api:Visible(state) isActive = state if billboard then billboard.Enabled = state end end
+    function api:Visible(state) 
+        isActive = state 
+        if billboard then 
+            if constantEnabled then
+                applyDynamicSize()
+            else
+                billboard.Enabled = isActive 
+            end
+        end 
+    end
 
     function api:ShowWindow(state)
         showWindow = state == true
@@ -1365,11 +1417,13 @@ function createInfoText(config)
             if ms ~= nil then minScale = tonumber(ms) or minScale end
             local mxs = pick(v, "MaxScale", "maxScale")
             if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
+            local st = pick(v, "studs", "Studs")
+            if st ~= nil then studs = tonumber(st) or studs end
             
-            if not constantEnabled then updateSize(true) end
+            if not constantEnabled then updateSize(true) else applyDynamicSize() end
         elseif type(v) == "boolean" then
             constantEnabled = v
-            if not constantEnabled then updateSize(true) end
+            if not constantEnabled then updateSize(true) else applyDynamicSize() end
         end
 
         v = pick(tbl, "OutlineColor", "outlineColor")
@@ -1432,7 +1486,11 @@ function createInfoText(config)
             local f = pick(newFontCfg, "text", "Text")
             if f then
                 fontCfg.text = f
-                for _, label in pairs(labels) do label.Font = f end
+                for id, label in pairs(labels) do 
+                    if not lineData[id].text.font then
+                        label.Font = f 
+                    end
+                end
             end
         end
     end
@@ -1456,7 +1514,7 @@ function createInfoText(config)
     return api
 end
 
-local function createRadar(config)
+function createRadar(config)
     config = config or {}
 
     local Players          = game:GetService("Players")
@@ -1935,5 +1993,5 @@ end
 return {
     createInfoGui  = createInfoGui,
     createInfoText = createInfoText,
-    createRadar     = createRadar
+    createRadar = createRadar
 }
