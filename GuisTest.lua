@@ -639,6 +639,30 @@ function createInfoGui(config)
         if isEdgeMode() and not collapsed then updateFrameSize(false) end
     end
 
+    local function setText(lines)
+        if not lines then return end
+
+        if lines.id then
+            setLine(lines)
+        elseif #lines > 0 and type(lines[1]) == "table" then
+            for _, data in ipairs(lines) do
+                if type(data) == "table" then
+                    if data.id then
+                        setLine(data)
+                    else
+                        applyGlobalPatch(data)
+                    end
+                end
+            end
+        else
+            applyGlobalPatch(lines)
+        end
+
+        updateOrder()
+        updateFrameSize(true)
+        if not collapsed then setContentTransparency(0, false) end
+    end
+
     header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
