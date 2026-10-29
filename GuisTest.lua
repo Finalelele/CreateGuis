@@ -1,20 +1,3 @@
---[[
-    GuiModule: createInfoGui / createInfoText / createRadar + Presets
-
-    Новые ключи CustomWindow (все необязательные):
-        Accent   = {color = Color3}              -- главный акцентный цвет (тоглы, подсветки, свип радара)
-        Depth    = {strength = 1}  | false | n  -- объём: градиенты, блик, светлая кромка (0 = выкл)
-        Shadow   = {color, transparency, size}   -- мягкая тень / цветное свечение
-
-    Готовые сеты:
-        local M = loadstring(...)()
-        createInfoGui({ CustomWindow = M.Presets.Blue })      -- .Green / .Red
-        M.Presets.Make(Color3 accent, Color3 deep, {transparency = 0.3})  -- свой сет
-
-    Любой сет можно применить на лету:
-        gui:SetCustomWindow(M.Presets.Red)
-]]
-
 local TweenService = game:GetService("TweenService")
 
 local Fx = {}
@@ -40,7 +23,6 @@ end
 
 function Fx.lighten(c, a) return c:Lerp(WHITE, a) end
 
--- сила эффекта "объём" из CustomWindow.Depth
 function Fx.depthStrength(cw)
     local d = pick(cw, "Depth", "depth")
     if d == false then return 0 end
@@ -52,7 +34,6 @@ function Fx.depthStrength(cw)
     return 1
 end
 
--- градиент "белый -> тёмный" (умножается на цвет объекта, даёт ощущение объёма)
 function Fx.shade(strength, amount)
     local v = math.clamp(1 - amount * strength, 0, 1)
     return ColorSequence.new(WHITE, Color3.new(v, v, v))
@@ -67,8 +48,6 @@ local function tween(obj, info, props, instant)
     end
 end
 
--- Мягкая тень/свечение (9-slice). Должна быть СОСЕДОМ окна, а не ребёнком,
--- и не внутри фрейма с ClipsDescendants (иначе обрежется).
 function Fx.newShadow(parent, cfg, z)
     local pad = tonumber(pick(cfg, "size", "Size")) or 24
     local s = Instance.new("ImageLabel")
@@ -88,7 +67,6 @@ function Fx.newShadow(parent, cfg, z)
     return s
 end
 
--- Градиентная рамка: светлее сверху, темнее и прозрачнее снизу
 function Fx.addBorderGradient(stroke, color, strength)
     local g = Instance.new("UIGradient")
     g.Rotation = 90
@@ -105,7 +83,6 @@ function Fx.addBorderGradient(stroke, color, strength)
     return obj
 end
 
--- Объём: градиент фона + верхний блик (Sheen) + светлая кромка (Gloss)
 function Fx.addDepth(body, strength, z)
     local parts = {}
 
@@ -165,6 +142,7 @@ function createInfoGui(config)
     local UserInputService = game:GetService("UserInputService")
     local CoreGui          = game:GetService("CoreGui")
     local HttpService      = game:GetService("HttpService")
+    local TextService      = game:GetService("TextService")
 
     local function resolveUDim2(val, default)
         if typeof(val) == "UDim2" then return val end
@@ -178,7 +156,6 @@ function createInfoGui(config)
         return default
     end
 
-    -- ========= CustomWindow (копируем, чтобы пресеты не мутировали) =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
     local function sub(...) return Fx.copy(pick(cw, ...)) end
 
@@ -194,6 +171,7 @@ function createInfoGui(config)
     local lineTextCfg   = sub("LineText", "lineText")
     local fontCfg       = sub("Font", "font")
     local accentCfg     = sub("Accent", "accent")
+    local toggleImageCfg = sub("ToggleImage", "toggleImage")
     local depth         = Fx.depthStrength(cw)
 
     local function accentColor()
@@ -209,7 +187,6 @@ function createInfoGui(config)
     local function lineTextColor() return pick(lineTextCfg, "color", "Color") or Color3.fromRGB(235, 238, 248) end
     local function tShadow() return pick(shadowCfg, "transparency", "Transparency") or 0.55 end
 
-    -- ========= Основные =========
     local guiName   = pick(config, "Name", "name") or "CustomWindow"
     local title     = pick(config, "Title", "title") or "Window"
     local size      = resolveUDim2(pick(config, "Size", "size"), UDim2.fromOffset(200, 500))
@@ -220,7 +197,6 @@ function createInfoGui(config)
     local reload    = pick(config, "Reload", "reload")
     if reload == nil then reload = true end
 
-    -- ========= Авто-размер =========
     local autoSizeCfg        = pick(config, "AutoSize", "autoSize") or {}
     local autoSizeEnabled    = pick(autoSizeCfg, "Enabled", "enabled")
     if autoSizeEnabled == nil then autoSizeEnabled = true end
@@ -232,7 +208,6 @@ function createInfoGui(config)
     local autoSizeSide = pick(autoSizeCfg, "side", "Side") or "down"
     local isHorizontal = (autoSizeSide == "left" or autoSizeSide == "right")
 
-    -- ========= Сохранение позиции =========
     local savePosCfg = pick(config, "SavePos", "savePos") or {}
     local savePosEnabled = pick(savePosCfg, "enabled", "Enabled") == true
     local savePosId = pick(savePosCfg, "id", "Id", "ID")
@@ -242,9 +217,7 @@ function createInfoGui(config)
     local function loadSaveData()
         if not savePosId then return end
         if isfile and readfile and isfile(saveFileName) then
-            local success, result = pcall(function()
-                return HttpService:JSONDecode(readfile(saveFileName))
-            end)
+            local success, result = pcall(function() return HttpService:JSONDecode(readfile(saveFileName)) end)
             if success and type(result) == "table" then saveData = result end
         end
     end
@@ -269,7 +242,6 @@ function createInfoGui(config)
     local linePadding   = 2
     local EDGE_MARGIN   = 12
 
-    -- размеры пилюли-тоглов
     local TRACK_W, TRACK_H, KNOB_H = 34, 18, 14
 
     local tweenTime    = pick(config, "TweenTime", "tweenTime") or 0.22
@@ -297,7 +269,6 @@ function createInfoGui(config)
     screen:SetAttribute("Reload", reload)
     screen.Parent = CoreGui
 
-    -- root: позиция/размер/масштаб/перетаскивание. Не клипает, поэтому тень видна.
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
     frame.Size = UDim2.fromOffset(size.X.Offset, headerHeight)
@@ -322,10 +293,8 @@ function createInfoGui(config)
     uiScale.Scale = scale
     uiScale.Parent = frame
 
-    -- тень (сосед body, ZIndex ниже)
     local shadow = Fx.newShadow(frame, shadowCfg, 0)
 
-    -- body: фон, рамка, скругление, клип содержимого
     local body = Instance.new("Frame")
     body.Name = "Body"
     body.Size = UDim2.new(1, 0, 1, 0)
@@ -351,7 +320,6 @@ function createInfoGui(config)
 
     local depthParts = Fx.addDepth(body, depth, 1)
 
-    -- шапка (скругление даёт клип body)
     local header = Instance.new("Frame")
     header.Name = "Header"
     header.Size = UDim2.new(1, 0, 0, headerHeight)
@@ -360,7 +328,13 @@ function createInfoGui(config)
     header.BorderSizePixel = 0
     header.Active = true
     header.ZIndex = 3
+    header.ClipsDescendants = true
     header.Parent = body
+
+    -- ИСПРАВЛЕНИЕ 1: Скругление самой шапки
+    local headerCorner = Instance.new("UICorner")
+    headerCorner.CornerRadius = UDim.new(0, radius())
+    headerCorner.Parent = header
 
     local headerGrad = Instance.new("UIGradient")
     headerGrad.Rotation = 90
@@ -415,7 +389,6 @@ function createInfoGui(config)
     titleLabel.ZIndex = 4
     titleLabel.Parent = header
 
-    -- кнопка сворачивания в виде объёмной пилюли
     local function toggleBaseColor() return pick(lineToggleCfg, "color", "Color") or Color3.fromRGB(40, 46, 66) end
     local function toggleTextColor() return pick(lineToggleCfg, "textColor", "TextColor") or Color3.fromRGB(215, 220, 235) end
 
@@ -450,18 +423,25 @@ function createInfoGui(config)
     local toggleScale = Instance.new("UIScale")
     toggleScale.Parent = toggle
 
-    local arrow = Instance.new("TextLabel")
+    -- ИСПРАВЛЕНИЕ 3: Поддержка картинок для стрелочки
+    local arrow = Instance.new("ImageLabel")
     arrow.Name = "Arrow"
     arrow.Size = UDim2.new(1, 0, 1, 0)
     arrow.BackgroundTransparency = 1
-    arrow.Text = "⌃"
-    arrow.TextColor3 = toggleTextColor()
-    arrow.Font = Enum.Font.GothamBold
-    arrow.TextSize = 15
     arrow.ZIndex = 6
     arrow.Parent = toggle
 
-    -- контейнер строк
+    local arrowText = Instance.new("TextLabel")
+    arrowText.Name = "ArrowText"
+    arrowText.Size = UDim2.new(1, 0, 1, 0)
+    arrowText.BackgroundTransparency = 1
+    arrowText.Text = "⌃"
+    arrowText.TextColor3 = toggleTextColor()
+    arrowText.Font = Enum.Font.GothamBold
+    arrowText.TextSize = 15
+    arrowText.ZIndex = 7
+    arrowText.Parent = toggle
+
     local scrolling = Instance.new("ScrollingFrame")
     scrolling.Name = "Container"
     scrolling.Position = UDim2.new(0, 0, 0, headerHeight)
@@ -544,7 +524,10 @@ function createInfoGui(config)
         else
             if autoSizeEnabled then
                 if isHorizontal then
-                    targetWidth = math.clamp(contentW + 20, 50, maxX)
+                    -- ИСПРАВЛЕНИЕ 2: Минимальная ширина = заголовок + тогл
+                    local titleWidth = TextService:GetTextSize(titleLabel.Text, titleLabel.TextSize, titleLabel.Font, Vector2.new(10000, 10000)).X
+                    local minW = titleWidth + 66
+                    targetWidth = math.max(minW, math.min(contentW + 20, maxX))
                     targetHeight = math.clamp(headerHeight + contentH + bottomPadding, headerHeight, maxY)
                 else
                     targetWidth = maxX
@@ -660,7 +643,6 @@ function createInfoGui(config)
             local active = t.value == true
             local left = (t.side == "left")
 
-            -- место под пилюлю выделяем через UIPadding (работает и в горизонтальном режиме)
             ui.padding.PaddingLeft   = UDim.new(0, left and (8 + TRACK_W + 8) or 8)
             ui.padding.PaddingRight  = UDim.new(0, left and 8 or (8 + TRACK_W + 8))
             ui.padding.PaddingTop    = UDim.new(0, 5)
@@ -686,7 +668,6 @@ function createInfoGui(config)
             ui.glow.ImageColor3 = onColor
             tween(ui.glow, quickInfo, { ImageTransparency = active and 0.6 or 1 }, instant)
 
-            -- ручка: пружинит и растягивается при нажатии
             local kw = (ui.pressed == true) and (KNOB_H + 4) or KNOB_H
             local kpos = active and UDim2.new(1, -(kw + 2), 0.5, -KNOB_H / 2) or UDim2.new(0, 2, 0.5, -KNOB_H / 2)
             tween(ui.knob, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
@@ -742,7 +723,6 @@ function createInfoGui(config)
             padding.PaddingBottom = UDim.new(0, 3)
             padding.Parent = lineFrame
 
-            -- свечение под пилюлей (сосед, ZIndex 0)
             local glow = Instance.new("ImageLabel")
             glow.Name = "ToggleGlow"
             glow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -770,7 +750,6 @@ function createInfoGui(config)
             label.ZIndex = 1
             label.Parent = lineFrame
 
-            -- пилюля-трек
             local track = Instance.new("Frame")
             track.Name = "ToggleTrack"
             track.Size = UDim2.fromOffset(TRACK_W, TRACK_H)
@@ -794,7 +773,6 @@ function createInfoGui(config)
             trackStroke.Color = Color3.fromRGB(88, 95, 120)
             trackStroke.Parent = track
 
-            -- верхний блик внутри пилюли
             local shine = Instance.new("Frame")
             shine.Name = "Shine"
             shine.Size = UDim2.new(1, -12, 0, 1)
@@ -854,7 +832,6 @@ function createInfoGui(config)
             track.InputBegan:Connect(onDown)
             knob.InputBegan:Connect(onDown)
 
-            -- подсветка строки с тоглом при наведении
             lineFrame.MouseEnter:Connect(function()
                 local s = lineData[id]
                 if s and s.toggle then
@@ -973,13 +950,36 @@ function createInfoGui(config)
 
     local function setCollapsed(state, animate)
         collapsed = state == true
-        tween(arrow, tweenInfo, { Rotation = collapsed and 180 or 0 }, not animate)
+        
+        -- ИСПРАВЛЕНИЕ 3: Картинки для стрелочки
+        local imgOpened = pick(toggleImageCfg, "opened", "Opened")
+        local imgCollapsed = pick(toggleImageCfg, "collapsed", "Collapsed")
+
+        if collapsed then
+            if imgCollapsed then
+                arrow.Image = imgCollapsed
+                arrowText.Visible = false
+            else
+                arrow.Image = ""
+                arrowText.Text = "⌄"
+                arrowText.Visible = true
+            end
+        else
+            if imgOpened then
+                arrow.Image = imgOpened
+                arrowText.Visible = false
+            else
+                arrow.Image = ""
+                arrowText.Text = "⌃"
+                arrowText.Visible = true
+            end
+        end
+
         if collapsed then setContentTransparency(1, not animate) end
         updateFrameSize(animate)
         if not collapsed then setContentTransparency(0, not animate) end
     end
 
-    -- ===== анимация появления / скрытия =====
     local function playIntro()
         body.BackgroundTransparency = 1
         header.BackgroundTransparency = 1
@@ -1014,13 +1014,23 @@ function createInfoGui(config)
 
     for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
     updateOrder()
-    arrow.Rotation = collapsed and 180 or 0
+    
+    -- Инициализация состояния стрелочки при старте
+    local initImgOpened = pick(toggleImageCfg, "opened", "Opened")
+    local initImgCollapsed = pick(toggleImageCfg, "collapsed", "Collapsed")
+    if collapsed then
+        if initImgCollapsed then arrow.Image = initImgCollapsed arrowText.Visible = false
+        else arrowText.Text = "⌄" end
+    else
+        if initImgOpened then arrow.Image = initImgOpened arrowText.Visible = false
+        else arrowText.Text = "⌃" end
+    end
+
     if collapsed then setContentTransparency(1, true) end
     updateFrameSize(false)
     task.defer(function() if not collapsed then updateFrameSize(false) end end)
     playIntro()
 
-    -- сброс "нажатого" состояния ручки
     connect(UserInputService.InputEnded, function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
@@ -1077,16 +1087,15 @@ function createInfoGui(config)
         if input == dragInput then updateDrag(input) end
     end)
 
-    -- кнопка сворачивания: наведение / нажатие
     local hoverInfo = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     connect(toggle.MouseEnter, function()
         tween(toggle, hoverInfo, { BackgroundColor3 = accentColor(), BackgroundTransparency = 0.02 })
-        tween(arrow, hoverInfo, { TextColor3 = WHITE })
+        tween(arrowText, hoverInfo, { TextColor3 = WHITE })
         tween(toggleStroke, hoverInfo, { Transparency = 0.6 })
     end)
     connect(toggle.MouseLeave, function()
         tween(toggle, hoverInfo, { BackgroundColor3 = toggleBaseColor(), BackgroundTransparency = 0.1 })
-        tween(arrow, hoverInfo, { TextColor3 = toggleTextColor() })
+        tween(arrowText, hoverInfo, { TextColor3 = toggleTextColor() })
         tween(toggleStroke, hoverInfo, { Transparency = 0.86 })
         tween(toggleScale, hoverInfo, { Scale = 1 })
     end)
@@ -1252,7 +1261,6 @@ function createInfoGui(config)
         updateFrameSize(true)
     end
 
-    -- Применяется плавно; принимает и пресеты (api:SetCustomWindow(Presets.Red))
     function api:SetCustomWindow(tbl)
         if type(tbl) ~= "table" then return end
         local oldLineColor = lineTextColor()
@@ -1314,7 +1322,7 @@ function createInfoGui(config)
         n = pick(tbl, "Corner", "corner")
         if n then
             local r = pick(n, "radius", "Radius")
-            if r then cornerCfg.radius = r corner.CornerRadius = UDim.new(0, r) end
+            if r then cornerCfg.radius = r corner.CornerRadius = UDim.new(0, r) headerCorner.CornerRadius = UDim.new(0, r) end
         end
 
         n = pick(tbl, "Shadow", "shadow")
@@ -1332,7 +1340,7 @@ function createInfoGui(config)
             local c = pick(n, "color", "Color")
             if c then lineToggleCfg.color = c tween(toggle, tweenInfo, { BackgroundColor3 = c }) end
             local tc = pick(n, "textColor", "TextColor")
-            if tc then lineToggleCfg.textColor = tc tween(arrow, tweenInfo, { TextColor3 = tc }) end
+            if tc then lineToggleCfg.textColor = tc tween(arrowText, tweenInfo, { TextColor3 = tc }) end
         end
 
         n = pick(tbl, "Scrollbar", "scrollbar")
@@ -1366,6 +1374,12 @@ function createInfoGui(config)
             if tf then fontCfg.title = tf titleLabel.Font = tf end
         end
 
+        n = pick(tbl, "ToggleImage", "toggleImage")
+        if n then
+            toggleImageCfg = n
+            setCollapsed(collapsed, false)
+        end
+
         if pick(tbl, "Depth", "depth") ~= nil then
             depth = Fx.depthStrength(tbl)
             depthParts.update(depth)
@@ -1385,9 +1399,8 @@ function createInfoGui(config)
     return api
 end
 
-
 --====================================================================
---  createInfoText  (BillboardGui поверх объекта)
+--  createInfoText
 --====================================================================
 function createInfoText(config)
     config = config or {}
@@ -1395,7 +1408,6 @@ function createInfoText(config)
     local RunService  = game:GetService("RunService")
     local TextService = game:GetService("TextService")
 
-    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
     local function sub(...) return Fx.copy(pick(cw, ...)) end
 
@@ -1414,7 +1426,6 @@ function createInfoText(config)
     local function radius()  return pick(cornerCfg, "radius", "Radius") or 8 end
     local function tShadow() return pick(shadowCfg, "transparency", "Transparency") or 0.6 end
 
-    -- ========= Основные =========
     local name         = pick(config, "Name", "name")         or "GhostRoomESP"
     local center       = pick(config, "Center", "center")
     local offset       = pick(config, "Offset", "offset")     or Vector3.new(0, 3, 0)
@@ -1518,7 +1529,6 @@ function createInfoText(config)
         end
     end
 
-    -- Окно плавно появляется/исчезает (CanvasGroup.GroupTransparency + тень)
     local function applyWindowLayout(animate)
         if not windowFrame then return end
         local gt = showWindow and 0 or 1
@@ -1571,31 +1581,23 @@ function createInfoText(config)
 
     local function applyDynamicSize()
         if not billboard or not billboard.Adornee or not constantEnabled then return end
-
         local camera = workspace.CurrentCamera
         if not camera then return end
-
         local adornee = billboard.Adornee
         local adorneePos
         if adornee:IsA("Model") then
             local primary = adornee.PrimaryPart or adornee:FindFirstChild("HumanoidRootPart") or adornee:FindFirstChildWhichIsA("BasePart")
-            if primary then
-                adorneePos = primary.Position
+            if primary then adorneePos = primary.Position
             else
                 local success, pivot = pcall(function() return adornee:GetPivot().Position end)
                 if success then adorneePos = pivot else return end
             end
-        elseif adornee:IsA("BasePart") then
-            adorneePos = adornee.Position
-        elseif adornee:IsA("Attachment") then
-            adorneePos = adornee.WorldPosition
-        else
-            return
-        end
+        elseif adornee:IsA("BasePart") then adorneePos = adornee.Position
+        elseif adornee:IsA("Attachment") then adorneePos = adornee.WorldPosition
+        else return end
 
         local distance = (camera.CFrame.Position - adorneePos).Magnitude
         distance = math.max(distance, 0.1)
-
         local dropPerStud = 0.05 / math.max(studs, 0.01)
         local fraction = math.clamp(distance * dropPerStud, 0, 1)
         local scaleFactor = maxScale - (maxScale - minScale) * fraction
@@ -1612,10 +1614,7 @@ function createInfoText(config)
     local function updateSize(animate)
         if not billboard then return end
         basePixelSize = measureContent()
-
-        if container then
-            container.Size = UDim2.fromOffset(basePixelSize.X, basePixelSize.Y)
-        end
+        if container then container.Size = UDim2.fromOffset(basePixelSize.X, basePixelSize.Y) end
 
         if not constantEnabled then
             billboard.Enabled = isActive
@@ -1647,11 +1646,9 @@ function createInfoText(config)
         billboard.ClipsDescendants = false
         billboard.Parent = adornee
 
-        -- тень: сосед окна
         shadowObj = Fx.newShadow(billboard, shadowCfg, zIndex)
         shadowObj.ImageTransparency = 1
 
-        -- окно: CanvasGroup, чтобы всё (рамка, блик, градиенты) плавно появлялось одним fade
         windowFrame = Instance.new("CanvasGroup")
         windowFrame.Name = "Window"
         windowFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -1713,15 +1710,11 @@ function createInfoText(config)
         local label = labels[id]
         local saved = lineData[id]
         if not label or not saved then return end
-
         label.Text = saved.text.text or ""
         TweenService:Create(label, TweenInfo.new(0.15), { TextColor3 = saved.text.color or Color3.fromRGB(255, 255, 255) }):Play()
 
-        if saved.text.font then
-            label.Font = saved.text.font
-        else
-            label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
-        end
+        if saved.text.font then label.Font = saved.text.font
+        else label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium end
 
         applyOutline(label, saved.text)
     end
@@ -1774,11 +1767,8 @@ function createInfoText(config)
         end
 
         if data.text ~= nil then
-            if type(data.text) == "string" then
-                saved.text.text = data.text
-            elseif type(data.text) == "table" then
-                for k, v in pairs(data.text) do saved.text[k] = v end
-            end
+            if type(data.text) == "string" then saved.text.text = data.text
+            elseif type(data.text) == "table" then for k, v in pairs(data.text) do saved.text[k] = v end end
         end
 
         if data.color ~= nil then saved.text.color = data.color end
@@ -1835,13 +1825,10 @@ function createInfoText(config)
     for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
     if billboard then updateOrder() updateSize(false) end
 
-    -- ===== Динамический размер окна =====
     local renderName = "InfoText_" .. name .. "_" .. tostring(math.random(1000, 9999))
     RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
         if not billboard or not billboard.Parent or not billboard.Adornee then return end
-        if constantEnabled then
-            applyDynamicSize()
-        end
+        if constantEnabled then applyDynamicSize() end
     end)
 
     local api = {}
@@ -1871,11 +1858,8 @@ function createInfoText(config)
     function api:Visible(state)
         isActive = state
         if billboard then
-            if constantEnabled then
-                applyDynamicSize()
-            else
-                billboard.Enabled = isActive
-            end
+            if constantEnabled then applyDynamicSize()
+            else billboard.Enabled = isActive end
         end
     end
 
@@ -1983,9 +1967,7 @@ function createInfoText(config)
         end
 
         v = pick(tbl, "TweenTime", "tweenTime")
-        if v ~= nil then
-            sizeTweenInfo = TweenInfo.new(v, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        end
+        if v ~= nil then sizeTweenInfo = TweenInfo.new(v, Enum.EasingStyle.Quint, Enum.EasingDirection.Out) end
     end
 
     function api:SetCustomWindow(tbl)
@@ -2089,7 +2071,6 @@ function createRadar(config)
     local CoreGui          = game:GetService("CoreGui")
     local UserInputService = game:GetService("UserInputService")
 
-    -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
     local function sub(...) return Fx.copy(pick(cw, ...)) end
 
@@ -2119,7 +2100,6 @@ function createRadar(config)
     local function cCross()  return pick(crosshairCfg, "color", "Color") or Color3.fromRGB(60, 68, 90) end
     local function tShadow() return pick(shadowCfg, "transparency", "Transparency") or 0.55 end
 
-    -- ========= Основные =========
     local Name         = pick(config, "Name", "name")         or "CustomRadar"
     local Title        = pick(config, "Title", "title")       or "Radar"
     local Position     = pick(config, "Position", "position") or UDim2.new(0.03, 0, 0.3, 0)
@@ -2130,7 +2110,6 @@ function createRadar(config)
     local CenterOffset = pick(config, "CenterOffset", "centerOffset") or Vector3.zero
     local EDGE_TEXT_HIDE_THRESHOLD = tonumber(pick(config, "TextHideThreshold", "textHideThreshold")) or 0.95
 
-    -- анимированный "свип" (вращающийся луч)
     local sweepEnabled = pick(config, "Sweep", "sweep")
     if sweepEnabled == nil then sweepEnabled = pick(radarCfg, "sweep", "Sweep") end
     if sweepEnabled == nil then sweepEnabled = true end
@@ -2159,7 +2138,6 @@ function createRadar(config)
     scaleObject.Scale = Scale
     scaleObject.Parent = gui
 
-    -- root (позиция), тень и body (фон) — как в createInfoGui
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
     frame.Size = UDim2.fromOffset(WINDOW_SIZE, WINDOW_HEIGHT)
@@ -2198,7 +2176,6 @@ function createRadar(config)
 
     local depthParts = Fx.addDepth(body, depth, 1)
 
-    -- заголовок с акцентной полоской
     local accentBar = Instance.new("Frame")
     accentBar.Name = "Accent"
     accentBar.Position = UDim2.fromOffset(12, 11)
@@ -2266,7 +2243,6 @@ function createRadar(config)
         if input == dragInput and dragging then update(input) end
     end)
 
-    -- диск радара
     local radar = Instance.new("Frame")
     radar.Name = "Radar"
     radar.Size = UDim2.fromOffset(RADAR_SIZE, RADAR_SIZE)
@@ -2332,7 +2308,6 @@ function createRadar(config)
             line.Size = UDim2.new(0, 1, 1, 0)
         end
         line.Parent = radar
-        -- линия бледнеет к краям
         local g = Instance.new("UIGradient")
         g.Rotation = horizontal and 0 or 90
         g.Transparency = NumberSequence.new({
@@ -2346,7 +2321,6 @@ function createRadar(config)
     createCross(true)
     createCross(false)
 
-    -- свип: вращающийся луч с шлейфом
     local sweepHolder = Instance.new("Frame")
     sweepHolder.Name = "Sweep"
     sweepHolder.BackgroundTransparency = 1
@@ -2377,7 +2351,6 @@ function createRadar(config)
         table.insert(sweepLines, line)
     end
 
-    -- центр
     local centerDot = Instance.new("Frame")
     centerDot.AnchorPoint = Vector2.new(0.5, 0.5)
     centerDot.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -2521,7 +2494,6 @@ function createRadar(config)
         for id, object in pairs(targetObjects) do updateTarget(id, object) end
     end)
 
-    -- ===== анимации появления / скрытия =====
     local function playIntro()
         body.BackgroundTransparency = 1
         frameStroke.Transparency = 1
@@ -2805,12 +2777,9 @@ end
 
 --====================================================================
 --  Presets: готовые CustomWindow в стиле Blue Oblivion
---  (тёмное тонированное стекло + яркий акцент + цветное свечение)
 --====================================================================
 local Presets = {}
 
--- accent: главный яркий цвет, deep: очень тёмный оттенок фона,
--- opts.transparency: полупрозрачность окна (0 = плотное, 0.5 = сильное стекло)
 function Presets.Make(accent, deep, opts)
     opts = opts or {}
     local glass = opts.transparency or 0.3
