@@ -83,8 +83,10 @@ function Fx.addBorderGradient(stroke, color, strength)
     return obj
 end
 
-function Fx.addDepth(body, strength, z)
+-- ИСПРАВЛЕНИЕ 1: Добавлен аргумент radius для скругления Sheen и Gloss
+function Fx.addDepth(body, strength, z, radius)
     local parts = {}
+    local r = radius or 8
 
     local grad = Instance.new("UIGradient")
     grad.Rotation = 90
@@ -98,6 +100,11 @@ function Fx.addDepth(body, strength, z)
     sheen.Active = false
     sheen.ZIndex = z or 1
     sheen.Parent = body
+    
+    local sheenCorner = Instance.new("UICorner")
+    sheenCorner.CornerRadius = UDim.new(0, r)
+    sheenCorner.Parent = sheen
+
     local sg = Instance.new("UIGradient")
     sg.Rotation = 90
     sg.Parent = sheen
@@ -318,7 +325,7 @@ function createInfoGui(config)
     frameStroke.Parent = body
     local borderGrad = Fx.addBorderGradient(frameStroke, cBorder(), depth)
 
-    local depthParts = Fx.addDepth(body, depth, 1)
+    local depthParts = Fx.addDepth(body, depth, 1, radius())
 
     local header = Instance.new("Frame")
     header.Name = "Header"
@@ -331,7 +338,6 @@ function createInfoGui(config)
     header.ClipsDescendants = true
     header.Parent = body
 
-    -- ИСПРАВЛЕНИЕ 1: Скругление самой шапки
     local headerCorner = Instance.new("UICorner")
     headerCorner.CornerRadius = UDim.new(0, radius())
     headerCorner.Parent = header
@@ -423,7 +429,6 @@ function createInfoGui(config)
     local toggleScale = Instance.new("UIScale")
     toggleScale.Parent = toggle
 
-    -- ИСПРАВЛЕНИЕ 3: Поддержка картинок для стрелочки
     local arrow = Instance.new("ImageLabel")
     arrow.Name = "Arrow"
     arrow.Size = UDim2.new(1, 0, 1, 0)
@@ -520,11 +525,18 @@ function createInfoGui(config)
 
         if collapsed then
             targetHeight = headerHeight
-            targetWidth = math.min(size.X.Offset, maxX)
+            -- ИСПРАВЛЕНИЕ 2: Не сжимать окно по X при сворачивании
+            targetWidth = frame.Size.X.Offset 
+            
+            -- ИСПРАВЛЕНИЕ 3: Фикс накопления глоу (тени) при сворачивании
+            if shadow then
+                local pad = pick(shadowCfg, "size", "Size") or 24
+                shadow.ScaleType = Enum.ScaleType.Stretch
+                shadow.Size = UDim2.new(1, pad * 2, 0, targetHeight + pad * 2)
+            end
         else
             if autoSizeEnabled then
                 if isHorizontal then
-                    -- ИСПРАВЛЕНИЕ 2: Минимальная ширина = заголовок + тогл
                     local titleWidth = TextService:GetTextSize(titleLabel.Text, titleLabel.TextSize, titleLabel.Font, Vector2.new(10000, 10000)).X
                     local minW = titleWidth + 66
                     targetWidth = math.max(minW, math.min(contentW + 20, maxX))
@@ -536,6 +548,12 @@ function createInfoGui(config)
             else
                 targetWidth = maxX
                 targetHeight = maxY
+            end
+
+            if shadow then
+                local pad = pick(shadowCfg, "size", "Size") or 24
+                shadow.ScaleType = Enum.ScaleType.Slice
+                shadow.Size = UDim2.new(1, pad * 2, 1, pad * 2)
             end
         end
 
@@ -951,7 +969,6 @@ function createInfoGui(config)
     local function setCollapsed(state, animate)
         collapsed = state == true
         
-        -- ИСПРАВЛЕНИЕ 3: Картинки для стрелочки
         local imgOpened = pick(toggleImageCfg, "opened", "Opened")
         local imgCollapsed = pick(toggleImageCfg, "collapsed", "Collapsed")
 
@@ -1015,7 +1032,6 @@ function createInfoGui(config)
     for _, data in ipairs(pick(config, "Lines", "lines") or {}) do setLine(data) end
     updateOrder()
     
-    -- Инициализация состояния стрелочки при старте
     local initImgOpened = pick(toggleImageCfg, "opened", "Opened")
     local initImgCollapsed = pick(toggleImageCfg, "collapsed", "Collapsed")
     if collapsed then
@@ -1671,7 +1687,7 @@ function createInfoText(config)
         windowStrokeObj.Parent = windowFrame
         borderGrad = Fx.addBorderGradient(windowStrokeObj, cBorder(), depth)
 
-        depthParts = Fx.addDepth(windowFrame, depth, 1)
+        depthParts = Fx.addDepth(windowFrame, depth, 1, radius())
 
         container = Instance.new("Frame")
         container.Name = "Container"
@@ -2174,7 +2190,7 @@ function createRadar(config)
     frameStroke.Parent = body
     local frameBorderGrad = Fx.addBorderGradient(frameStroke, cBorder(), depth)
 
-    local depthParts = Fx.addDepth(body, depth, 1)
+    local depthParts = Fx.addDepth(body, depth, 1, pick(cornerCfg, "radius", "Radius") or 14)
 
     local accentBar = Instance.new("Frame")
     accentBar.Name = "Accent"
@@ -2265,7 +2281,7 @@ function createRadar(config)
     radarStroke.Parent = radar
     local radarBorderGrad = Fx.addBorderGradient(radarStroke, cBorder(), depth)
 
-    local radarDepth = Fx.addDepth(radar, depth * 0.8, 1)
+    local radarDepth = Fx.addDepth(radar, depth * 0.8, 1, 100)
 
     local gridStrokes = {}
     local function createCircle(csize, transparency)
