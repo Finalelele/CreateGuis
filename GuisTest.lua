@@ -4,6 +4,7 @@ function createInfoGui(config)
     local TweenService     = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local CoreGui          = game:GetService("CoreGui")
+    local TextService      = game:GetService("TextService")
     local HttpService      = game:GetService("HttpService")
 
     local function pick(tbl, ...)
@@ -50,7 +51,6 @@ function createInfoGui(config)
     local autoSizeWindowEdgeWithMaxSize = pick(autoSizeCfg, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
     if autoSizeWindowEdgeWithMaxSize == nil then autoSizeWindowEdgeWithMaxSize = false end
     
-    -- Направление расширения (по умолчанию "down")
     local autoSizeSide       = pick(autoSizeCfg, "side", "Side") or "down"
 
     -- ========= Сохранение позиции =========
@@ -124,13 +124,16 @@ function createInfoGui(config)
     frame.ClipsDescendants = true
     frame.Parent = screen
 
-    -- Настройка AnchorPoint в зависимости от стороны расширения
+    -- Настройка AnchorPoint с сохранением визуального Top-Left
     if autoSizeSide == "up" then
         frame.AnchorPoint = Vector2.new(0, 1)
+        frame.Position = UDim2.new(position.X.Scale, position.X.Offset, position.Y.Scale, position.Y.Offset + headerHeight)
     elseif autoSizeSide == "left" then
         frame.AnchorPoint = Vector2.new(1, 0)
+        frame.Position = UDim2.new(position.X.Scale, position.X.Offset + width, position.Y.Scale, position.Y.Offset)
     else
-        frame.AnchorPoint = Vector2.new(0, 0) -- down, right
+        frame.AnchorPoint = Vector2.new(0, 0)
+        frame.Position = position
     end
 
     local corner = Instance.new("UICorner")
@@ -274,17 +277,37 @@ function createInfoGui(config)
 
     local function isEdgeMode() return autoSizeWindowEdge end
 
+    -- Вычисление ширины текста для режимов left/right
+    local function getMaxTextWidth()
+        local maxW = 0
+        for _, ui in pairs(labels) do
+            local text = ui.text.Text
+            if text == "" then text = " " end
+            local tSize = TextService:GetTextSize(text, textSize, ui.text.Font, Vector2.new(10000, 10000))
+            local extra = 0
+            local saved = lineData[ui.frame.Name]
+            if saved and saved.toggle then extra = 34 end
+            maxW = math.max(maxW, tSize.X + extra)
+        end
+        return maxW + 20 -- +20 на отступы
+    end
+
     local function updateFrameSize(animate)
-        local targetHeight
-        if collapsed then
-            targetHeight = headerHeight
-        else
+        local targetHeight = headerHeight
+        local targetWidth = width
+
+        if not collapsed then
             local contentH = getContentHeightLogical()
             local desired  = headerHeight + contentH + bottomPadding
             if autoSizeEnabled then
                 targetHeight = math.min(desired, getEffectiveMaxHeightLogical())
             else
                 targetHeight = autoSizeMaxSize
+            end
+
+            -- Расширение по горизонтали
+            if autoSizeSide == "left" or autoSizeSide == "right" then
+                targetWidth = math.max(width, getMaxTextWidth())
             end
         end
 
@@ -297,11 +320,13 @@ function createInfoGui(config)
         end
 
         if activeTween then activeTween:Cancel() activeTween = nil end
+        local targetSize = UDim2.new(0, targetWidth, 0, targetHeight)
+        
         if animate and not (isEdgeMode() and dragging) then
-            activeTween = TweenService:Create(frame, tweenInfo, { Size = UDim2.new(0, width, 0, targetHeight) })
+            activeTween = TweenService:Create(frame, tweenInfo, { Size = targetSize })
             activeTween:Play()
         else
-            frame.Size = UDim2.new(0, width, 0, targetHeight)
+            frame.Size = targetSize
         end
     end
 
@@ -635,7 +660,6 @@ function createInfoGui(config)
     updateFrameSize(false)
     task.defer(function() if not collapsed then updateFrameSize(false) end end)
 
-    -- ===== Сохранение позиции при перетаскивании =====
     if savePosId then
         local saveDebounce = false
         frame:GetPropertyChangedSignal("Position"):Connect(function()
@@ -739,7 +763,7 @@ function createInfoGui(config)
         v = pick(tbl, "Width", "width")
         if v ~= nil then
             width = v
-            frame.Size = UDim2.new(0, width, 0, frame.Size.Y.Offset)
+            updateFrameSize(true)
         end
 
         v = pick(tbl, "Scale", "scale")
@@ -785,16 +809,33 @@ function createInfoGui(config)
         v = pick(tbl, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
         if v ~= nil then autoSizeWindowEdgeWithMaxSize = v == true end
 
-        -- Обновление стороны
         v = pick(tbl, "side", "Side")
         if v ~= nil then
-            autoSizeSide = tostring(v):lower()
-            if autoSizeSide == "up" then
-                frame.AnchorPoint = Vector2.new(0, 1)
-            elseif autoSizeSide == "left" then
-                frame.AnchorPoint = Vector2.new(1, 0)
-            else
-                frame.AnchorPoint = Vector2.new(0, 0) -- down, right
+            local newSide = tostring(v):lower()
+            if newSide ~= autoSizeSide then
+                -- Сохраняем визуальный Top-Left угол при смене стороны
+                local oldAnchor = frame.AnchorPoint
+                local pos = frame.Position
+                local sizeX = frame.Size.X.Offset
+                local sizeY = frame.Size.Y.Offset
+                
+                local tlX = pos.X.Scale - oldAnchor.X * sizeX
+                local tlXOff = pos.X.Offset - oldAnchor.X * sizeX
+                local tlY = pos.Y.Scale - oldAnchor.Y * sizeY
+                local tlYOff = pos.Y.Offset - oldAnchor.Y * sizeY
+                
+                autoSizeSide = newSide
+                local newAnchor = Vector2.new(0, 0)
+                if autoSizeSide == "up" then newAnchor = Vector2.new(0, 1)
+                elseif autoSizeSide == "left" then newAnchor = Vector2.new(1, 0) end
+                
+                frame.AnchorPoint = newAnchor
+                frame.Position = UDim2.new(
+                    tlX + newAnchor.X * sizeX,
+                    tlXOff + newAnchor.X * sizeX,
+                    tlY + newAnchor.Y * sizeY,
+                    tlYOff + newAnchor.Y * sizeY
+                )
             end
         end
 
