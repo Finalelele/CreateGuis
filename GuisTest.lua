@@ -47,7 +47,6 @@ function createInfoGui(config)
     local guiName   = pick(config, "Name", "name") or "CustomWindow"
     local title     = pick(config, "Title", "title") or "Window"
     
-    -- Новый параметр Size (по умолчанию 200x500)
     local size      = resolveUDim2(pick(config, "Size", "size"), UDim2.fromOffset(200, 500))
     local scale     = pick(config, "Scale", "scale") or 1
     local position  = resolveUDim2(pick(config, "Position", "position"), UDim2.new(0.05, 0, 0.15, 0))
@@ -66,6 +65,7 @@ function createInfoGui(config)
     if autoSizeWindowEdgeWithSize == nil then autoSizeWindowEdgeWithSize = false end
     
     local autoSizeSide       = pick(autoSizeCfg, "side", "Side") or "down"
+    local isHorizontal       = (autoSizeSide == "left" or autoSizeSide == "right")
 
     -- ========= Сохранение позиции =========
     local savePosCfg = pick(config, "SavePos", "savePos") or {}
@@ -241,7 +241,7 @@ function createInfoGui(config)
     toggleCorner.CornerRadius = UDim.new(0, 6)
     toggleCorner.Parent = toggle
 
-    -- Настройка ScrollingFrame в зависимости от стороны
+    -- Настройка ScrollingFrame
     local scrolling = Instance.new("ScrollingFrame")
     scrolling.Name = "Container"
     scrolling.Position = UDim2.new(0, 0, 0, headerHeight)
@@ -256,7 +256,7 @@ function createInfoGui(config)
     scrolling.Parent = frame
 
     if Enum.AutomaticSize then
-        if autoSizeSide == "left" or autoSizeSide == "right" then
+        if isHorizontal then
             scrolling.ScrollingDirection = Enum.ScrollingDirection.XY
             scrolling.AutomaticCanvasSize = Enum.AutomaticSize.XY
         else
@@ -319,25 +319,27 @@ function createInfoGui(config)
 
         if collapsed then
             targetHeight = headerHeight
-            targetWidth = math.max(size.X.Offset, 50) -- keep width fixed when collapsed
+            targetWidth = math.min(size.X.Offset, maxX)
         else
             if autoSizeEnabled then
-                local isHorizontal = (autoSizeSide == "left" or autoSizeSide == "right")
-                
                 if isHorizontal then
-                    targetWidth = math.min(contentW + 20, maxX) -- +20 for padding
-                    targetHeight = math.min(headerHeight + contentH + bottomPadding, maxY)
+                    -- Сжимаем/растягиваем ширину по тексту, но не больше maxX
+                    targetWidth = math.clamp(contentW + 20, 50, maxX)
+                    -- Высота по контенту
+                    targetHeight = math.clamp(headerHeight + contentH + bottomPadding, headerHeight, maxY)
                 else
-                    targetWidth = math.max(size.X.Offset, 50) -- keep X fixed
-                    targetHeight = math.min(headerHeight + contentH + bottomPadding, maxY)
+                    -- Фиксированная ширина
+                    targetWidth = maxX
+                    -- Высота по контенту
+                    targetHeight = math.clamp(headerHeight + contentH + bottomPadding, headerHeight, maxY)
                 end
             else
+                -- Фиксированные размеры (без авто-сайза)
                 targetWidth = maxX
                 targetHeight = maxY
             end
         end
 
-        -- Расчет скроллбаров
         if not collapsed then
             local availableW = targetWidth
             local availableH = targetHeight - headerHeight
@@ -345,7 +347,7 @@ function createInfoGui(config)
             local needVert = (contentH > availableH + 1)
             local needHoriz = (contentW > availableW + 1)
             
-            if autoSizeSide == "left" or autoSizeSide == "right" then
+            if isHorizontal then
                 scrolling.ScrollBarThickness = (needVert or needHoriz) and 4 or 0
             else
                 scrolling.ScrollBarThickness = needVert and 4 or 0
@@ -445,15 +447,15 @@ function createInfoGui(config)
 
         if saved.toggle then
             ui.track.Visible = true
-            local isLeft = (saved.toggle.side == "left")
-            if isLeft then
+            local isLeftToggle = (saved.toggle.side == "left")
+            if isLeftToggle then
                 ui.track.Position = UDim2.new(0, 0, 0.5, -7)
                 ui.text.Position = UDim2.new(0, 34, 0, 0)
-                ui.text.Size = UDim2.new(1, -34, 0, 0)
+                ui.text.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, -34, 0, 0)
             else
                 ui.track.Position = UDim2.new(1, -28, 0.5, -7)
                 ui.text.Position = UDim2.new(0, 0, 0, 0)
-                ui.text.Size = UDim2.new(1, -34, 0, 0)
+                ui.text.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, -34, 0, 0)
             end
 
             local isActive = saved.toggle.value == true
@@ -482,7 +484,7 @@ function createInfoGui(config)
         else
             ui.track.Visible = false
             ui.text.Position = UDim2.new(0, 0, 0, 0)
-            ui.text.Size = UDim2.new(1, 0, 0, 0)
+            ui.text.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
         end
     end
 
@@ -497,8 +499,9 @@ function createInfoGui(config)
 
             local lineFrame = Instance.new("Frame")
             lineFrame.Name = id
-            lineFrame.Size = UDim2.new(1, 0, 0, 0)
-            lineFrame.AutomaticSize = (autoSizeSide == "left" or autoSizeSide == "right") and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+            -- ВАЖНО: При горизонтальном режиме строки не растягиваются на 100%, а сжимаются под текст
+            lineFrame.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+            lineFrame.AutomaticSize = isHorizontal and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
             lineFrame.BackgroundTransparency = 1
             lineFrame.Parent = scrolling
 
@@ -511,9 +514,9 @@ function createInfoGui(config)
 
             local label = Instance.new("TextLabel")
             label.Name = "Text"
-            label.Size = (autoSizeSide == "left" or autoSizeSide == "right") and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
-            label.AutomaticSize = (autoSizeSide == "left" or autoSizeSide == "right") and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
-            label.TextWrapped = (autoSizeSide == "up" or autoSizeSide == "down")
+            label.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+            label.AutomaticSize = isHorizontal and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+            label.TextWrapped = not isHorizontal
             label.BackgroundTransparency = 1
             label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
             label.TextSize = textSize
@@ -860,6 +863,8 @@ function createInfoGui(config)
                 local tlOffsetY = pos.Y.Offset - oldAnchor.Y * sizeY
                 
                 autoSizeSide = newSide
+                isHorizontal = (autoSizeSide == "left" or autoSizeSide == "right")
+                
                 local newAnchor = Vector2.new(0, 0)
                 if autoSizeSide == "up" then newAnchor = Vector2.new(0, 1)
                 elseif autoSizeSide == "left" then newAnchor = Vector2.new(1, 0) end
@@ -873,7 +878,7 @@ function createInfoGui(config)
                 )
 
                 -- Обновляем свойства текста и скролла
-                if autoSizeSide == "left" or autoSizeSide == "right" then
+                if isHorizontal then
                     scrolling.ScrollingDirection = Enum.ScrollingDirection.XY
                     scrolling.AutomaticCanvasSize = Enum.AutomaticSize.XY
                 else
@@ -881,11 +886,15 @@ function createInfoGui(config)
                     scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
                 end
 
-                for _, ui in pairs(labels) do
-                    ui.frame.AutomaticSize = (autoSizeSide == "left" or autoSizeSide == "right") and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
-                    ui.text.Size = (autoSizeSide == "left" or autoSizeSide == "right") and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
-                    ui.text.AutomaticSize = (autoSizeSide == "left" or autoSizeSide == "right") and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
-                    ui.text.TextWrapped = (autoSizeSide == "up" or autoSizeSide == "down")
+                for id, ui in pairs(labels) do
+                    ui.frame.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+                    ui.frame.AutomaticSize = isHorizontal and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+                    
+                    ui.text.TextWrapped = not isHorizontal
+                    ui.text.AutomaticSize = isHorizontal and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+                    ui.text.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+                    
+                    renderLine(id) -- Обновляем позиции тоглов
                 end
             end
         end
