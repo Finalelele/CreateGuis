@@ -4,6 +4,7 @@ function createInfoGui(config)
     local TweenService     = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local CoreGui          = game:GetService("CoreGui")
+    local HttpService      = game:GetService("HttpService")
 
     local function pick(tbl, ...)
         if type(tbl) ~= "table" then return nil end
@@ -39,9 +40,7 @@ function createInfoGui(config)
     local reload    = pick(config, "Reload", "reload")
     if reload == nil then reload = true end
 
-    local defaultOutlineColor = pick(config, "OutlineColor", "outlineColor") or Color3.fromRGB(255, 255, 255)
-    local defaultOutlineSize  = pick(config, "OutlineSize", "outlineSize")
-
+    -- ========= Настройки авто-размера =========
     local autoSizeCfg        = pick(config, "AutoSize", "autoSize") or {}
     local autoSizeEnabled    = pick(autoSizeCfg, "Enabled", "enabled")
     if autoSizeEnabled == nil then autoSizeEnabled = true end
@@ -50,6 +49,45 @@ function createInfoGui(config)
     if autoSizeWindowEdge == nil then autoSizeWindowEdge = false end
     local autoSizeWindowEdgeWithMaxSize = pick(autoSizeCfg, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
     if autoSizeWindowEdgeWithMaxSize == nil then autoSizeWindowEdgeWithMaxSize = false end
+    
+    -- Направление расширения (по умолчанию "down")
+    local autoSizeSide       = pick(autoSizeCfg, "side", "Side") or "down"
+
+    -- ========= Сохранение позиции =========
+    local savePosCfg = pick(config, "SavePos", "savePos") or {}
+    local savePosEnabled = pick(savePosCfg, "enabled", "Enabled") == true
+    local savePosId = pick(savePosCfg, "id", "Id", "ID")
+    local saveFileName = "FinaleleleGuiPositions.json"
+    local saveData = {}
+
+    local function loadSaveData()
+        if not savePosId then return end
+        if isfile and readfile and isfile(saveFileName) then
+            local success, result = pcall(function()
+                return HttpService:JSONDecode(readfile(saveFileName))
+            end)
+            if success and type(result) == "table" then
+                saveData = result
+            end
+        end
+    end
+
+    local function saveDataToFile()
+        if not savePosId then return end
+        if writefile then
+            pcall(function()
+                writefile(saveFileName, HttpService:JSONEncode(saveData))
+            end)
+        end
+    end
+
+    loadSaveData()
+    if savePosEnabled and savePosId and saveData[savePosId] then
+        local pos = saveData[savePosId]
+        if type(pos) == "table" and pos.XScale then
+            position = UDim2.new(pos.XScale, pos.XOffset, pos.YScale, pos.YOffset)
+        end
+    end
 
     local headerHeight  = 32
     local bottomPadding = 3
@@ -85,6 +123,15 @@ function createInfoGui(config)
     frame.Active = true
     frame.ClipsDescendants = true
     frame.Parent = screen
+
+    -- Настройка AnchorPoint в зависимости от стороны расширения
+    if autoSizeSide == "up" then
+        frame.AnchorPoint = Vector2.new(0, 1)
+    elseif autoSizeSide == "left" then
+        frame.AnchorPoint = Vector2.new(1, 0)
+    else
+        frame.AnchorPoint = Vector2.new(0, 0) -- down, right
+    end
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, pick(cornerCfg, "radius", "Radius") or 8)
@@ -287,7 +334,7 @@ function createInfoGui(config)
                 stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
                 stroke.Parent = label
             end
-            stroke.Color = data.outlineColor or defaultOutlineColor
+            stroke.Color = data.outlineColor or Color3.fromRGB(255, 255, 255)
             stroke.Thickness = data.outlineSize
             stroke.Transparency = collapsed and 1 or 0
         elseif stroke then
@@ -328,7 +375,6 @@ function createInfoGui(config)
         ui.text.Text = saved.text.text or ""
         ui.text.TextColor3 = saved.text.color or pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255)
         
-        -- Поддержка кастомного шрифта для строки
         if saved.text.font then
             ui.text.Font = saved.text.font
         else
@@ -472,7 +518,7 @@ function createInfoGui(config)
             labels[id] = { frame = lineFrame, text = label, track = track, knob = knob }
             lineData[id] = {
                 id = id,
-                text = { text = "", color = pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255), outlineColor = defaultOutlineColor, outlineSize = defaultOutlineSize },
+                text = { text = "", color = pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255) },
                 toggle = nil,
                 order = nil, created = creationCounter,
             }
@@ -484,8 +530,6 @@ function createInfoGui(config)
             saved.text = {
                 text = tostring(saved.text or ""),
                 color = saved.color or pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255),
-                outlineColor = saved.outlineColor or defaultOutlineColor,
-                outlineSize = saved.outlineSize
             }
         end
 
@@ -501,7 +545,7 @@ function createInfoGui(config)
         if data.outlineColor ~= nil then saved.text.outlineColor = data.outlineColor end
         if data.outlineSize ~= nil then saved.text.outlineSize = data.outlineSize == false and nil or data.outlineSize end
         if data.order ~= nil then saved.order = data.order == false and nil or data.order end
-        if data.text and data.text.font ~= nil then saved.text.font = data.text.font end -- Кастомный шрифт
+        if data.text and data.text.font ~= nil then saved.text.font = data.text.font end
 
         if data.toggle ~= nil then
             if saved.toggle == nil then saved.toggle = { value = false, side = "right" } end
@@ -529,8 +573,6 @@ function createInfoGui(config)
                 saved.text = {
                     text = tostring(saved.text or ""),
                     color = saved.color or pick(lineTextCfg, "color", "Color") or Color3.fromRGB(255, 255, 255),
-                    outlineColor = saved.outlineColor or defaultOutlineColor,
-                    outlineSize = saved.outlineSize
                 }
             end
 
@@ -592,6 +634,24 @@ function createInfoGui(config)
     if collapsed then setContentTransparency(1, true) end
     updateFrameSize(false)
     task.defer(function() if not collapsed then updateFrameSize(false) end end)
+
+    -- ===== Сохранение позиции при перетаскивании =====
+    if savePosId then
+        local saveDebounce = false
+        frame:GetPropertyChangedSignal("Position"):Connect(function()
+            if saveDebounce then return end
+            saveDebounce = true
+            task.delay(1, function()
+                local p = frame.Position
+                saveData[savePosId] = {
+                    XScale = p.X.Scale, XOffset = p.X.Offset,
+                    YScale = p.Y.Scale, YOffset = p.Y.Offset
+                }
+                saveDataToFile()
+                saveDebounce = false
+            end)
+        end)
+    end
 
     local function updateDrag(input)
         if not dragging or not dragStart or not startPos then return end
@@ -698,28 +758,6 @@ function createInfoGui(config)
             titleLabel.TextSize = textSize + 2
             for _, ui in pairs(labels) do ui.text.TextSize = textSize end
             updateFrameSize(true)
-        end
-
-        v = pick(tbl, "OutlineColor", "outlineColor")
-        if v ~= nil then
-            defaultOutlineColor = v
-            for id, data in pairs(lineData) do
-                if data.text.outlineSize then
-                    data.text.outlineColor = v
-                    applyOutline(labels[id].text, data.text)
-                end
-            end
-        end
-
-        v = pick(tbl, "OutlineSize", "outlineSize")
-        if v ~= nil then
-            defaultOutlineSize = v
-            for id, data in pairs(lineData) do
-                if data.text.outlineSize ~= nil then
-                    data.text.outlineSize = v
-                    applyOutline(labels[id].text, data.text)
-                end
-            end
         end
 
         v = pick(tbl, "Collapsed", "collapsed")
@@ -835,8 +873,8 @@ function createInfoGui(config)
             local f = pick(newFontCfg, "text", "Text")
             if f then
                 fontCfg.text = f
-                for _, ui in pairs(labels) do 
-                    if not lineData[ui.frame.Name].text.font then
+                for id, ui in pairs(labels) do 
+                    if not lineData[id].text.font then
                         ui.text.Font = f 
                     end
                 end
