@@ -83,7 +83,6 @@ function Fx.addBorderGradient(stroke, color, strength)
     return obj
 end
 
--- ИСПРАВЛЕНИЕ 1: Добавлен аргумент radius для скругления Sheen и Gloss
 function Fx.addDepth(body, strength, z, radius)
     local parts = {}
     local r = radius or 8
@@ -525,15 +524,7 @@ function createInfoGui(config)
 
         if collapsed then
             targetHeight = headerHeight
-            -- ИСПРАВЛЕНИЕ 2: Не сжимать окно по X при сворачивании
             targetWidth = frame.Size.X.Offset 
-            
-            -- ИСПРАВЛЕНИЕ 3: Фикс накопления глоу (тени) при сворачивании
-            if shadow then
-                local pad = pick(shadowCfg, "size", "Size") or 24
-                shadow.ScaleType = Enum.ScaleType.Stretch
-                shadow.Size = UDim2.new(1, pad * 2, 0, targetHeight + pad * 2)
-            end
         else
             if autoSizeEnabled then
                 if isHorizontal then
@@ -549,12 +540,15 @@ function createInfoGui(config)
                 targetWidth = maxX
                 targetHeight = maxY
             end
+        end
 
-            if shadow then
-                local pad = pick(shadowCfg, "size", "Size") or 24
-                shadow.ScaleType = Enum.ScaleType.Slice
-                shadow.Size = UDim2.new(1, pad * 2, 1, pad * 2)
-            end
+        -- ИСПРАВЛЕНИЕ: Используем Slice и ограничиваем минимальный размер, чтобы избежать растягивания и наложения
+        if shadow then
+            local pad = pick(shadowCfg, "size", "Size") or 24
+            shadow.ScaleType = Enum.ScaleType.Slice
+            local shadowW = math.max(targetWidth, 100)
+            local shadowH = math.max(targetHeight, 100)
+            shadow.Size = UDim2.fromOffset(shadowW + pad * 2, shadowH + pad * 2)
         end
 
         if not collapsed then
@@ -1348,7 +1342,7 @@ function createInfoGui(config)
             local t = pick(n, "transparency", "Transparency")
             if t ~= nil then shadowCfg.transparency = t tween(shadow, tweenInfo, { ImageTransparency = t }) end
             local sz = pick(n, "size", "Size")
-            if sz then shadowCfg.size = sz shadow.Size = UDim2.new(1, sz * 2, 1, sz * 2) end
+            if sz then shadowCfg.size = sz updateFrameSize(true) end
         end
 
         n = pick(tbl, "LineToggle", "lineToggle")
