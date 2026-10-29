@@ -813,16 +813,17 @@ function createInfoGui(config)
         if v ~= nil then
             local newSide = tostring(v):lower()
             if newSide ~= autoSizeSide then
-                -- Сохраняем визуальный Top-Left угол при смене стороны
+                -- Исправленный расчет позиции при смене стороны (не смешиваем Scale и Offset)
                 local oldAnchor = frame.AnchorPoint
                 local pos = frame.Position
                 local sizeX = frame.Size.X.Offset
                 local sizeY = frame.Size.Y.Offset
                 
-                local tlX = pos.X.Scale - oldAnchor.X * sizeX
-                local tlXOff = pos.X.Offset - oldAnchor.X * sizeX
-                local tlY = pos.Y.Scale - oldAnchor.Y * sizeY
-                local tlYOff = pos.Y.Offset - oldAnchor.Y * sizeY
+                local tlScaleX = pos.X.Scale
+                local tlOffsetX = pos.X.Offset - oldAnchor.X * sizeX
+                
+                local tlScaleY = pos.Y.Scale
+                local tlOffsetY = pos.Y.Offset - oldAnchor.Y * sizeY
                 
                 autoSizeSide = newSide
                 local newAnchor = Vector2.new(0, 0)
@@ -831,10 +832,10 @@ function createInfoGui(config)
                 
                 frame.AnchorPoint = newAnchor
                 frame.Position = UDim2.new(
-                    tlX + newAnchor.X * sizeX,
-                    tlXOff + newAnchor.X * sizeX,
-                    tlY + newAnchor.Y * sizeY,
-                    tlYOff + newAnchor.Y * sizeY
+                    tlScaleX, 
+                    tlOffsetX + newAnchor.X * sizeX,
+                    tlScaleY, 
+                    tlOffsetY + newAnchor.Y * sizeY
                 )
             end
         end
