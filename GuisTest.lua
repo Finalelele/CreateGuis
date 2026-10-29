@@ -597,6 +597,30 @@ function createInfoGui(config)
         end
     end
 
+    local function setText(lines)
+        if not lines then return end
+
+        if lines.id then
+            setLine(lines)
+        elseif #lines > 0 and type(lines[1]) == "table" then
+            for _, data in ipairs(lines) do
+                if type(data) == "table" then
+                    if data.id then
+                        setLine(data)
+                    else
+                        applyGlobalPatch(data)
+                    end
+                end
+            end
+        else
+            applyGlobalPatch(lines)
+        end
+
+        updateOrder()
+        updateFrameSize(true)
+        if not collapsed then setContentTransparency(0, false) end
+    end
+
     local function setCollapsed(state, animate)
         collapsed = state == true
         toggle.Text = collapsed and "⌄" or "⌃"
@@ -637,30 +661,6 @@ function createInfoGui(config)
             startPos.Y.Scale, startPos.Y.Offset + delta.Y
         )
         if isEdgeMode() and not collapsed then updateFrameSize(false) end
-    end
-
-    local function setText(lines)
-        if not lines then return end
-
-        if lines.id then
-            setLine(lines)
-        elseif #lines > 0 and type(lines[1]) == "table" then
-            for _, data in ipairs(lines) do
-                if type(data) == "table" then
-                    if data.id then
-                        setLine(data)
-                    else
-                        applyGlobalPatch(data)
-                    end
-                end
-            end
-        else
-            applyGlobalPatch(lines)
-        end
-
-        updateOrder()
-        updateFrameSize(true)
-        if not collapsed then setContentTransparency(0, false) end
     end
 
     header.InputBegan:Connect(function(input)
@@ -785,6 +785,7 @@ function createInfoGui(config)
         v = pick(tbl, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
         if v ~= nil then autoSizeWindowEdgeWithMaxSize = v == true end
 
+        -- Обновление стороны
         v = pick(tbl, "side", "Side")
         if v ~= nil then
             autoSizeSide = tostring(v):lower()
@@ -793,7 +794,7 @@ function createInfoGui(config)
             elseif autoSizeSide == "left" then
                 frame.AnchorPoint = Vector2.new(1, 0)
             else
-                frame.AnchorPoint = Vector2.new(0, 0)
+                frame.AnchorPoint = Vector2.new(0, 0) -- down, right
             end
         end
 
