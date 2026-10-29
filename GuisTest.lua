@@ -15,6 +15,19 @@ function createInfoGui(config)
         return nil
     end
 
+    -- Помощник для парсинга UDim2 и {x=..., y=...}
+    local function resolveUDim2(val, default)
+        if typeof(val) == "UDim2" then return val end
+        if type(val) == "table" then
+            if val.x ~= nil and val.y ~= nil then
+                return UDim2.fromOffset(val.x, val.y)
+            elseif val.XScale ~= nil and val.YScale ~= nil then
+                return UDim2.new(val.XScale, val.XOffset or 0, val.YScale, val.YOffset or 0)
+            end
+        end
+        return default
+    end
+
     -- ========= CustomWindow =========
     local cw = pick(config, "CustomWindow", "customWindow") or {}
 
@@ -33,9 +46,11 @@ function createInfoGui(config)
     -- ========= Основные =========
     local guiName   = pick(config, "Name", "name") or "CustomWindow"
     local title     = pick(config, "Title", "title") or "Window"
-    local width     = pick(config, "Width", "width") or 200
+    
+    -- Новый параметр Size (по умолчанию 200x500)
+    local size      = resolveUDim2(pick(config, "Size", "size"), UDim2.fromOffset(200, 500))
     local scale     = pick(config, "Scale", "scale") or 1
-    local position  = pick(config, "Position", "position") or UDim2.new(0.05, 0, 0.15, 0)
+    local position  = resolveUDim2(pick(config, "Position", "position"), UDim2.new(0.05, 0, 0.15, 0))
     local textSize  = pick(config, "TextSize", "textSize") or 14
 
     local reload    = pick(config, "Reload", "reload")
@@ -45,11 +60,10 @@ function createInfoGui(config)
     local autoSizeCfg        = pick(config, "AutoSize", "autoSize") or {}
     local autoSizeEnabled    = pick(autoSizeCfg, "Enabled", "enabled")
     if autoSizeEnabled == nil then autoSizeEnabled = true end
-    local autoSizeMaxSize    = pick(autoSizeCfg, "MaxSize", "maxSize") or 500
     local autoSizeWindowEdge = pick(autoSizeCfg, "WindowEdge", "windowEdge")
     if autoSizeWindowEdge == nil then autoSizeWindowEdge = false end
-    local autoSizeWindowEdgeWithMaxSize = pick(autoSizeCfg, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
-    if autoSizeWindowEdgeWithMaxSize == nil then autoSizeWindowEdgeWithMaxSize = false end
+    local autoSizeWindowEdgeWithSize = pick(autoSizeCfg, "WindowEdgeWithSize", "windowEdgeWithSize")
+    if autoSizeWindowEdgeWithSize == nil then autoSizeWindowEdgeWithSize = false end
     
     local autoSizeSide       = pick(autoSizeCfg, "side", "Side") or "down"
 
@@ -115,7 +129,7 @@ function createInfoGui(config)
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, width, 0, headerHeight)
+    frame.Size = UDim2.fromOffset(size.X.Offset, headerHeight)
     frame.Position = position
     frame.BackgroundColor3 = pick(bg, "color", "Color") or Color3.fromRGB(30, 30, 35)
     frame.BackgroundTransparency = pick(bg, "transparency", "Transparency") or 0
@@ -130,7 +144,7 @@ function createInfoGui(config)
         frame.Position = UDim2.new(position.X.Scale, position.X.Offset, position.Y.Scale, position.Y.Offset + headerHeight)
     elseif autoSizeSide == "left" then
         frame.AnchorPoint = Vector2.new(1, 0)
-        frame.Position = UDim2.new(position.X.Scale, position.X.Offset + width, position.Y.Scale, position.Y.Offset)
+        frame.Position = UDim2.new(position.X.Scale, position.X.Offset + size.X.Offset, position.Y.Scale, position.Y.Offset)
     else
         frame.AnchorPoint = Vector2.new(0, 0)
         frame.Position = position
@@ -227,6 +241,7 @@ function createInfoGui(config)
     toggleCorner.CornerRadius = UDim.new(0, 6)
     toggleCorner.Parent = toggle
 
+    -- Настройка ScrollingFrame в зависимости от стороны
     local scrolling = Instance.new("ScrollingFrame")
     scrolling.Name = "Container"
     scrolling.Position = UDim2.new(0, 0, 0, headerHeight)
@@ -237,12 +252,17 @@ function createInfoGui(config)
     scrolling.ScrollBarImageColor3 = pick(scrollbarCfg, "color", "Color") or pick(topbarLine, "color", "Color") or Color3.fromRGB(90, 145, 255)
     scrolling.ScrollBarImageTransparency = 0.3
     scrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
     scrolling.ElasticBehavior = Enum.ElasticBehavior.Never
     scrolling.Parent = frame
 
     if Enum.AutomaticSize then
-        scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        if autoSizeSide == "left" or autoSizeSide == "right" then
+            scrolling.ScrollingDirection = Enum.ScrollingDirection.XY
+            scrolling.AutomaticCanvasSize = Enum.AutomaticSize.XY
+        else
+            scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
+            scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        end
     end
 
     local layout = Instance.new("UIListLayout")
@@ -258,69 +278,84 @@ function createInfoGui(config)
 
     local function getScale() local s = uiScale.Scale return (s and s > 0) and s or 1 end
     local function getContentHeightLogical() return layout.AbsoluteContentSize.Y / getScale() end
+    local function getContentWidthLogical() return layout.AbsoluteContentSize.X / getScale() end
 
-    local function getEffectiveMaxHeightLogical()
+    local function getEffectiveMaxSize()
+        local maxX = size.X.Offset
+        local maxY = size.Y.Offset
+
         if autoSizeWindowEdge then
-            local screenH = screen.AbsoluteSize.Y
-            local yPos    = frame.AbsolutePosition.Y
-            local edgeAvailable = (screenH - yPos - EDGE_MARGIN) / getScale()
-            edgeAvailable = math.max(edgeAvailable, headerHeight)
-            if autoSizeWindowEdgeWithMaxSize then
-                return math.min(autoSizeMaxSize, edgeAvailable)
-            else
-                return edgeAvailable
+            local screenSize = screen.AbsoluteSize
+            local absPos = frame.AbsolutePosition
+            
+            if autoSizeSide == "down" then
+                local edgeAvailable = (screenSize.Y - absPos.Y - EDGE_MARGIN) / getScale()
+                maxY = autoSizeWindowEdgeWithSize and math.min(size.Y.Offset, edgeAvailable) or edgeAvailable
+            elseif autoSizeSide == "up" then
+                local topY = frame.AbsolutePosition.Y - frame.AbsoluteSize.Y
+                local edgeAvailable = (topY - EDGE_MARGIN) / getScale()
+                maxY = autoSizeWindowEdgeWithSize and math.min(size.Y.Offset, edgeAvailable) or edgeAvailable
+            elseif autoSizeSide == "right" then
+                local edgeAvailable = (screenSize.X - absPos.X - EDGE_MARGIN) / getScale()
+                maxX = autoSizeWindowEdgeWithSize and math.min(size.X.Offset, edgeAvailable) or edgeAvailable
+            elseif autoSizeSide == "left" then
+                local leftX = frame.AbsolutePosition.X - frame.AbsoluteSize.X
+                local edgeAvailable = (leftX - EDGE_MARGIN) / getScale()
+                maxX = autoSizeWindowEdgeWithSize and math.min(size.X.Offset, edgeAvailable) or edgeAvailable
             end
-        else
-            return autoSizeMaxSize
         end
+        return math.max(maxX, 50), math.max(maxY, headerHeight)
     end
 
     local function isEdgeMode() return autoSizeWindowEdge end
 
-    -- Вычисление ширины текста для режимов left/right
-    local function getMaxTextWidth()
-        local maxW = 0
-        for _, ui in pairs(labels) do
-            local text = ui.text.Text
-            if text == "" then text = " " end
-            local tSize = TextService:GetTextSize(text, textSize, ui.text.Font, Vector2.new(10000, 10000))
-            local extra = 0
-            local saved = lineData[ui.frame.Name]
-            if saved and saved.toggle then extra = 34 end
-            maxW = math.max(maxW, tSize.X + extra)
-        end
-        return maxW + 20 -- +20 на отступы
-    end
-
     local function updateFrameSize(animate)
-        local targetHeight = headerHeight
-        local targetWidth = width
+        local targetWidth = size.X.Offset
+        local targetHeight = size.Y.Offset
 
-        if not collapsed then
-            local contentH = getContentHeightLogical()
-            local desired  = headerHeight + contentH + bottomPadding
+        local contentW = getContentWidthLogical()
+        local contentH = getContentHeightLogical()
+        local maxX, maxY = getEffectiveMaxSize()
+
+        if collapsed then
+            targetHeight = headerHeight
+            targetWidth = math.max(size.X.Offset, 50) -- keep width fixed when collapsed
+        else
             if autoSizeEnabled then
-                targetHeight = math.min(desired, getEffectiveMaxHeightLogical())
+                local isHorizontal = (autoSizeSide == "left" or autoSizeSide == "right")
+                
+                if isHorizontal then
+                    targetWidth = math.min(contentW + 20, maxX) -- +20 for padding
+                    targetHeight = math.min(headerHeight + contentH + bottomPadding, maxY)
+                else
+                    targetWidth = math.max(size.X.Offset, 50) -- keep X fixed
+                    targetHeight = math.min(headerHeight + contentH + bottomPadding, maxY)
+                end
             else
-                targetHeight = autoSizeMaxSize
-            end
-
-            -- Расширение по горизонтали
-            if autoSizeSide == "left" or autoSizeSide == "right" then
-                targetWidth = math.max(width, getMaxTextWidth())
+                targetWidth = maxX
+                targetHeight = maxY
             end
         end
 
+        -- Расчет скроллбаров
         if not collapsed then
-            local contentH   = getContentHeightLogical()
+            local availableW = targetWidth
             local availableH = targetHeight - headerHeight
-            scrolling.ScrollBarThickness = (contentH > availableH + 1) and 4 or 0
+            
+            local needVert = (contentH > availableH + 1)
+            local needHoriz = (contentW > availableW + 1)
+            
+            if autoSizeSide == "left" or autoSizeSide == "right" then
+                scrolling.ScrollBarThickness = (needVert or needHoriz) and 4 or 0
+            else
+                scrolling.ScrollBarThickness = needVert and 4 or 0
+            end
         else
             scrolling.ScrollBarThickness = 0
         end
 
         if activeTween then activeTween:Cancel() activeTween = nil end
-        local targetSize = UDim2.new(0, targetWidth, 0, targetHeight)
+        local targetSize = UDim2.fromOffset(targetWidth, targetHeight)
         
         if animate and not (isEdgeMode() and dragging) then
             activeTween = TweenService:Create(frame, tweenInfo, { Size = targetSize })
@@ -463,7 +498,7 @@ function createInfoGui(config)
             local lineFrame = Instance.new("Frame")
             lineFrame.Name = id
             lineFrame.Size = UDim2.new(1, 0, 0, 0)
-            lineFrame.AutomaticSize = Enum.AutomaticSize.Y
+            lineFrame.AutomaticSize = (autoSizeSide == "left" or autoSizeSide == "right") and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
             lineFrame.BackgroundTransparency = 1
             lineFrame.Parent = scrolling
 
@@ -476,9 +511,9 @@ function createInfoGui(config)
 
             local label = Instance.new("TextLabel")
             label.Name = "Text"
-            label.Size = UDim2.new(1, 0, 0, 0)
-            label.AutomaticSize = Enum.AutomaticSize.Y
-            label.TextWrapped = true
+            label.Size = (autoSizeSide == "left" or autoSizeSide == "right") and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+            label.AutomaticSize = (autoSizeSide == "left" or autoSizeSide == "right") and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+            label.TextWrapped = (autoSizeSide == "up" or autoSizeSide == "down")
             label.BackgroundTransparency = 1
             label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
             label.TextSize = textSize
@@ -760,9 +795,9 @@ function createInfoGui(config)
         v = pick(tbl, "Title", "title")
         if v ~= nil then title = tostring(v) titleLabel.Text = title end
 
-        v = pick(tbl, "Width", "width")
+        v = pick(tbl, "Size", "size")
         if v ~= nil then
-            width = v
+            size = resolveUDim2(v, size)
             updateFrameSize(true)
         end
 
@@ -774,7 +809,9 @@ function createInfoGui(config)
         end
 
         v = pick(tbl, "Position", "position")
-        if v ~= nil then frame.Position = v end
+        if v ~= nil then 
+            frame.Position = resolveUDim2(v, frame.Position)
+        end
 
         v = pick(tbl, "TextSize", "textSize")
         if v ~= nil then
@@ -800,20 +837,17 @@ function createInfoGui(config)
         local v = pick(tbl, "Enabled", "enabled")
         if v ~= nil then autoSizeEnabled = v == true end
 
-        v = pick(tbl, "MaxSize", "maxSize")
-        if v ~= nil then autoSizeMaxSize = tonumber(v) or autoSizeMaxSize end
-
         v = pick(tbl, "WindowEdge", "windowEdge")
         if v ~= nil then autoSizeWindowEdge = v == true end
 
-        v = pick(tbl, "WindowEdgeWithMaxSize", "windowEdgeWithMaxSize")
-        if v ~= nil then autoSizeWindowEdgeWithMaxSize = v == true end
+        v = pick(tbl, "WindowEdgeWithSize", "windowEdgeWithSize")
+        if v ~= nil then autoSizeWindowEdgeWithSize = v == true end
 
         v = pick(tbl, "side", "Side")
         if v ~= nil then
             local newSide = tostring(v):lower()
             if newSide ~= autoSizeSide then
-                -- Исправленный расчет позиции при смене стороны (не смешиваем Scale и Offset)
+                -- Исправленный расчет позиции при смене стороны
                 local oldAnchor = frame.AnchorPoint
                 local pos = frame.Position
                 local sizeX = frame.Size.X.Offset
@@ -837,6 +871,22 @@ function createInfoGui(config)
                     tlScaleY, 
                     tlOffsetY + newAnchor.Y * sizeY
                 )
+
+                -- Обновляем свойства текста и скролла
+                if autoSizeSide == "left" or autoSizeSide == "right" then
+                    scrolling.ScrollingDirection = Enum.ScrollingDirection.XY
+                    scrolling.AutomaticCanvasSize = Enum.AutomaticSize.XY
+                else
+                    scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
+                    scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
+                end
+
+                for _, ui in pairs(labels) do
+                    ui.frame.AutomaticSize = (autoSizeSide == "left" or autoSizeSide == "right") and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+                    ui.text.Size = (autoSizeSide == "left" or autoSizeSide == "right") and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+                    ui.text.AutomaticSize = (autoSizeSide == "left" or autoSizeSide == "right") and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+                    ui.text.TextWrapped = (autoSizeSide == "up" or autoSizeSide == "down")
+                end
             end
         end
 
