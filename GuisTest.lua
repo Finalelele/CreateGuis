@@ -53,13 +53,12 @@ function Fx.newShadow(parent, cfg, z)
     local s = Instance.new("ImageLabel")
     s.Name = "Shadow"
     s.AnchorPoint = Vector2.new(0.5, 0.5)
-    s.Position = UDim2.new(0.5, 0, 0.5, 0)
+    s.Position = UDim2.new(0.5, 0, 0.5, 4)
     s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
     s.ScaleType = Enum.ScaleType.Slice
-    -- Уменьшили SliceCenter, чтобы тень можно было сжимать без наслоения краев
-    s.SliceCenter = Rect.new(20, 20, 490, 490)
+    s.SliceCenter = Rect.new(49, 49, 450, 450)
     s.ImageColor3 = pick(cfg, "color", "Color") or BLACK
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
     s.ZIndex = z or 0
@@ -84,6 +83,7 @@ function Fx.addBorderGradient(stroke, color, strength)
     return obj
 end
 
+-- ИСПРАВЛЕНИЕ 1: Добавлен аргумент radius для скругления Sheen и Gloss
 function Fx.addDepth(body, strength, z, radius)
     local parts = {}
     local r = radius or 8
@@ -525,7 +525,15 @@ function createInfoGui(config)
 
         if collapsed then
             targetHeight = headerHeight
+            -- ИСПРАВЛЕНИЕ 2: Не сжимать окно по X при сворачивании
             targetWidth = frame.Size.X.Offset 
+            
+            -- ИСПРАВЛЕНИЕ 3: Фикс накопления глоу (тени) при сворачивании
+            if shadow then
+                local pad = pick(shadowCfg, "size", "Size") or 24
+                shadow.ScaleType = Enum.ScaleType.Stretch
+                shadow.Size = UDim2.new(1, pad * 2, 0, targetHeight + pad * 2)
+            end
         else
             if autoSizeEnabled then
                 if isHorizontal then
@@ -541,12 +549,12 @@ function createInfoGui(config)
                 targetWidth = maxX
                 targetHeight = maxY
             end
-        end
 
-        -- ИСПРАВЛЕНИЕ: Убрано жесткое задание shadow.Size и minSize. 
-        -- Тень плавно масштабируется вместе с окном благодаря привязке UDim2.new(1, pad*2, 1, pad*2).
-        if shadow then
-            shadow.ImageTransparency = tShadow()
+            if shadow then
+                local pad = pick(shadowCfg, "size", "Size") or 24
+                shadow.ScaleType = Enum.ScaleType.Slice
+                shadow.Size = UDim2.new(1, pad * 2, 1, pad * 2)
+            end
         end
 
         if not collapsed then
