@@ -1554,13 +1554,20 @@ function createInfoText(config)
     end
 
     local function applyWindowLayout(animate)
-        if not windowFrame then return end
-        local gt = showWindow and 0 or 1
-        local st = showWindow and tShadow() or 1
-        tween(windowFrame, sizeTweenInfo, { GroupTransparency = gt }, not animate)
-        tween(shadowObj, sizeTweenInfo, { ImageTransparency = st }, not animate)
-        if windowStrokeObj then
-            tween(windowStrokeObj, sizeTweenInfo, { Transparency = showWindow and tBorder() or 1 }, not animate)
+        if not windowFrame or not shadowObj then return end
+        
+        -- ИСПРАВЛЕНИЕ: Жесткое скрытие окна и тени через Visible
+        windowFrame.Visible = showWindow
+        shadowObj.Visible = showWindow
+
+        if showWindow then
+            local gt = 0
+            local st = tShadow()
+            tween(windowFrame, sizeTweenInfo, { GroupTransparency = gt }, not animate)
+            tween(shadowObj, sizeTweenInfo, { ImageTransparency = st }, not animate)
+            if windowStrokeObj then
+                tween(windowStrokeObj, sizeTweenInfo, { Transparency = tBorder() }, not animate)
+            end
         end
     end
 
@@ -2085,7 +2092,6 @@ function createInfoText(config)
 
     return api
 end
-
 
 --====================================================================
 --  createRadar
