@@ -2833,6 +2833,26 @@ end
 Presets.Blue  = Presets.Make(Color3.fromRGB(56, 128, 255), Color3.fromRGB(8, 12, 26))
 Presets.Green = Presets.Make(Color3.fromRGB(46, 230, 130), Color3.fromRGB(6, 20, 15))
 Presets.Red   = Presets.Make(Color3.fromRGB(255, 66, 84),  Color3.fromRGB(24, 8, 12))
+-- default color
+Presets.Dark = {
+	Background = {color = Color3.fromRGB(14, 17, 26),   transparency = 0.08},
+	Topbar     = {color = Color3.fromRGB(22, 26, 38),   transparency = 0.2},
+	TopbarLine = {color = Color3.fromRGB(70, 140, 255)},
+	Accent     = {color = Color3.fromRGB(70, 140, 255)},
+	Title      = {color = Color3.fromRGB(245, 247, 255)},
+	Border     = {color = Color3.fromRGB(70, 85, 125), thickness = 1, transparency = 0.2},
+	Corner     = {radius = 10},
+	Shadow     = {color = Color3.fromRGB(0, 0, 0), transparency = 0.55, size = 30},
+	LineToggle = {color = Color3.fromRGB(40, 46, 66), textColor = Color3.fromRGB(215, 220, 235)},
+	Scrollbar  = {color = Color3.fromRGB(70, 140, 255)},
+	LineText   = {color = Color3.fromRGB(235, 238, 248)},
+	Font       = {title = Enum.Font.GothamSemibold, text = Enum.Font.GothamMedium},
+	Radar      = {color = Color3.fromRGB(6, 8, 14), transparency = 0.1},
+	Grid       = {color = Color3.fromRGB(70, 80, 105)},
+	Crosshair  = {color = Color3.fromRGB(60, 68, 90)},
+	Padding    = {value = 8},
+	Depth      = {strength = 1},
+}
 
 return {
     createInfoGui  = createInfoGui,
