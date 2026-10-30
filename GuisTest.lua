@@ -48,9 +48,9 @@ local function tween(obj, info, props, instant)
     end
 end
 
--- ИСПРАВЛЕНИЕ 1: Ограничитель SliceScale для сохранения круглых углов
+-- ИСПРАВЛЕНИЕ: Дефолтный размер тени теперь 30
 function Fx.setShadowSize(s, pad)
-    pad = math.max(tonumber(pad) or 24, 1)
+    pad = math.max(tonumber(pad) or 30, 1)
     s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
     s.SliceScale = math.clamp(pad / 24, 0.7, 1.5)
 end
@@ -59,8 +59,7 @@ function Fx.newShadow(parent, cfg, z)
     local s = Instance.new("ImageLabel")
     s.Name = "Shadow"
     s.AnchorPoint = Vector2.new(0.5, 0.5)
-    -- ИСПРАВЛЕНИЕ 2: Убрано смещение вниз на 4 пикселя
-    s.Position = UDim2.new(0.5, 0, 0.5, 0) 
+    s.Position = UDim2.new(0.5, 0, 0.5, 0)
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
     s.ScaleType = Enum.ScaleType.Slice
@@ -69,7 +68,8 @@ function Fx.newShadow(parent, cfg, z)
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
     s.ZIndex = z or 0
     s.Active = false
-    Fx.setShadowSize(s, pick(cfg, "size", "Size") or 24)
+    -- ИСПРАВЛЕНИЕ: Дефолт 30 вместо 24
+    Fx.setShadowSize(s, pick(cfg, "size", "Size") or 30)
     s.Parent = parent
     return s
 end
@@ -681,8 +681,8 @@ function createInfoGui(config)
             ui.glow.ImageColor3 = onColor
             tween(ui.glow, quickInfo, { ImageTransparency = active and 0.6 or 1 }, instant)
 
-            -- КРАСИВАЯ АНИМАЦИЯ КРУЖОЧКА
-            local targetPos = active and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+            -- ИСПРАВЛЕНИЕ: Убран оффсет -7 по Y, чтобы кружочек был по центру
+            local targetPos = active and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
             
             if instant or ui.lastActive == nil then
                 ui.knob.Position = targetPos
@@ -821,7 +821,8 @@ function createInfoGui(config)
             knob.Name = "ToggleKnob"
             knob.AnchorPoint = Vector2.new(0, 0.5)
             knob.Size = UDim2.fromOffset(14, 14)
-            knob.Position = UDim2.new(0, 2, 0.5, -7)
+            -- ИСПРАВЛЕНИЕ: Убран оффсет -7, чтобы кружочек был по центру
+            knob.Position = UDim2.new(0, 2, 0.5, 0)
             knob.BackgroundColor3 = WHITE
             knob.BorderSizePixel = 0
             knob.AutoButtonColor = false
@@ -2817,11 +2818,10 @@ function Presets.Make(accent, deep, opts)
         Title      = { color = WHITE:Lerp(accent, 0.12) },
         Border     = { color = accent, thickness = 1, transparency = 0.25 },
         Corner     = { radius = 12 },
-        Shadow     = { color = accent, transparency = 0.72, size = 26 },
+        Shadow     = { color = accent, transparency = 0.72, size = 30 },
         LineToggle = { color = deep:Lerp(accent, 0.2), textColor = WHITE:Lerp(accent, 0.2) },
         Scrollbar  = { color = accent },
         LineText   = { color = Color3.fromRGB(218, 224, 240):Lerp(accent, 0.08) },
-        Font       = { title = Enum.Font.BuilderSansBold, text = Enum.Font.BuilderSansMedium },
         Radar      = { color = deep:Lerp(BLACK, 0.3), transparency = glass * 0.6 },
         Grid       = { color = accent:Lerp(deep, 0.55) },
         Crosshair  = { color = accent:Lerp(deep, 0.6) },
