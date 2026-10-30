@@ -53,12 +53,13 @@ function Fx.newShadow(parent, cfg, z)
     local s = Instance.new("ImageLabel")
     s.Name = "Shadow"
     s.AnchorPoint = Vector2.new(0.5, 0.5)
-    s.Position = UDim2.new(0.5, 0, 0.5, 0) -- ИСПРАВЛЕНИЕ 1: Убран сдвиг вниз на 4 пикселя
+    s.Position = UDim2.new(0.5, 0, 0.5, 0)
     s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
     s.ScaleType = Enum.ScaleType.Slice
-    s.SliceCenter = Rect.new(49, 49, 450, 450)
+    -- Уменьшили SliceCenter, чтобы тень можно было сжимать без наслоения краев
+    s.SliceCenter = Rect.new(20, 20, 490, 490)
     s.ImageColor3 = pick(cfg, "color", "Color") or BLACK
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
     s.ZIndex = z or 0
@@ -542,14 +543,9 @@ function createInfoGui(config)
             end
         end
 
-        -- ИСПРАВЛЕНИЕ 2: Тень сохраняется при сворачивании, не дает 9-slice схлопнуться и не перекрывает сама себя
+        -- ИСПРАВЛЕНИЕ: Убрано жесткое задание shadow.Size и minSize. 
+        -- Тень плавно масштабируется вместе с окном благодаря привязке UDim2.new(1, pad*2, 1, pad*2).
         if shadow then
-            local pad = pick(shadowCfg, "size", "Size") or 24
-            shadow.ScaleType = Enum.ScaleType.Slice
-            local minSize = 100 -- 9-slice требует минимум 100 пикселей, чтобы не превратиться в прямоугольник
-            local shadowW = math.max(targetWidth, minSize)
-            local shadowH = math.max(targetHeight, minSize)
-            shadow.Size = UDim2.fromOffset(shadowW + pad * 2, shadowH + pad * 2)
             shadow.ImageTransparency = tShadow()
         end
 
@@ -1344,7 +1340,7 @@ function createInfoGui(config)
             local t = pick(n, "transparency", "Transparency")
             if t ~= nil then shadowCfg.transparency = t tween(shadow, tweenInfo, { ImageTransparency = t }) end
             local sz = pick(n, "size", "Size")
-            if sz then shadowCfg.size = sz updateFrameSize(true) end
+            if sz then shadowCfg.size = sz shadow.Size = UDim2.new(1, sz * 2, 1, sz * 2) end
         end
 
         n = pick(tbl, "LineToggle", "lineToggle")
@@ -2020,7 +2016,7 @@ function createInfoText(config)
                 if showWindow then tween(shadowObj, sizeTweenInfo, { ImageTransparency = t }) end
             end
             local sz = pick(n, "size", "Size")
-            if sz then shadowCfg.size = sz updateSize(true) end
+            if sz then shadowCfg.size = sz if shadowObj then shadowObj.Size = UDim2.new(1, sz * 2, 1, sz * 2) end end
         end
 
         n = pick(tbl, "Padding", "padding")
