@@ -1,9 +1,9 @@
 # CreateGuis
+Official updated version
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Finalelele/CreateGuis/refs/heads/main/GuisTest.lua?t="..tick()))()
 
+Version with testing updates
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Finalelele/CreateGuis/refs/heads/main/Guis.lua?t="..tick()))()
-
-# CreateGuis
 
 Customizable, animated windows for Roblox: **Info Gui** (draggable window with lines and toggles), **Info Text Gui** (billboard text above an object) and **Radar**.
 
@@ -413,6 +413,26 @@ local InfoGui = Guis.createInfoGui({
 })
 
 InfoGui:SetCustomWindow({Accent = {color = Color3.fromRGB(255, 66, 84)}})
+```
+
+## Presets
+
+Ready-made semi-transparent glass styles in blue, green and red. They work for all three windows.
+
+```lua
+local InfoGui = Guis.createInfoGui({Title = "Example", CustomWindow = Guis.Presets.Blue})
+local InfoText = Guis.createInfoText({Center = workspace.ExamplePart, ShowWindow = true, CustomWindow = Guis.Presets.Green})
+local Radar = Guis.createRadar({CustomWindow = Guis.Presets.Red})
+
+InfoGui:ApplyPreset(Guis.Presets.Red) -- switch preset on the fly
+```
+
+Make your own preset:
+
+```lua
+-- Presets.Make(accent, deep, {transparency = number})
+-- accent: bright main color, deep: very dark background tint, transparency: window glass (0 = solid)
+local Purple = Guis.Presets.Make(Color3.fromRGB(170, 90, 255), Color3.fromRGB(18, 10, 28), {transparency = 0.3})
 ```
 
 ## CustomWindow keys
