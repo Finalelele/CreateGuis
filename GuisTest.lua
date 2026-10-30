@@ -48,11 +48,10 @@ local function tween(obj, info, props, instant)
     end
 end
 
--- ИСПРАВЛЕНИЕ 1 (Тень): Добавлена функция для правильного масштабирования 9-slice
 function Fx.setShadowSize(s, pad)
     pad = math.max(tonumber(pad) or 24, 1)
     s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
-    s.SliceScale = pad / 49
+    s.SliceScale = pad / 150 -- Обновлено под новый SliceCenter
 end
 
 function Fx.newShadow(parent, cfg, z)
@@ -63,7 +62,8 @@ function Fx.newShadow(parent, cfg, z)
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
     s.ScaleType = Enum.ScaleType.Slice
-    s.SliceCenter = Rect.new(49, 49, 450, 450)
+    -- ИСПРАВЛЕНИЕ: Увеличен SliceCenter для более круглых углов
+    s.SliceCenter = Rect.new(128, 128, 372, 372) 
     s.ImageColor3 = pick(cfg, "color", "Color") or BLACK
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
     s.ZIndex = z or 0
@@ -242,10 +242,14 @@ function createInfoGui(config)
     end
 
     loadSaveData()
+    -- ИСПРАВЛЕНИЕ 1: Загрузка состояния collapsed из файла
     if savePosEnabled and savePosId and saveData[savePosId] then
         local pos = saveData[savePosId]
         if type(pos) == "table" and pos.XScale then
             position = UDim2.new(pos.XScale, pos.XOffset, pos.YScale, pos.YOffset)
+        end
+        if pos.collapsed ~= nil then
+            config.Collapsed = pos.collapsed
         end
     end
 
@@ -255,7 +259,6 @@ function createInfoGui(config)
     local EDGE_MARGIN   = 12
 
     local TRACK_W, TRACK_H, KNOB_H = 34, 18, 14
-    -- ИСПРАВЛЕНИЕ 2: Добавлены константы позиций ручки
     local KNOB_OFF_X = 2 + KNOB_H / 2
     local KNOB_ON_X  = TRACK_W - 2 - KNOB_H / 2
 
@@ -551,8 +554,6 @@ function createInfoGui(config)
             end
         end
 
-        -- Удалены хаки с тенью (Stretch), теперь она корректно работает благодаря SliceScale
-
         if not collapsed then
             local availableW = targetWidth
             local availableH = targetHeight - headerHeight
@@ -682,7 +683,6 @@ function createInfoGui(config)
             ui.glow.ImageColor3 = onColor
             tween(ui.glow, quickInfo, { ImageTransparency = active and 0.6 or 1 }, instant)
 
-            -- ИСПРАВЛЕНИЕ 2: Логика движения ручки
             local knobPos = UDim2.new(0, active and KNOB_ON_X or KNOB_OFF_X, 0.5, 0)
             if instant or ui.knobActive == nil then
                 ui.knobToken = (ui.knobToken or 0) + 1
@@ -827,7 +827,6 @@ function createInfoGui(config)
             local knob = Instance.new("ImageButton")
             knob.Name = "ToggleKnob"
             knob.Size = UDim2.fromOffset(KNOB_H, KNOB_H)
-            -- ИСПРАВЛЕНИЕ 2: Установка AnchorPoint и правильной начальной позиции
             knob.AnchorPoint = Vector2.new(0.5, 0.5)
             knob.Position = UDim2.new(0, KNOB_OFF_X, 0.5, 0)
             knob.BackgroundColor3 = WHITE
@@ -850,7 +849,6 @@ function createInfoGui(config)
             knobStroke.Thickness = 1
             knobStroke.Parent = knob
 
-            -- ИСПРАВЛЕНИЕ 2: lastInput защищает от двойного клика
             local lastInput
             local function onDown(input)
                 if input == lastInput then return end
@@ -1067,8 +1065,6 @@ function createInfoGui(config)
     task.defer(function() if not collapsed then updateFrameSize(false) end end)
     playIntro()
 
-    -- Удален connect(UserInputService.InputEnded, ...) со сбросом pressed
-
     if savePosId then
         local saveDebounce = false
         connect(frame:GetPropertyChangedSignal("Position"), function()
@@ -1076,14 +1072,30 @@ function createInfoGui(config)
             saveDebounce = true
             task.delay(1, function()
                 local p = frame.Position
+                -- ИСПРАВЛЕНИЕ 1: Сохраняем также collapsed
                 saveData[savePosId] = {
                     XScale = p.X.Scale, XOffset = p.X.Offset,
-                    YScale = p.Y.Scale, YOffset = p.Y.Offset
+                    YScale = p.Y.Scale, YOffset = p.Y.Offset,
+                    collapsed = collapsed
                 }
                 saveDataToFile()
                 saveDebounce = false
             end)
         end)
+        -- Сохраняем при изменении состояния свернутости
+        local oldSetCollapsed = setCollapsed
+        setCollapsed = function(state, animate)
+            oldSetCollapsed(state, animate)
+            if savePosId then
+                local p = frame.Position
+                saveData[savePosId] = {
+                    XScale = p.X.Scale, XOffset = p.X.Offset,
+                    YScale = p.Y.Scale, YOffset = p.Y.Offset,
+                    collapsed = collapsed
+                }
+                saveDataToFile()
+            end
+        end
     end
 
     local function updateDrag(input)
@@ -1358,7 +1370,6 @@ function createInfoGui(config)
             local t = pick(n, "transparency", "Transparency")
             if t ~= nil then shadowCfg.transparency = t tween(shadow, tweenInfo, { ImageTransparency = t }) end
             local sz = pick(n, "size", "Size")
-            -- ИСПРАВЛЕНИЕ 1: Используем Fx.setShadowSize
             if sz then shadowCfg.size = sz Fx.setShadowSize(shadow, sz) end
         end
 
@@ -1562,6 +1573,10 @@ function createInfoText(config)
         local st = showWindow and tShadow() or 1
         tween(windowFrame, sizeTweenInfo, { GroupTransparency = gt }, not animate)
         tween(shadowObj, sizeTweenInfo, { ImageTransparency = st }, not animate)
+        -- ИСПРАВЛЕНИЕ 2: Принудительное скрытие белой обводки, если ShowWindow = false
+        if windowStrokeObj then
+            tween(windowStrokeObj, sizeTweenInfo, { Transparency = showWindow and tBorder() or 1 }, not animate)
+        end
     end
 
     local function measureContent()
@@ -2035,7 +2050,6 @@ function createInfoText(config)
                 if showWindow then tween(shadowObj, sizeTweenInfo, { ImageTransparency = t }) end
             end
             local sz = pick(n, "size", "Size")
-            -- ИСПРАВЛЕНИЕ 1: Используем Fx.setShadowSize
             if sz then shadowCfg.size = sz if shadowObj then Fx.setShadowSize(shadowObj, sz) end end
         end
 
@@ -2138,7 +2152,8 @@ function createRadar(config)
     local CenterOffset = pick(config, "CenterOffset", "centerOffset") or Vector3.zero
     local EDGE_TEXT_HIDE_THRESHOLD = tonumber(pick(config, "TextHideThreshold", "textHideThreshold")) or 0.95
 
-    local sweepEnabled = pick(config, "Sweep", "sweep")
+    -- ИСПРАВЛЕНИЕ 3: Добавлен параметр Animated
+    local sweepEnabled = pick(config, "Animated", "animated", "Sweep", "sweep")
     if sweepEnabled == nil then sweepEnabled = pick(radarCfg, "sweep", "Sweep") end
     if sweepEnabled == nil then sweepEnabled = true end
     local sweepSpeed = tonumber(pick(config, "SweepSpeed", "sweepSpeed")) or 110
@@ -2665,7 +2680,8 @@ function createRadar(config)
         v = pick(tbl, "TextHideThreshold", "textHideThreshold")
         if v ~= nil then EDGE_TEXT_HIDE_THRESHOLD = tonumber(v) or EDGE_TEXT_HIDE_THRESHOLD end
 
-        v = pick(tbl, "Sweep", "sweep")
+        -- ИСПРАВЛЕНИЕ 3: Поддержка Animated в SetParameter
+        v = pick(tbl, "Animated", "animated", "Sweep", "sweep")
         if v ~= nil then sweepEnabled = v == true sweepHolder.Visible = sweepEnabled end
 
         v = pick(tbl, "SweepSpeed", "sweepSpeed")
@@ -2768,7 +2784,6 @@ function createRadar(config)
             local t = pick(n, "transparency", "Transparency")
             if t ~= nil then shadowCfg.transparency = t tween(shadow, tinfo, { ImageTransparency = t }) end
             local sz = pick(n, "size", "Size")
-            -- ИСПРАВЛЕНИЕ 1: Используем Fx.setShadowSize
             if sz then shadowCfg.size = sz Fx.setShadowSize(shadow, sz) end
         end
 
