@@ -48,13 +48,18 @@ local function tween(obj, info, props, instant)
     end
 end
 
+-- ИСПРАВЛЕНИЕ 1 (Тень): Добавлена функция для правильного масштабирования 9-slice
+function Fx.setShadowSize(s, pad)
+    pad = math.max(tonumber(pad) or 24, 1)
+    s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
+    s.SliceScale = pad / 49
+end
+
 function Fx.newShadow(parent, cfg, z)
-    local pad = tonumber(pick(cfg, "size", "Size")) or 24
     local s = Instance.new("ImageLabel")
     s.Name = "Shadow"
     s.AnchorPoint = Vector2.new(0.5, 0.5)
     s.Position = UDim2.new(0.5, 0, 0.5, 4)
-    s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
     s.ScaleType = Enum.ScaleType.Slice
@@ -63,6 +68,7 @@ function Fx.newShadow(parent, cfg, z)
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
     s.ZIndex = z or 0
     s.Active = false
+    Fx.setShadowSize(s, pick(cfg, "size", "Size") or 24)
     s.Parent = parent
     return s
 end
@@ -83,7 +89,6 @@ function Fx.addBorderGradient(stroke, color, strength)
     return obj
 end
 
--- ИСПРАВЛЕНИЕ 1: Добавлен аргумент radius для скругления Sheen и Gloss
 function Fx.addDepth(body, strength, z, radius)
     local parts = {}
     local r = radius or 8
@@ -250,6 +255,9 @@ function createInfoGui(config)
     local EDGE_MARGIN   = 12
 
     local TRACK_W, TRACK_H, KNOB_H = 34, 18, 14
+    -- ИСПРАВЛЕНИЕ 2: Добавлены константы позиций ручки
+    local KNOB_OFF_X = 2 + KNOB_H / 2
+    local KNOB_ON_X  = TRACK_W - 2 - KNOB_H / 2
 
     local tweenTime    = pick(config, "TweenTime", "tweenTime") or 0.22
     local tweenInfo    = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -525,15 +533,7 @@ function createInfoGui(config)
 
         if collapsed then
             targetHeight = headerHeight
-            -- ИСПРАВЛЕНИЕ 2: Не сжимать окно по X при сворачивании
             targetWidth = frame.Size.X.Offset 
-            
-            -- ИСПРАВЛЕНИЕ 3: Фикс накопления глоу (тени) при сворачивании
-            if shadow then
-                local pad = pick(shadowCfg, "size", "Size") or 24
-                shadow.ScaleType = Enum.ScaleType.Stretch
-                shadow.Size = UDim2.new(1, pad * 2, 0, targetHeight + pad * 2)
-            end
         else
             if autoSizeEnabled then
                 if isHorizontal then
@@ -549,13 +549,9 @@ function createInfoGui(config)
                 targetWidth = maxX
                 targetHeight = maxY
             end
-
-            if shadow then
-                local pad = pick(shadowCfg, "size", "Size") or 24
-                shadow.ScaleType = Enum.ScaleType.Slice
-                shadow.Size = UDim2.new(1, pad * 2, 1, pad * 2)
-            end
         end
+
+        -- Удалены хаки с тенью (Stretch), теперь она корректно работает благодаря SliceScale
 
         if not collapsed then
             local availableW = targetWidth
@@ -686,10 +682,30 @@ function createInfoGui(config)
             ui.glow.ImageColor3 = onColor
             tween(ui.glow, quickInfo, { ImageTransparency = active and 0.6 or 1 }, instant)
 
-            local kw = (ui.pressed == true) and (KNOB_H + 4) or KNOB_H
-            local kpos = active and UDim2.new(1, -(kw + 2), 0.5, -KNOB_H / 2) or UDim2.new(0, 2, 0.5, -KNOB_H / 2)
-            tween(ui.knob, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-                { Position = kpos, Size = UDim2.fromOffset(kw, KNOB_H) }, instant)
+            -- ИСПРАВЛЕНИЕ 2: Логика движения ручки
+            local knobPos = UDim2.new(0, active and KNOB_ON_X or KNOB_OFF_X, 0.5, 0)
+            if instant or ui.knobActive == nil then
+                ui.knobToken = (ui.knobToken or 0) + 1
+                ui.knob.Position = knobPos
+                ui.knob.Size = UDim2.fromOffset(KNOB_H, KNOB_H)
+                ui.knobActive = active
+            elseif ui.knobActive ~= active then
+                ui.knobActive = active
+                ui.knobToken = (ui.knobToken or 0) + 1
+                local token, knob = ui.knobToken, ui.knob
+
+                TweenService:Create(knob, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                    { Position = knobPos }):Play()
+
+                local squeeze = TweenService:Create(knob, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    { Size = UDim2.fromOffset(KNOB_H + 5, KNOB_H - 2) })
+                squeeze:Play()
+                squeeze.Completed:Connect(function()
+                    if ui.knobToken ~= token then return end
+                    TweenService:Create(knob, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                        { Size = UDim2.fromOffset(KNOB_H, KNOB_H) }):Play()
+                end)
+            end
 
             if t.image then
                 ui.knob.BackgroundTransparency = 1
@@ -811,7 +827,9 @@ function createInfoGui(config)
             local knob = Instance.new("ImageButton")
             knob.Name = "ToggleKnob"
             knob.Size = UDim2.fromOffset(KNOB_H, KNOB_H)
-            knob.Position = UDim2.new(0, 2, 0.5, -KNOB_H / 2)
+            -- ИСПРАВЛЕНИЕ 2: Установка AnchorPoint и правильной начальной позиции
+            knob.AnchorPoint = Vector2.new(0.5, 0.5)
+            knob.Position = UDim2.new(0, KNOB_OFF_X, 0.5, 0)
             knob.BackgroundColor3 = WHITE
             knob.BorderSizePixel = 0
             knob.AutoButtonColor = false
@@ -832,13 +850,15 @@ function createInfoGui(config)
             knobStroke.Thickness = 1
             knobStroke.Parent = knob
 
+            -- ИСПРАВЛЕНИЕ 2: lastInput защищает от двойного клика
+            local lastInput
             local function onDown(input)
+                if input == lastInput then return end
                 if input.UserInputType == Enum.UserInputType.MouseButton1
                     or input.UserInputType == Enum.UserInputType.Touch then
+                    lastInput = input
                     local s = lineData[id]
-                    local u = labels[id]
-                    if s and s.toggle and u then
-                        u.pressed = true
+                    if s and s.toggle then
                         s.toggle.value = not (s.toggle.value or false)
                         renderLine(id)
                         if s.toggle.callback then
@@ -864,7 +884,7 @@ function createInfoGui(config)
             labels[id] = {
                 frame = lineFrame, text = label, track = track, knob = knob,
                 glow = glow, trackStroke = trackStroke, shine = shine,
-                padding = padding, pressed = false,
+                padding = padding,
             }
             lineData[id] = {
                 id = id,
@@ -1047,17 +1067,7 @@ function createInfoGui(config)
     task.defer(function() if not collapsed then updateFrameSize(false) end end)
     playIntro()
 
-    connect(UserInputService.InputEnded, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-            for id, ui in pairs(labels) do
-                if ui.pressed then
-                    ui.pressed = false
-                    renderLine(id)
-                end
-            end
-        end
-    end)
+    -- Удален connect(UserInputService.InputEnded, ...) со сбросом pressed
 
     if savePosId then
         local saveDebounce = false
@@ -1348,7 +1358,8 @@ function createInfoGui(config)
             local t = pick(n, "transparency", "Transparency")
             if t ~= nil then shadowCfg.transparency = t tween(shadow, tweenInfo, { ImageTransparency = t }) end
             local sz = pick(n, "size", "Size")
-            if sz then shadowCfg.size = sz shadow.Size = UDim2.new(1, sz * 2, 1, sz * 2) end
+            -- ИСПРАВЛЕНИЕ 1: Используем Fx.setShadowSize
+            if sz then shadowCfg.size = sz Fx.setShadowSize(shadow, sz) end
         end
 
         n = pick(tbl, "LineToggle", "lineToggle")
@@ -2024,7 +2035,8 @@ function createInfoText(config)
                 if showWindow then tween(shadowObj, sizeTweenInfo, { ImageTransparency = t }) end
             end
             local sz = pick(n, "size", "Size")
-            if sz then shadowCfg.size = sz if shadowObj then shadowObj.Size = UDim2.new(1, sz * 2, 1, sz * 2) end end
+            -- ИСПРАВЛЕНИЕ 1: Используем Fx.setShadowSize
+            if sz then shadowCfg.size = sz if shadowObj then Fx.setShadowSize(shadowObj, sz) end end
         end
 
         n = pick(tbl, "Padding", "padding")
@@ -2756,7 +2768,8 @@ function createRadar(config)
             local t = pick(n, "transparency", "Transparency")
             if t ~= nil then shadowCfg.transparency = t tween(shadow, tinfo, { ImageTransparency = t }) end
             local sz = pick(n, "size", "Size")
-            if sz then shadowCfg.size = sz shadow.Size = UDim2.new(1, sz * 2, 1, sz * 2) end
+            -- ИСПРАВЛЕНИЕ 1: Используем Fx.setShadowSize
+            if sz then shadowCfg.size = sz Fx.setShadowSize(shadow, sz) end
         end
 
         n = pick(tbl, "Font", "font")
