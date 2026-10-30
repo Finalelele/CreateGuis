@@ -542,13 +542,19 @@ function createInfoGui(config)
             end
         end
 
-        -- ИСПРАВЛЕНИЕ: Используем Slice и ограничиваем минимальный размер, чтобы избежать растягивания и наложения
+        -- ИСПРАВЛЕНИЕ: Тень теперь идеально привязана к размеру окна
         if shadow then
             local pad = pick(shadowCfg, "size", "Size") or 24
             shadow.ScaleType = Enum.ScaleType.Slice
-            local shadowW = math.max(targetWidth, 100)
-            local shadowH = math.max(targetHeight, 100)
-            shadow.Size = UDim2.fromOffset(shadowW + pad * 2, shadowH + pad * 2)
+            -- Размер тени всегда 100% ширины и высоты окна + отступы
+            shadow.Size = UDim2.new(1, pad * 2, 1, pad * 2)
+            
+            -- Если окно сжимается меньше 100px, плавно гасим тень, чтобы избежать бага 9-slice
+            local t = tShadow()
+            if targetHeight < 100 then
+                t = math.min(1, t + (100 - targetHeight) / 100 * 0.7)
+            end
+            shadow.ImageTransparency = t
         end
 
         if not collapsed then
@@ -2018,7 +2024,7 @@ function createInfoText(config)
                 if showWindow then tween(shadowObj, sizeTweenInfo, { ImageTransparency = t }) end
             end
             local sz = pick(n, "size", "Size")
-            if sz then shadowCfg.size = sz if shadowObj then shadowObj.Size = UDim2.new(1, sz * 2, 1, sz * 2) end end
+            if sz then shadowCfg.size = sz updateSize(true) end
         end
 
         n = pick(tbl, "Padding", "padding")
