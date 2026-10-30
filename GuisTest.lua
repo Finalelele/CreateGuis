@@ -53,7 +53,7 @@ function Fx.newShadow(parent, cfg, z)
     local s = Instance.new("ImageLabel")
     s.Name = "Shadow"
     s.AnchorPoint = Vector2.new(0.5, 0.5)
-    s.Position = UDim2.new(0.5, 0, 0.5, 4)
+    s.Position = UDim2.new(0.5, 0, 0.5, 0) -- ИСПРАВЛЕНИЕ 1: Убран сдвиг вниз на 4 пикселя
     s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
@@ -542,19 +542,15 @@ function createInfoGui(config)
             end
         end
 
-        -- ИСПРАВЛЕНИЕ: Тень теперь идеально привязана к размеру окна
+        -- ИСПРАВЛЕНИЕ 2: Тень сохраняется при сворачивании, не дает 9-slice схлопнуться и не перекрывает сама себя
         if shadow then
             local pad = pick(shadowCfg, "size", "Size") or 24
             shadow.ScaleType = Enum.ScaleType.Slice
-            -- Размер тени всегда 100% ширины и высоты окна + отступы
-            shadow.Size = UDim2.new(1, pad * 2, 1, pad * 2)
-            
-            -- Если окно сжимается меньше 100px, плавно гасим тень, чтобы избежать бага 9-slice
-            local t = tShadow()
-            if targetHeight < 100 then
-                t = math.min(1, t + (100 - targetHeight) / 100 * 0.7)
-            end
-            shadow.ImageTransparency = t
+            local minSize = 100 -- 9-slice требует минимум 100 пикселей, чтобы не превратиться в прямоугольник
+            local shadowW = math.max(targetWidth, minSize)
+            local shadowH = math.max(targetHeight, minSize)
+            shadow.Size = UDim2.fromOffset(shadowW + pad * 2, shadowH + pad * 2)
+            shadow.ImageTransparency = tShadow()
         end
 
         if not collapsed then
