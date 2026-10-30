@@ -1555,10 +1555,14 @@ function createInfoText(config)
 
     local function applyWindowLayout(animate)
         if not windowFrame then return end
+        
+        windowFrame.Visible = showWindow
+        if shadowObj then shadowObj.Visible = showWindow end
+
         local gt = showWindow and 0 or 1
         local st = showWindow and tShadow() or 1
         tween(windowFrame, sizeTweenInfo, { GroupTransparency = gt }, not animate)
-        tween(shadowObj, sizeTweenInfo, { ImageTransparency = st }, not animate)
+        if shadowObj then tween(shadowObj, sizeTweenInfo, { ImageTransparency = st }, not animate) end
         if windowStrokeObj then
             tween(windowStrokeObj, sizeTweenInfo, { Transparency = showWindow and tBorder() or 1 }, not animate)
         end
@@ -1635,6 +1639,12 @@ function createInfoText(config)
             billboard.Enabled = isActive
             if uiScale then uiScale.Scale = scaleFactor end
             billboard.Size = UDim2.fromOffset(basePixelSize.X * scaleFactor, basePixelSize.Y * scaleFactor)
+
+            -- ИСПРАВЛЕНИЕ: Пропорционально сжимаем отступ (pad) тени
+            if shadowObj then
+                local basePad = pick(shadowCfg, "size", "Size") or 30
+                Fx.setShadowSize(shadowObj, basePad * scaleFactor)
+            end
         end
     end
 
@@ -1675,6 +1685,7 @@ function createInfoText(config)
 
         shadowObj = Fx.newShadow(billboard, shadowCfg, zIndex)
         shadowObj.ImageTransparency = 1
+        shadowObj.Visible = showWindow
 
         windowFrame = Instance.new("CanvasGroup")
         windowFrame.Name = "Window"
@@ -1683,6 +1694,7 @@ function createInfoText(config)
         windowFrame.BackgroundTransparency = tBg()
         windowFrame.BorderSizePixel = 0
         windowFrame.GroupTransparency = 1
+        windowFrame.Visible = showWindow
         windowFrame.ZIndex = zIndex + 1
         windowFrame.Parent = billboard
 
@@ -2085,7 +2097,6 @@ function createInfoText(config)
 
     return api
 end
-
 
 --====================================================================
 --  createRadar
