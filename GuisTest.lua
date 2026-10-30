@@ -1556,7 +1556,6 @@ function createInfoText(config)
     local function applyWindowLayout(animate)
         if not windowFrame then return end
         
-        -- ИСПРАВЛЕНИЕ: Жестко управляем видимостью через Visible
         windowFrame.Visible = showWindow
         if shadowObj then shadowObj.Visible = showWindow end
 
@@ -1640,6 +1639,12 @@ function createInfoText(config)
             billboard.Enabled = isActive
             if uiScale then uiScale.Scale = scaleFactor end
             billboard.Size = UDim2.fromOffset(basePixelSize.X * scaleFactor, basePixelSize.Y * scaleFactor)
+
+            -- ИСПРАВЛЕНИЕ: Пропорционально сжимаем отступ (pad) тени
+            if shadowObj then
+                local basePad = pick(shadowCfg, "size", "Size") or 30
+                Fx.setShadowSize(shadowObj, basePad * scaleFactor)
+            end
         end
     end
 
@@ -1680,7 +1685,7 @@ function createInfoText(config)
 
         shadowObj = Fx.newShadow(billboard, shadowCfg, zIndex)
         shadowObj.ImageTransparency = 1
-        shadowObj.Visible = showWindow -- ИСПРАВЛЕНИЕ
+        shadowObj.Visible = showWindow
 
         windowFrame = Instance.new("CanvasGroup")
         windowFrame.Name = "Window"
@@ -1689,7 +1694,7 @@ function createInfoText(config)
         windowFrame.BackgroundTransparency = tBg()
         windowFrame.BorderSizePixel = 0
         windowFrame.GroupTransparency = 1
-        windowFrame.Visible = showWindow -- ИСПРАВЛЕНИЕ
+        windowFrame.Visible = showWindow
         windowFrame.ZIndex = zIndex + 1
         windowFrame.Parent = billboard
 
