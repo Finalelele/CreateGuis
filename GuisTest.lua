@@ -51,7 +51,7 @@ end
 function Fx.setShadowSize(s, pad)
     pad = math.max(tonumber(pad) or 24, 1)
     s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
-    s.SliceScale = pad / 150 -- Обновлено под новый SliceCenter
+    s.SliceScale = pad / 49
 end
 
 function Fx.newShadow(parent, cfg, z)
@@ -62,8 +62,8 @@ function Fx.newShadow(parent, cfg, z)
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
     s.ScaleType = Enum.ScaleType.Slice
-    -- ИСПРАВЛЕНИЕ: Увеличен SliceCenter для более круглых углов
-    s.SliceCenter = Rect.new(128, 128, 372, 372) 
+    -- ИСПРАВЛЕНИЕ: Возвращен оригинальный SliceCenter для круглого глоу
+    s.SliceCenter = Rect.new(49, 49, 450, 450) 
     s.ImageColor3 = pick(cfg, "color", "Color") or BLACK
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
     s.ZIndex = z or 0
@@ -242,7 +242,6 @@ function createInfoGui(config)
     end
 
     loadSaveData()
-    -- ИСПРАВЛЕНИЕ 1: Загрузка состояния collapsed из файла
     if savePosEnabled and savePosId and saveData[savePosId] then
         local pos = saveData[savePosId]
         if type(pos) == "table" and pos.XScale then
@@ -259,8 +258,6 @@ function createInfoGui(config)
     local EDGE_MARGIN   = 12
 
     local TRACK_W, TRACK_H, KNOB_H = 34, 18, 14
-    local KNOB_OFF_X = 2 + KNOB_H / 2
-    local KNOB_ON_X  = TRACK_W - 2 - KNOB_H / 2
 
     local tweenTime    = pick(config, "TweenTime", "tweenTime") or 0.22
     local tweenInfo    = TweenInfo.new(tweenTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -683,29 +680,9 @@ function createInfoGui(config)
             ui.glow.ImageColor3 = onColor
             tween(ui.glow, quickInfo, { ImageTransparency = active and 0.6 or 1 }, instant)
 
-            local knobPos = UDim2.new(0, active and KNOB_ON_X or KNOB_OFF_X, 0.5, 0)
-            if instant or ui.knobActive == nil then
-                ui.knobToken = (ui.knobToken or 0) + 1
-                ui.knob.Position = knobPos
-                ui.knob.Size = UDim2.fromOffset(KNOB_H, KNOB_H)
-                ui.knobActive = active
-            elseif ui.knobActive ~= active then
-                ui.knobActive = active
-                ui.knobToken = (ui.knobToken or 0) + 1
-                local token, knob = ui.knobToken, ui.knob
-
-                TweenService:Create(knob, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                    { Position = knobPos }):Play()
-
-                local squeeze = TweenService:Create(knob, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    { Size = UDim2.fromOffset(KNOB_H + 5, KNOB_H - 2) })
-                squeeze:Play()
-                squeeze.Completed:Connect(function()
-                    if ui.knobToken ~= token then return end
-                    TweenService:Create(knob, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                        { Size = UDim2.fromOffset(KNOB_H, KNOB_H) }):Play()
-                end)
-            end
+            -- ИСПРАВЛЕНИЕ: Убран весь сложный код, возвращена простая рабочая анимация
+            local targetPos = active and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
+            TweenService:Create(ui.knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
 
             if t.image then
                 ui.knob.BackgroundTransparency = 1
@@ -826,9 +803,8 @@ function createInfoGui(config)
 
             local knob = Instance.new("ImageButton")
             knob.Name = "ToggleKnob"
-            knob.Size = UDim2.fromOffset(KNOB_H, KNOB_H)
-            knob.AnchorPoint = Vector2.new(0.5, 0.5)
-            knob.Position = UDim2.new(0, KNOB_OFF_X, 0.5, 0)
+            knob.Size = UDim2.fromOffset(10, 10)
+            knob.Position = UDim2.new(0, 2, 0.5, -5)
             knob.BackgroundColor3 = WHITE
             knob.BorderSizePixel = 0
             knob.AutoButtonColor = false
@@ -838,35 +814,29 @@ function createInfoGui(config)
             knobCorner.CornerRadius = UDim.new(1, 0)
             knobCorner.Parent = knob
 
-            local knobGrad = Instance.new("UIGradient")
-            knobGrad.Rotation = 90
-            knobGrad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 206, 222))
-            knobGrad.Parent = knob
-
-            local knobStroke = Instance.new("UIStroke")
-            knobStroke.Color = BLACK
-            knobStroke.Transparency = 0.72
-            knobStroke.Thickness = 1
-            knobStroke.Parent = knob
-
-            local lastInput
-            local function onDown(input)
-                if input == lastInput then return end
-                if input.UserInputType == Enum.UserInputType.MouseButton1
-                    or input.UserInputType == Enum.UserInputType.Touch then
-                    lastInput = input
-                    local s = lineData[id]
-                    if s and s.toggle then
-                        s.toggle.value = not (s.toggle.value or false)
-                        renderLine(id)
-                        if s.toggle.callback then
-                            s.toggle.callback(s.toggle.value)
-                        end
+            -- ИСПРАВЛЕНИЕ: Возвращен простой и рабочий onToggleClick
+            local function onToggleClick()
+                local s = lineData[id]
+                if s and s.toggle then
+                    s.toggle.value = not (s.toggle.value or false)
+                    renderLine(id)
+                    if s.toggle.callback then
+                        s.toggle.callback(s.toggle.value)
                     end
                 end
             end
-            track.InputBegan:Connect(onDown)
-            knob.InputBegan:Connect(onDown)
+
+            track.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    onToggleClick()
+                end
+            end)
+            
+            knob.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    onToggleClick()
+                end
+            end)
 
             lineFrame.MouseEnter:Connect(function()
                 local s = lineData[id]
@@ -1072,7 +1042,6 @@ function createInfoGui(config)
             saveDebounce = true
             task.delay(1, function()
                 local p = frame.Position
-                -- ИСПРАВЛЕНИЕ 1: Сохраняем также collapsed
                 saveData[savePosId] = {
                     XScale = p.X.Scale, XOffset = p.X.Offset,
                     YScale = p.Y.Scale, YOffset = p.Y.Offset,
@@ -1082,7 +1051,7 @@ function createInfoGui(config)
                 saveDebounce = false
             end)
         end)
-        -- Сохраняем при изменении состояния свернутости
+        
         local oldSetCollapsed = setCollapsed
         setCollapsed = function(state, animate)
             oldSetCollapsed(state, animate)
@@ -1573,7 +1542,6 @@ function createInfoText(config)
         local st = showWindow and tShadow() or 1
         tween(windowFrame, sizeTweenInfo, { GroupTransparency = gt }, not animate)
         tween(shadowObj, sizeTweenInfo, { ImageTransparency = st }, not animate)
-        -- ИСПРАВЛЕНИЕ 2: Принудительное скрытие белой обводки, если ShowWindow = false
         if windowStrokeObj then
             tween(windowStrokeObj, sizeTweenInfo, { Transparency = showWindow and tBorder() or 1 }, not animate)
         end
@@ -2152,7 +2120,6 @@ function createRadar(config)
     local CenterOffset = pick(config, "CenterOffset", "centerOffset") or Vector3.zero
     local EDGE_TEXT_HIDE_THRESHOLD = tonumber(pick(config, "TextHideThreshold", "textHideThreshold")) or 0.95
 
-    -- ИСПРАВЛЕНИЕ 3: Добавлен параметр Animated
     local sweepEnabled = pick(config, "Animated", "animated", "Sweep", "sweep")
     if sweepEnabled == nil then sweepEnabled = pick(radarCfg, "sweep", "Sweep") end
     if sweepEnabled == nil then sweepEnabled = true end
@@ -2680,7 +2647,6 @@ function createRadar(config)
         v = pick(tbl, "TextHideThreshold", "textHideThreshold")
         if v ~= nil then EDGE_TEXT_HIDE_THRESHOLD = tonumber(v) or EDGE_TEXT_HIDE_THRESHOLD end
 
-        -- ИСПРАВЛЕНИЕ 3: Поддержка Animated в SetParameter
         v = pick(tbl, "Animated", "animated", "Sweep", "sweep")
         if v ~= nil then sweepEnabled = v == true sweepHolder.Visible = sweepEnabled end
 
