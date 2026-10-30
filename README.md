@@ -199,7 +199,7 @@ local InfoText = Guis.createInfoText({
 
 ### Parameters
 
-```
+```lua
 Name         = string                       (billboard name), default: "GhostRoomESP"
 Center       = Model|BasePart|Attachment    (object the text is attached to).
                                             If it is nil the lines are kept and shown as soon as you set it
@@ -317,7 +317,7 @@ local Radar = Guis.createRadar({
 
 ### Parameters
 
-```
+```lua
 Name         = string                       (window core name), default: "CustomRadar"
 Title        = string                       (text in the title bar), default: "Radar"
 Position     = UDim2.new(...)               (window position), default: UDim2.new(0.03, 0, 0.3, 0)
