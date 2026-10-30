@@ -45,7 +45,7 @@ local InfoGui = Guis.createInfoGui({
 
 ### Parameters
 
-```
+```lua
 Name         = string                       (window core name), default: "CustomWindow"
 Title        = string                       (text in the title bar), default: "Window"
 Reload       = true|false                   (if true, this window is destroyed and replaced when a window
