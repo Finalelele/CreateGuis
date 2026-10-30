@@ -1554,20 +1554,18 @@ function createInfoText(config)
     end
 
     local function applyWindowLayout(animate)
-        if not windowFrame or not shadowObj then return end
+        if not windowFrame then return end
         
-        -- ИСПРАВЛЕНИЕ: Жесткое скрытие окна и тени через Visible
+        -- ИСПРАВЛЕНИЕ: Жестко управляем видимостью через Visible
         windowFrame.Visible = showWindow
-        shadowObj.Visible = showWindow
+        if shadowObj then shadowObj.Visible = showWindow end
 
-        if showWindow then
-            local gt = 0
-            local st = tShadow()
-            tween(windowFrame, sizeTweenInfo, { GroupTransparency = gt }, not animate)
-            tween(shadowObj, sizeTweenInfo, { ImageTransparency = st }, not animate)
-            if windowStrokeObj then
-                tween(windowStrokeObj, sizeTweenInfo, { Transparency = tBorder() }, not animate)
-            end
+        local gt = showWindow and 0 or 1
+        local st = showWindow and tShadow() or 1
+        tween(windowFrame, sizeTweenInfo, { GroupTransparency = gt }, not animate)
+        if shadowObj then tween(shadowObj, sizeTweenInfo, { ImageTransparency = st }, not animate) end
+        if windowStrokeObj then
+            tween(windowStrokeObj, sizeTweenInfo, { Transparency = showWindow and tBorder() or 1 }, not animate)
         end
     end
 
@@ -1682,6 +1680,7 @@ function createInfoText(config)
 
         shadowObj = Fx.newShadow(billboard, shadowCfg, zIndex)
         shadowObj.ImageTransparency = 1
+        shadowObj.Visible = showWindow -- ИСПРАВЛЕНИЕ
 
         windowFrame = Instance.new("CanvasGroup")
         windowFrame.Name = "Window"
@@ -1690,6 +1689,7 @@ function createInfoText(config)
         windowFrame.BackgroundTransparency = tBg()
         windowFrame.BorderSizePixel = 0
         windowFrame.GroupTransparency = 1
+        windowFrame.Visible = showWindow -- ИСПРАВЛЕНИЕ
         windowFrame.ZIndex = zIndex + 1
         windowFrame.Parent = billboard
 
