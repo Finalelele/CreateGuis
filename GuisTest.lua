@@ -48,21 +48,23 @@ local function tween(obj, info, props, instant)
     end
 end
 
+-- ИСПРАВЛЕНИЕ 1: Ограничитель SliceScale для сохранения круглых углов
 function Fx.setShadowSize(s, pad)
     pad = math.max(tonumber(pad) or 24, 1)
     s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
-    s.SliceScale = pad / 49
+    s.SliceScale = math.clamp(pad / 24, 0.7, 1.5)
 end
 
 function Fx.newShadow(parent, cfg, z)
     local s = Instance.new("ImageLabel")
     s.Name = "Shadow"
     s.AnchorPoint = Vector2.new(0.5, 0.5)
-    s.Position = UDim2.new(0.5, 0, 0.5, 4)
+    -- ИСПРАВЛЕНИЕ 2: Убрано смещение вниз на 4 пикселя
+    s.Position = UDim2.new(0.5, 0, 0.5, 0) 
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
     s.ScaleType = Enum.ScaleType.Slice
-    s.SliceCenter = Rect.new(49, 49, 450, 450) 
+    s.SliceCenter = Rect.new(49, 49, 450, 450)
     s.ImageColor3 = pick(cfg, "color", "Color") or BLACK
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
     s.ZIndex = z or 0
@@ -679,7 +681,7 @@ function createInfoGui(config)
             ui.glow.ImageColor3 = onColor
             tween(ui.glow, quickInfo, { ImageTransparency = active and 0.6 or 1 }, instant)
 
-            -- ВОЗВРАЩЕНА КРАСИВАЯ АНИМАЦИЯ КРУЖОЧКА
+            -- КРАСИВАЯ АНИМАЦИЯ КРУЖОЧКА
             local targetPos = active and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
             
             if instant or ui.lastActive == nil then
@@ -688,10 +690,9 @@ function createInfoGui(config)
                 ui.lastActive = active
             elseif ui.lastActive ~= active then
                 ui.lastActive = active
-                -- Движение с пружинкой (Back easing)
+                
                 TweenService:Create(ui.knob, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = targetPos}):Play()
                 
-                -- Эффект сжатия при движении
                 local squish = TweenService:Create(ui.knob, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(18, 12)})
                 squish:Play()
                 squish.Completed:Connect(function()
