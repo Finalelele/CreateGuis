@@ -62,7 +62,6 @@ function Fx.newShadow(parent, cfg, z)
     s.BackgroundTransparency = 1
     s.Image = "rbxassetid://6014261993"
     s.ScaleType = Enum.ScaleType.Slice
-    -- ИСПРАВЛЕНИЕ: Возвращен оригинальный SliceCenter для круглого глоу
     s.SliceCenter = Rect.new(49, 49, 450, 450) 
     s.ImageColor3 = pick(cfg, "color", "Color") or BLACK
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
@@ -680,9 +679,25 @@ function createInfoGui(config)
             ui.glow.ImageColor3 = onColor
             tween(ui.glow, quickInfo, { ImageTransparency = active and 0.6 or 1 }, instant)
 
-            -- ИСПРАВЛЕНИЕ: Убран весь сложный код, возвращена простая рабочая анимация
-            local targetPos = active and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
-            TweenService:Create(ui.knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+            -- ВОЗВРАЩЕНА КРАСИВАЯ АНИМАЦИЯ КРУЖОЧКА
+            local targetPos = active and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+            
+            if instant or ui.lastActive == nil then
+                ui.knob.Position = targetPos
+                ui.knob.Size = UDim2.fromOffset(14, 14)
+                ui.lastActive = active
+            elseif ui.lastActive ~= active then
+                ui.lastActive = active
+                -- Движение с пружинкой (Back easing)
+                TweenService:Create(ui.knob, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+                
+                -- Эффект сжатия при движении
+                local squish = TweenService:Create(ui.knob, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(18, 12)})
+                squish:Play()
+                squish.Completed:Connect(function()
+                    TweenService:Create(ui.knob, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(14, 14)}):Play()
+                end)
+            end
 
             if t.image then
                 ui.knob.BackgroundTransparency = 1
@@ -803,8 +818,9 @@ function createInfoGui(config)
 
             local knob = Instance.new("ImageButton")
             knob.Name = "ToggleKnob"
-            knob.Size = UDim2.fromOffset(10, 10)
-            knob.Position = UDim2.new(0, 2, 0.5, -5)
+            knob.AnchorPoint = Vector2.new(0, 0.5)
+            knob.Size = UDim2.fromOffset(14, 14)
+            knob.Position = UDim2.new(0, 2, 0.5, -7)
             knob.BackgroundColor3 = WHITE
             knob.BorderSizePixel = 0
             knob.AutoButtonColor = false
@@ -814,7 +830,6 @@ function createInfoGui(config)
             knobCorner.CornerRadius = UDim.new(1, 0)
             knobCorner.Parent = knob
 
-            -- ИСПРАВЛЕНИЕ: Возвращен простой и рабочий onToggleClick
             local function onToggleClick()
                 local s = lineData[id]
                 if s and s.toggle then
@@ -852,7 +867,7 @@ function createInfoGui(config)
             labels[id] = {
                 frame = lineFrame, text = label, track = track, knob = knob,
                 glow = glow, trackStroke = trackStroke, shine = shine,
-                padding = padding,
+                padding = padding, lastActive = nil,
             }
             lineData[id] = {
                 id = id,
