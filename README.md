@@ -94,11 +94,6 @@ Lines = {
 			outlineSize = 1,                -- number|false (text outline thickness), default: none
 		},
 
-		-- shortcuts, same as the same keys inside text = {...}
-		color = Color3.fromRGB(255, 255, 255),
-		outlineColor = Color3.fromRGB(255, 255, 255),
-		outlineSize = 1,
-
 		order = 1,                          -- number|false (position in the list. Lines without order
 		                                    -- fill the free positions in creation order. false = reset)
 
