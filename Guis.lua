@@ -48,7 +48,6 @@ local function tween(obj, info, props, instant)
     end
 end
 
--- ИСПРАВЛЕНИЕ: Дефолтный размер тени теперь 30
 function Fx.setShadowSize(s, pad)
     pad = math.max(tonumber(pad) or 30, 1)
     s.Size = UDim2.new(1, pad * 2, 1, pad * 2)
@@ -68,7 +67,6 @@ function Fx.newShadow(parent, cfg, z)
     s.ImageTransparency = pick(cfg, "transparency", "Transparency") or 0.55
     s.ZIndex = z or 0
     s.Active = false
-    -- ИСПРАВЛЕНИЕ: Дефолт 30 вместо 24
     Fx.setShadowSize(s, pick(cfg, "size", "Size") or 30)
     s.Parent = parent
     return s
@@ -555,8 +553,20 @@ function createInfoGui(config)
         if not collapsed then
             local availableW = targetWidth
             local availableH = targetHeight - headerHeight
-            local needVert = (contentH > availableH + 1)
             local needHoriz = (contentW > availableW + 1)
+            
+            -- ИСПРАВЛЕНИЕ 1: Учитываем место под горизонтальный скроллбар
+            if needHoriz then
+                availableH = availableH - 4
+            end
+            
+            local needVert = (contentH > availableH + 1)
+
+            -- Если нужен только горизонтальный ползунок, немного увеличиваем окно в высоту, чтобы не появлялся вертикальный
+            if isHorizontal and needHoriz and not needVert then
+                targetHeight = targetHeight + 4
+            end
+
             if isHorizontal then
                 scrolling.ScrollBarThickness = (needVert or needHoriz) and 4 or 0
             else
@@ -681,7 +691,6 @@ function createInfoGui(config)
             ui.glow.ImageColor3 = onColor
             tween(ui.glow, quickInfo, { ImageTransparency = active and 0.6 or 1 }, instant)
 
-            -- ИСПРАВЛЕНИЕ: Убран оффсет -7 по Y, чтобы кружочек был по центру
             local targetPos = active and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
             
             if instant or ui.lastActive == nil then
@@ -821,7 +830,6 @@ function createInfoGui(config)
             knob.Name = "ToggleKnob"
             knob.AnchorPoint = Vector2.new(0, 0.5)
             knob.Size = UDim2.fromOffset(14, 14)
-            -- ИСПРАВЛЕНИЕ: Убран оффсет -7, чтобы кружочек был по центру
             knob.Position = UDim2.new(0, 2, 0.5, 0)
             knob.BackgroundColor3 = WHITE
             knob.BorderSizePixel = 0
@@ -1052,35 +1060,23 @@ function createInfoGui(config)
     task.defer(function() if not collapsed then updateFrameSize(false) end end)
     playIntro()
 
+    -- ИСПРАВЛЕНИЕ 2: Функция сохранения позиции
+    local function savePosition()
+        if not savePosId then return end
+        local p = frame.Position
+        saveData[savePosId] = {
+            XScale = p.X.Scale, XOffset = p.X.Offset,
+            YScale = p.Y.Scale, YOffset = p.Y.Offset,
+            collapsed = collapsed
+        }
+        saveDataToFile()
+    end
+
     if savePosId then
-        local saveDebounce = false
-        connect(frame:GetPropertyChangedSignal("Position"), function()
-            if saveDebounce then return end
-            saveDebounce = true
-            task.delay(1, function()
-                local p = frame.Position
-                saveData[savePosId] = {
-                    XScale = p.X.Scale, XOffset = p.X.Offset,
-                    YScale = p.Y.Scale, YOffset = p.Y.Offset,
-                    collapsed = collapsed
-                }
-                saveDataToFile()
-                saveDebounce = false
-            end)
-        end)
-        
         local oldSetCollapsed = setCollapsed
         setCollapsed = function(state, animate)
             oldSetCollapsed(state, animate)
-            if savePosId then
-                local p = frame.Position
-                saveData[savePosId] = {
-                    XScale = p.X.Scale, XOffset = p.X.Offset,
-                    YScale = p.Y.Scale, YOffset = p.Y.Offset,
-                    collapsed = collapsed
-                }
-                saveDataToFile()
-            end
+            savePosition()
         end
     end
 
@@ -1098,8 +1094,13 @@ function createInfoGui(config)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true dragStart = input.Position startPos = frame.Position
+            savePosition() -- СоХРАНЯЕМ ПРИ ЗАЖАТИИ
+            
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                if input.UserInputState == Enum.UserInputState.End then 
+                    dragging = false 
+                    savePosition() -- СОХРАНЯЕМ ПРИ ОТПУСКАНИИ
+                end
             end)
         end
     end)
@@ -1640,7 +1641,6 @@ function createInfoText(config)
             if uiScale then uiScale.Scale = scaleFactor end
             billboard.Size = UDim2.fromOffset(basePixelSize.X * scaleFactor, basePixelSize.Y * scaleFactor)
 
-            -- ИСПРАВЛЕНИЕ: Пропорционально сжимаем отступ (pad) тени
             if shadowObj then
                 local basePad = pick(shadowCfg, "size", "Size") or 30
                 Fx.setShadowSize(shadowObj, basePad * scaleFactor)
@@ -2097,6 +2097,7 @@ function createInfoText(config)
 
     return api
 end
+
 
 --====================================================================
 --  createRadar
