@@ -218,7 +218,6 @@ function createInfoGui(config)
 
     local autoSizeSide = pick(autoSizeCfg, "side", "Side") or "down"
     
-    -- Строгий парсер сторон
     local function parseSide(side)
         side = tostring(side or "down"):lower()
         local hasX, hasY = false, false
@@ -232,7 +231,7 @@ function createInfoGui(config)
         end
         
         if (isLeft and isRight) or (isUp and isDown) or not (isLeft or isRight or isUp or isDown) then
-            return false, true, 0, 0 -- Дефолт "down"
+            return false, true, 0, 0
         end
         
         return hasX, hasY, isLeft and 1 or 0, isUp and 1 or 0
@@ -404,7 +403,6 @@ function createInfoGui(config)
     accentGlow.Transparency = 0.72
     accentGlow.Parent = accent
 
-    -- Новый контейнер для заголовка и кнопки
     local headerContent = Instance.new("Frame")
     headerContent.Name = "HeaderContent"
     headerContent.BackgroundTransparency = 1
@@ -563,18 +561,24 @@ function createInfoGui(config)
         local contentW = getContentWidthLogical()
         local contentH = getContentHeightLogical()
         local maxX, maxY = getEffectiveMaxSize()
+        
+        -- ИСПРАВЛЕНИЕ: Используем реальную ширину контейнера заголовка (Текст + Тогл)
+        local headerContentWidth = headerContent.AbsoluteSize.X / getScale()
+        local minW = 18 + headerContentWidth + 12 -- 18px (отступ слева) + 12px (отступ справа)
 
         if collapsed then
             targetHeight = headerHeight
-            if autoSizeX then targetWidth = frame.Size.X.Offset else targetWidth = size.X.Offset end
+            if autoSizeX then 
+                targetWidth = math.max(minW, frame.Size.X.Offset)
+            else 
+                targetWidth = math.max(minW, size.X.Offset) 
+            end
         else
             if autoSizeEnabled then
                 if autoSizeX then
-                    local titleWidth = TextService:GetTextSize(titleLabel.Text, titleLabel.TextSize, titleLabel.Font, Vector2.new(10000, 10000)).X
-                    local minW = titleWidth + 66
                     targetWidth = math.max(minW, math.min(contentW + 20, maxX))
                 else
-                    targetWidth = maxX
+                    targetWidth = math.max(minW, maxX)
                 end
                 
                 if autoSizeY then
@@ -583,7 +587,7 @@ function createInfoGui(config)
                     targetHeight = maxY
                 end
             else
-                targetWidth = maxX
+                targetWidth = math.max(minW, maxX)
                 targetHeight = maxY
             end
         end
@@ -622,6 +626,10 @@ function createInfoGui(config)
     end
 
     connect(layout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+        if not collapsed then updateFrameSize(true) end
+    end)
+    
+    connect(headerContent:GetPropertyChangedSignal("AbsoluteSize"), function()
         if not collapsed then updateFrameSize(true) end
     end)
 
@@ -1275,7 +1283,6 @@ function createInfoGui(config)
             autoSizeSide = tostring(v):lower()
             autoSizeX, autoSizeY, anchorX, anchorY = parseSide(autoSizeSide)
             
-            -- Пересчет позиции при смене AnchorPoint
             local pos = frame.Position
             local sizeX = frame.Size.X.Offset
             local sizeY = frame.Size.Y.Offset
