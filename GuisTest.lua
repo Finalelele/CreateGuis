@@ -218,11 +218,27 @@ function createInfoGui(config)
 
     local autoSizeSide = pick(autoSizeCfg, "side", "Side") or "down"
     
-    -- ИСПРАВЛЕНИЕ: Умный парсинг стороны
-    local autoSizeX = string.find(autoSizeSide, "left") ~= nil or string.find(autoSizeSide, "right") ~= nil
-    local autoSizeY = string.find(autoSizeSide, "up") ~= nil or string.find(autoSizeSide, "down") ~= nil
-    local anchorX = string.find(autoSizeSide, "left") and 1 or 0
-    local anchorY = string.find(autoSizeSide, "up") and 1 or 0
+    -- Строгий парсер сторон
+    local function parseSide(side)
+        side = tostring(side or "down"):lower()
+        local hasX, hasY = false, false
+        local isLeft, isRight, isUp, isDown = false, false, false, false
+        
+        for part in string.gmatch(side, "[^%-]+") do
+            if part == "left" then isLeft = true; hasX = true end
+            if part == "right" then isRight = true; hasX = true end
+            if part == "up" then isUp = true; hasY = true end
+            if part == "down" then isDown = true; hasY = true end
+        end
+        
+        if (isLeft and isRight) or (isUp and isDown) or not (isLeft or isRight or isUp or isDown) then
+            return false, true, 0, 0 -- Дефолт "down"
+        end
+        
+        return hasX, hasY, isLeft and 1 or 0, isUp and 1 or 0
+    end
+
+    local autoSizeX, autoSizeY, anchorX, anchorY = parseSide(autoSizeSide)
 
     local savePosCfg = pick(config, "SavePos", "savePos") or {}
     local savePosEnabled = pick(savePosCfg, "enabled", "Enabled") == true
@@ -297,7 +313,6 @@ function createInfoGui(config)
     frame.ClipsDescendants = false
     frame.Parent = screen
 
-    -- Устанавливаем AnchorPoint на основе новых флагов
     frame.AnchorPoint = Vector2.new(anchorX, anchorY)
     frame.Position = UDim2.new(
         position.X.Scale + anchorX * size.X.Offset, position.X.Offset,
@@ -538,7 +553,6 @@ function createInfoGui(config)
             if autoSizeX then targetWidth = frame.Size.X.Offset else targetWidth = size.X.Offset end
         else
             if autoSizeEnabled then
-                -- Логика ширины (X)
                 if autoSizeX then
                     local titleWidth = TextService:GetTextSize(titleLabel.Text, titleLabel.TextSize, titleLabel.Font, Vector2.new(10000, 10000)).X
                     local minW = titleWidth + 66
@@ -547,7 +561,6 @@ function createInfoGui(config)
                     targetWidth = maxX
                 end
                 
-                -- Логика высоты (Y)
                 if autoSizeY then
                     targetHeight = math.clamp(headerHeight + contentH + bottomPadding, headerHeight, maxY)
                 else
@@ -1244,10 +1257,7 @@ function createInfoGui(config)
         v = pick(tbl, "side", "Side")
         if v ~= nil then
             autoSizeSide = tostring(v):lower()
-            autoSizeX = string.find(autoSizeSide, "left") ~= nil or string.find(autoSizeSide, "right") ~= nil
-            autoSizeY = string.find(autoSizeSide, "up") ~= nil or string.find(autoSizeSide, "down") ~= nil
-            anchorX = string.find(autoSizeSide, "left") and 1 or 0
-            anchorY = string.find(autoSizeSide, "up") and 1 or 0
+            autoSizeX, autoSizeY, anchorX, anchorY = parseSide(autoSizeSide)
             
             -- Пересчет позиции при смене AnchorPoint
             local pos = frame.Position
@@ -1424,7 +1434,6 @@ function createInfoGui(config)
 
     return api
 end
-
 --====================================================================
 --  createInfoText
 --====================================================================
