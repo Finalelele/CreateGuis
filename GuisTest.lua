@@ -404,10 +404,26 @@ function createInfoGui(config)
     accentGlow.Transparency = 0.72
     accentGlow.Parent = accent
 
+    -- Новый контейнер для заголовка и кнопки
+    local headerContent = Instance.new("Frame")
+    headerContent.Name = "HeaderContent"
+    headerContent.BackgroundTransparency = 1
+    headerContent.Position = UDim2.new(0, 18, 0, 0)
+    headerContent.Size = UDim2.new(0, 0, 1, 0)
+    headerContent.AutomaticSize = Enum.AutomaticSize.X
+    headerContent.Parent = header
+
+    local headerLayout = Instance.new("UIListLayout")
+    headerLayout.FillDirection = Enum.FillDirection.Horizontal
+    headerLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    headerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    headerLayout.Padding = UDim.new(0, 8)
+    headerLayout.Parent = headerContent
+
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Name = "Title"
-    titleLabel.Position = UDim2.new(0, 18, 0, 0)
-    titleLabel.Size = UDim2.new(1, -56, 1, 0)
+    titleLabel.Size = UDim2.new(0, 0, 1, 0)
+    titleLabel.AutomaticSize = Enum.AutomaticSize.X
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
     titleLabel.TextColor3 = pick(titleCfg, "color", "Color") or Color3.fromRGB(245, 247, 255)
@@ -416,15 +432,14 @@ function createInfoGui(config)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
     titleLabel.ZIndex = 4
-    titleLabel.Parent = header
+    titleLabel.LayoutOrder = 1
+    titleLabel.Parent = headerContent
 
     local function toggleBaseColor() return pick(lineToggleCfg, "color", "Color") or Color3.fromRGB(40, 46, 66) end
     local function toggleTextColor() return pick(lineToggleCfg, "textColor", "TextColor") or Color3.fromRGB(215, 220, 235) end
 
     local toggle = Instance.new("TextButton")
     toggle.Name = "Toggle"
-    toggle.AnchorPoint = Vector2.new(1, 0.5)
-    toggle.Position = UDim2.new(1, -8, 0.5, 0)
     toggle.Size = UDim2.fromOffset(28, 20)
     toggle.BackgroundColor3 = toggleBaseColor()
     toggle.BackgroundTransparency = 0.1
@@ -432,7 +447,8 @@ function createInfoGui(config)
     toggle.AutoButtonColor = false
     toggle.Text = ""
     toggle.ZIndex = 5
-    toggle.Parent = header
+    toggle.LayoutOrder = 2
+    toggle.Parent = headerContent
 
     local toggleCorner = Instance.new("UICorner")
     toggleCorner.CornerRadius = UDim.new(1, 0)
@@ -1434,6 +1450,7 @@ function createInfoGui(config)
 
     return api
 end
+
 --====================================================================
 --  createInfoText
 --====================================================================
