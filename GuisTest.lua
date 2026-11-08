@@ -217,7 +217,12 @@ function createInfoGui(config)
     if autoSizeWindowEdgeWithSize == nil then autoSizeWindowEdgeWithSize = false end
 
     local autoSizeSide = pick(autoSizeCfg, "side", "Side") or "down"
-    local isHorizontal = (autoSizeSide == "left" or autoSizeSide == "right")
+    
+    -- ИСПРАВЛЕНИЕ: Умный парсинг стороны
+    local autoSizeX = string.find(autoSizeSide, "left") ~= nil or string.find(autoSizeSide, "right") ~= nil
+    local autoSizeY = string.find(autoSizeSide, "up") ~= nil or string.find(autoSizeSide, "down") ~= nil
+    local anchorX = string.find(autoSizeSide, "left") and 1 or 0
+    local anchorY = string.find(autoSizeSide, "up") and 1 or 0
 
     local savePosCfg = pick(config, "SavePos", "savePos") or {}
     local savePosEnabled = pick(savePosCfg, "enabled", "Enabled") == true
@@ -292,16 +297,12 @@ function createInfoGui(config)
     frame.ClipsDescendants = false
     frame.Parent = screen
 
-    if autoSizeSide == "up" then
-        frame.AnchorPoint = Vector2.new(0, 1)
-        frame.Position = UDim2.new(position.X.Scale, position.X.Offset, position.Y.Scale, position.Y.Offset + headerHeight)
-    elseif autoSizeSide == "left" then
-        frame.AnchorPoint = Vector2.new(1, 0)
-        frame.Position = UDim2.new(position.X.Scale, position.X.Offset + size.X.Offset, position.Y.Scale, position.Y.Offset)
-    else
-        frame.AnchorPoint = Vector2.new(0, 0)
-        frame.Position = position
-    end
+    -- Устанавливаем AnchorPoint на основе новых флагов
+    frame.AnchorPoint = Vector2.new(anchorX, anchorY)
+    frame.Position = UDim2.new(
+        position.X.Scale + anchorX * size.X.Offset, position.X.Offset,
+        position.Y.Scale + anchorY * headerHeight, position.Y.Offset
+    )
 
     local uiScale = Instance.new("UIScale")
     uiScale.Scale = scale
@@ -469,7 +470,7 @@ function createInfoGui(config)
     scrolling.Parent = body
 
     if Enum.AutomaticSize then
-        if isHorizontal then
+        if autoSizeX then
             scrolling.ScrollingDirection = Enum.ScrollingDirection.XY
             scrolling.AutomaticCanvasSize = Enum.AutomaticSize.XY
         else
@@ -501,17 +502,19 @@ function createInfoGui(config)
             local screenSize = screen.AbsoluteSize
             local absPos = frame.AbsolutePosition
 
-            if autoSizeSide == "down" then
+            if anchorY == 0 then
                 local edgeAvailable = (screenSize.Y - absPos.Y - EDGE_MARGIN) / getScale()
                 maxY = autoSizeWindowEdgeWithSize and math.min(size.Y.Offset, edgeAvailable) or edgeAvailable
-            elseif autoSizeSide == "up" then
+            else
                 local topY = frame.AbsolutePosition.Y - frame.AbsoluteSize.Y
                 local edgeAvailable = (topY - EDGE_MARGIN) / getScale()
                 maxY = autoSizeWindowEdgeWithSize and math.min(size.Y.Offset, edgeAvailable) or edgeAvailable
-            elseif autoSizeSide == "right" then
+            end
+            
+            if anchorX == 0 then
                 local edgeAvailable = (screenSize.X - absPos.X - EDGE_MARGIN) / getScale()
                 maxX = autoSizeWindowEdgeWithSize and math.min(size.X.Offset, edgeAvailable) or edgeAvailable
-            elseif autoSizeSide == "left" then
+            else
                 local leftX = frame.AbsolutePosition.X - frame.AbsoluteSize.X
                 local edgeAvailable = (leftX - EDGE_MARGIN) / getScale()
                 maxX = autoSizeWindowEdgeWithSize and math.min(size.X.Offset, edgeAvailable) or edgeAvailable
@@ -532,17 +535,23 @@ function createInfoGui(config)
 
         if collapsed then
             targetHeight = headerHeight
-            targetWidth = frame.Size.X.Offset 
+            if autoSizeX then targetWidth = frame.Size.X.Offset else targetWidth = size.X.Offset end
         else
             if autoSizeEnabled then
-                if isHorizontal then
+                -- Логика ширины (X)
+                if autoSizeX then
                     local titleWidth = TextService:GetTextSize(titleLabel.Text, titleLabel.TextSize, titleLabel.Font, Vector2.new(10000, 10000)).X
                     local minW = titleWidth + 66
                     targetWidth = math.max(minW, math.min(contentW + 20, maxX))
-                    targetHeight = math.clamp(headerHeight + contentH + bottomPadding, headerHeight, maxY)
                 else
                     targetWidth = maxX
+                end
+                
+                -- Логика высоты (Y)
+                if autoSizeY then
                     targetHeight = math.clamp(headerHeight + contentH + bottomPadding, headerHeight, maxY)
+                else
+                    targetHeight = maxY
                 end
             else
                 targetWidth = maxX
@@ -555,20 +564,16 @@ function createInfoGui(config)
             local availableH = targetHeight - headerHeight
             local needHoriz = (contentW > availableW + 1)
             
-            -- ИСПРАВЛЕНИЕ 1: Учитываем место под горизонтальный скроллбар
-            if needHoriz then
+            if needHoriz and autoSizeY then
                 availableH = availableH - 4
             end
             
             local needVert = (contentH > availableH + 1)
 
-            -- Если нужен только горизонтальный ползунок, немного увеличиваем окно в высоту, чтобы не появлялся вертикальный
-            if isHorizontal and needHoriz and not needVert then
-                targetHeight = targetHeight + 4
-            end
-
-            if isHorizontal then
+            if autoSizeX and autoSizeY then
                 scrolling.ScrollBarThickness = (needVert or needHoriz) and 4 or 0
+            elseif autoSizeX then
+                scrolling.ScrollBarThickness = needHoriz and 4 or 0
             else
                 scrolling.ScrollBarThickness = needVert and 4 or 0
             end
@@ -679,7 +684,7 @@ function createInfoGui(config)
             ui.glow.Position = UDim2.new(trackPos.X.Scale, trackPos.X.Offset + TRACK_W / 2, trackPos.Y.Scale, trackPos.Y.Offset + TRACK_H / 2)
 
             ui.text.Position = UDim2.new(0, 0, 0, 0)
-            ui.text.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+            ui.text.Size = autoSizeX and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
 
             local onColor  = t.enabledColor or t.color or accentColor()
             local offColor = t.disabledColor or Color3.fromRGB(40, 45, 62)
@@ -726,7 +731,7 @@ function createInfoGui(config)
             ui.track.Visible = false
             ui.glow.Visible = false
             ui.text.Position = UDim2.new(0, 0, 0, 0)
-            ui.text.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+            ui.text.Size = autoSizeX and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
         end
     end
 
@@ -741,8 +746,8 @@ function createInfoGui(config)
 
             local lineFrame = Instance.new("Frame")
             lineFrame.Name = id
-            lineFrame.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
-            lineFrame.AutomaticSize = isHorizontal and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+            lineFrame.Size = autoSizeX and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+            lineFrame.AutomaticSize = autoSizeX and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
             lineFrame.BackgroundColor3 = WHITE
             lineFrame.BackgroundTransparency = 1
             lineFrame.BorderSizePixel = 0
@@ -774,9 +779,9 @@ function createInfoGui(config)
 
             local label = Instance.new("TextLabel")
             label.Name = "Text"
-            label.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
-            label.AutomaticSize = isHorizontal and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
-            label.TextWrapped = not isHorizontal
+            label.Size = autoSizeX and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+            label.AutomaticSize = autoSizeX and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+            label.TextWrapped = not autoSizeX
             label.BackgroundTransparency = 1
             label.Font = pick(fontCfg, "text", "Text") or Enum.Font.GothamMedium
             label.TextSize = textSize
@@ -1060,7 +1065,6 @@ function createInfoGui(config)
     task.defer(function() if not collapsed then updateFrameSize(false) end end)
     playIntro()
 
-    -- ИСПРАВЛЕНИЕ 2: Функция сохранения позиции
     local function savePosition()
         if not savePosId then return end
         local p = frame.Position
@@ -1094,12 +1098,12 @@ function createInfoGui(config)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true dragStart = input.Position startPos = frame.Position
-            savePosition() -- СоХРАНЯЕМ ПРИ ЗАЖАТИИ
+            savePosition()
             
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then 
                     dragging = false 
-                    savePosition() -- СОХРАНЯЕМ ПРИ ОТПУСКАНИИ
+                    savePosition()
                 end
             end)
         end
@@ -1239,47 +1243,44 @@ function createInfoGui(config)
 
         v = pick(tbl, "side", "Side")
         if v ~= nil then
-            local newSide = tostring(v):lower()
-            if newSide ~= autoSizeSide then
-                local oldAnchor = frame.AnchorPoint
-                local pos = frame.Position
-                local sizeX = frame.Size.X.Offset
-                local sizeY = frame.Size.Y.Offset
+            autoSizeSide = tostring(v):lower()
+            autoSizeX = string.find(autoSizeSide, "left") ~= nil or string.find(autoSizeSide, "right") ~= nil
+            autoSizeY = string.find(autoSizeSide, "up") ~= nil or string.find(autoSizeSide, "down") ~= nil
+            anchorX = string.find(autoSizeSide, "left") and 1 or 0
+            anchorY = string.find(autoSizeSide, "up") and 1 or 0
+            
+            -- Пересчет позиции при смене AnchorPoint
+            local pos = frame.Position
+            local sizeX = frame.Size.X.Offset
+            local sizeY = frame.Size.Y.Offset
+            local oldAnchor = frame.AnchorPoint
+            
+            local tlScaleX = pos.X.Scale - oldAnchor.X * sizeX
+            local tlOffsetX = pos.X.Offset - oldAnchor.X * sizeX
+            local tlScaleY = pos.Y.Scale - oldAnchor.Y * sizeY
+            local tlOffsetY = pos.Y.Offset - oldAnchor.Y * sizeY
+            
+            frame.AnchorPoint = Vector2.new(anchorX, anchorY)
+            frame.Position = UDim2.new(
+                tlScaleX + anchorX * sizeX, tlOffsetX + anchorX * sizeX,
+                tlScaleY + anchorY * sizeY, tlOffsetY + anchorY * sizeY
+            )
 
-                local tlScaleX = pos.X.Scale
-                local tlOffsetX = pos.X.Offset - oldAnchor.X * sizeX
-                local tlScaleY = pos.Y.Scale
-                local tlOffsetY = pos.Y.Offset - oldAnchor.Y * sizeY
+            if autoSizeX then
+                scrolling.ScrollingDirection = Enum.ScrollingDirection.XY
+                scrolling.AutomaticCanvasSize = Enum.AutomaticSize.XY
+            else
+                scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
+                scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
+            end
 
-                autoSizeSide = newSide
-                isHorizontal = (autoSizeSide == "left" or autoSizeSide == "right")
-
-                local newAnchor = Vector2.new(0, 0)
-                if autoSizeSide == "up" then newAnchor = Vector2.new(0, 1)
-                elseif autoSizeSide == "left" then newAnchor = Vector2.new(1, 0) end
-
-                frame.AnchorPoint = newAnchor
-                frame.Position = UDim2.new(
-                    tlScaleX, tlOffsetX + newAnchor.X * sizeX,
-                    tlScaleY, tlOffsetY + newAnchor.Y * sizeY
-                )
-
-                if isHorizontal then
-                    scrolling.ScrollingDirection = Enum.ScrollingDirection.XY
-                    scrolling.AutomaticCanvasSize = Enum.AutomaticSize.XY
-                else
-                    scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
-                    scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
-                end
-
-                for id, ui in pairs(labels) do
-                    ui.frame.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
-                    ui.frame.AutomaticSize = isHorizontal and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
-                    ui.text.TextWrapped = not isHorizontal
-                    ui.text.AutomaticSize = isHorizontal and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
-                    ui.text.Size = isHorizontal and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
-                    renderLine(id, true)
-                end
+            for id, ui in pairs(labels) do
+                ui.frame.Size = autoSizeX and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+                ui.frame.AutomaticSize = autoSizeX and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+                ui.text.TextWrapped = not autoSizeX
+                ui.text.AutomaticSize = autoSizeX and Enum.AutomaticSize.XY or Enum.AutomaticSize.Y
+                ui.text.Size = autoSizeX and UDim2.new(0, 0, 0, 0) or UDim2.new(1, 0, 0, 0)
+                renderLine(id, true)
             end
         end
 
