@@ -2169,7 +2169,6 @@ function createRadar(config)
     if sweepEnabled == nil then sweepEnabled = true end
     local sweepSpeed = tonumber(pick(config, "SweepSpeed", "sweepSpeed")) or 110
 
-    -- === НОВЫЕ ПАРАМЕТРЫ ===
     local worldViewEnabled = pick(config, "WorldView", "worldView") == true
 
     local zoneCfg = pick(config, "VisibleZone", "visibleZone") or {}
@@ -2178,6 +2177,7 @@ function createRadar(config)
     local zoneWidth = tonumber(pick(zoneCfg, "width", "Width") or 100)
     local zoneRotation = tonumber(pick(zoneCfg, "rotation", "Rotation") or 0)
     local zoneColor = pick(zoneCfg, "color", "Color") or accentColor()
+    local zoneTarget = pick(zoneCfg, "target", "Target") or Players.LocalPlayer
 
     local enabled = true
     local targets = {}
@@ -2352,7 +2352,7 @@ function createRadar(config)
     zoneCircle.Visible = (zoneShape == "circle")
     zoneCircle.ZIndex = 1
     zoneCircle.Parent = zoneHolder
-    
+
     local zoneCircleCorner = Instance.new("UICorner")
     zoneCircleCorner.CornerRadius = UDim.new(1, 0)
     zoneCircleCorner.Parent = zoneCircle
@@ -2383,11 +2383,10 @@ function createRadar(config)
         zoneCircle.BackgroundColor3 = zoneColor
         zoneCircleStroke.Color = zoneColor
         zoneTriangle.ImageColor3 = zoneColor
-        
+
         if zoneShape == "circle" then
             zoneCircle.Size = UDim2.fromOffset(zoneWidth, zoneWidth)
         elseif zoneShape == "triangle" then
-            -- Радиус 1:1. Чтобы клин смотрел вверх при rotation = 0, используем ImageLabel
             zoneTriangle.Size = UDim2.fromOffset(zoneWidth, zoneWidth)
             zoneTriangle.Rotation = zoneRotation
         end
@@ -2403,8 +2402,7 @@ function createRadar(config)
     worldViewContainer.Visible = worldViewEnabled
     worldViewContainer.ZIndex = 1
     worldViewContainer.Parent = radar
-    
-    -- Внутренний контейнер для вращения (чтобы не вертеть сам radar)
+
     local worldViewInner = Instance.new("Frame")
     worldViewInner.Name = "Inner"
     worldViewInner.BackgroundTransparency = 1
@@ -2522,18 +2520,6 @@ function createRadar(config)
     cdGlow.Parent = centerDot
 
     -- === Логика отрисовки WorldView ===
-    local materialColors = {
-        [Enum.Material.Asphalt] = Color3.fromRGB(50, 50, 50),
-        [Enum.Material.Concrete] = Color3.fromRGB(120, 120, 120),
-        [Enum.Material.Brick] = Color3.fromRGB(150, 80, 60),
-        [Enum.Material.Wood] = Color3.fromRGB(100, 70, 40),
-        [Enum.Material.WoodPlanks] = Color3.fromRGB(120, 90, 60),
-        [Enum.Material.Grass] = Color3.fromRGB(60, 120, 60),
-        [Enum.Material.Slate] = Color3.fromRGB(40, 40, 60),
-        [Enum.Material.Metal] = Color3.fromRGB(100, 100, 110),
-    }
-
-    local worldPartsCache = {}
     local worldUIObjects = {}
 
     local function updateWorldView()
@@ -2546,19 +2532,16 @@ function createRadar(config)
         local camera = workspace.CurrentCamera
         if not camera then return end
 
-        -- 1. Очищаем старые объекты (или переиспользуем)
         for _, obj in pairs(worldUIObjects) do
             obj.Visible = false
         end
 
-        -- 2. Получаем детали вокруг игрока
         local overlapParams = OverlapParams.new()
         overlapParams.FilterType = Enum.RaycastFilterType.Exclude
         overlapParams.FilterDescendantsInstances = {gui, character}
-        
+
         local parts = workspace:GetPartBoundsInRadius(hrp.Position, Size, overlapParams)
-        
-        -- 3. Сортируем по высоте (снизу вверх)
+
         table.sort(parts, function(a, b)
             return a.Position.Y < b.Position.Y
         end)
@@ -2566,22 +2549,21 @@ function createRadar(config)
         local centerPos = hrp.Position
         local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z).Unit
         local right = Vector3.new(camera.CFrame.RightVector.X, 0, camera.CFrame.RightVector.Z).Unit
-        
+
         local pixelsPerStud = (RADAR_SIZE / 2) / Size
 
         local index = 1
         for _, part in ipairs(parts) do
-            if part.Transparency < 1 and part.Size.Magnitude > 0.1 then
+            if part ~= workspace.Terrain and part.Transparency < 1 and part.Size.Magnitude > 0.1 then
                 local offset = part.Position - centerPos
                 local dist = offset.Magnitude
                 if dist <= Size then
                     local x = offset:Dot(right)
                     local z = offset:Dot(forward)
-                    
+
                     local px = (x * pixelsPerStud) + (RADAR_SIZE / 2)
                     local py = (RADAR_SIZE / 2) - (z * pixelsPerStud)
 
-                    -- Настройка UI элемента
                     local uiObj = worldUIObjects[part]
                     if not uiObj then
                         uiObj = Instance.new("Frame")
@@ -2592,15 +2574,9 @@ function createRadar(config)
                         worldUIObjects[part] = uiObj
                     end
 
-                    -- Цвет
-                    local color = part.Color
-                    if part.Color.R > 0.9 and part.Color.G > 0.9 and part.Color.B > 0.9 then
-                        color = materialColors[part.Material] or Color3.fromRGB(150, 150, 150)
-                    end
-                    uiObj.BackgroundColor3 = color
+                    uiObj.BackgroundColor3 = part.Color
                     uiObj.BackgroundTransparency = 0.2
-                    
-                    -- Размер и позиция (используем масштаб)
+
                     local width = math.max(part.Size.X * pixelsPerStud, 2)
                     local height = math.max(part.Size.Z * pixelsPerStud, 2)
                     uiObj.Size = UDim2.fromOffset(width, height)
@@ -2609,15 +2585,14 @@ function createRadar(config)
 
                     uiObj.ZIndex = 10 + index
                     uiObj.Visible = true
-                    
+
                     index = index + 1
-                    if index > 300 then break end -- Ограничитель производительности
+                    if index > 300 then break end
                 end
             end
         end
     end
 
-    -- Обновление карты раз в 0.1 секунды (а не каждый кадр)
     local worldViewTick = 0
     connect(RunService.Heartbeat, function(dt)
         if not worldViewEnabled then return end
@@ -2639,6 +2614,16 @@ function createRadar(config)
             return target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
         end
         if target:IsA("BasePart") then return target end
+        return nil
+    end
+
+    local function resolveWorldPosition(target)
+        if not target then return nil end
+        local t = typeof(target)
+        if t == "Vector3" then return target end
+        if t == "CFrame"  then return target.Position end
+        local root = getRoot(target)
+        if root then return root.Position end
         return nil
     end
 
@@ -2752,6 +2737,36 @@ function createRadar(config)
             sweepHolder.Rotation = (os.clock() * sweepSpeed) % 360
         end
         for id, object in pairs(targetObjects) do updateTarget(id, object) end
+
+        -- === VisibleZone: позиционирование по target ===
+        local zonePositioned = false
+        if zoneEnabled and zoneTarget then
+            local zonePos   = resolveWorldPosition(zoneTarget)
+            local centerPos = getCenterPosition()
+            local camera    = workspace.CurrentCamera
+            if zonePos and centerPos and camera then
+                local offset  = zonePos - centerPos
+                local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+                local right   = Vector3.new(camera.CFrame.RightVector.X, 0, camera.CFrame.RightVector.Z)
+                if forward.Magnitude > 0.001 and right.Magnitude > 0.001 then
+                    forward = forward.Unit
+                    right   = right.Unit
+                    local dx   = offset:Dot(right)
+                    local dy   = offset:Dot(forward)
+                    local norm = math.min(offset.Magnitude / Size, 1)
+                    local dir  = Vector2.new(dx, dy)
+                    if dir.Magnitude > 0 then dir = dir.Unit * norm end
+                    zoneHolder.Position = UDim2.new(
+                        0.5 + dir.X * 0.5, 0,
+                        0.5 - dir.Y * 0.5, 0
+                    )
+                    zonePositioned = true
+                end
+            end
+        end
+        if not zonePositioned then
+            zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
+        end
     end)
 
     local function playIntro()
@@ -2903,7 +2918,6 @@ function createRadar(config)
         v = pick(tbl, "SweepSpeed", "sweepSpeed")
         if v ~= nil then sweepSpeed = tonumber(v) or sweepSpeed end
 
-        -- === Обработка WorldView ===
         v = pick(tbl, "WorldView", "worldView")
         if v ~= nil then
             worldViewEnabled = v == true
@@ -2913,7 +2927,6 @@ function createRadar(config)
             if worldViewEnabled then updateWorldView() end
         end
 
-        -- === Обработка VisibleZone ===
         v = pick(tbl, "VisibleZone", "visibleZone")
         if v ~= nil then
             if type(v) == "table" then
@@ -2927,7 +2940,9 @@ function createRadar(config)
                 if rot ~= nil then zoneRotation = tonumber(rot) or zoneRotation end
                 local col = pick(v, "color", "Color")
                 if col ~= nil then zoneColor = col end
-                
+                local tgt = pick(v, "target", "Target")
+                if tgt ~= nil then zoneTarget = tgt end
+
                 updateVisibleZone()
             elseif type(v) == "boolean" then
                 zoneEnabled = v
