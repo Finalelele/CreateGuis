@@ -2169,6 +2169,16 @@ function createRadar(config)
     if sweepEnabled == nil then sweepEnabled = true end
     local sweepSpeed = tonumber(pick(config, "SweepSpeed", "sweepSpeed")) or 110
 
+    -- === НОВЫЕ ПАРАМЕТРЫ ===
+    local worldViewEnabled = pick(config, "WorldView", "worldView") == true
+
+    local zoneCfg = pick(config, "VisibleZone", "visibleZone") or {}
+    local zoneEnabled = zoneCfg.enabled ~= false
+    local zoneShape = tostring(pick(zoneCfg, "shape", "Shape") or "circle"):lower()
+    local zoneWidth = tonumber(pick(zoneCfg, "width", "Width") or 100)
+    local zoneRotation = tonumber(pick(zoneCfg, "rotation", "Rotation") or 0)
+    local zoneColor = pick(zoneCfg, "color", "Color") or accentColor()
+
     local enabled = true
     local targets = {}
     local WINDOW_SIZE, WINDOW_HEIGHT = 220, 260
@@ -2321,6 +2331,93 @@ function createRadar(config)
 
     local radarDepth = Fx.addDepth(radar, depth * 0.8, 1, 100)
 
+    -- === VisibleZone UI ===
+    local zoneHolder = Instance.new("Frame")
+    zoneHolder.Name = "VisibleZone"
+    zoneHolder.BackgroundTransparency = 1
+    zoneHolder.Size = UDim2.new(1, 0, 1, 0)
+    zoneHolder.AnchorPoint = Vector2.new(0.5, 0.5)
+    zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
+    zoneHolder.Visible = zoneEnabled
+    zoneHolder.ZIndex = 1
+    zoneHolder.Parent = radar
+
+    local zoneCircle = Instance.new("Frame")
+    zoneCircle.Name = "Circle"
+    zoneCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+    zoneCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+    zoneCircle.BackgroundColor3 = zoneColor
+    zoneCircle.BackgroundTransparency = 0.8
+    zoneCircle.BorderSizePixel = 0
+    zoneCircle.Visible = (zoneShape == "circle")
+    zoneCircle.ZIndex = 1
+    zoneCircle.Parent = zoneHolder
+    
+    local zoneCircleCorner = Instance.new("UICorner")
+    zoneCircleCorner.CornerRadius = UDim.new(1, 0)
+    zoneCircleCorner.Parent = zoneCircle
+
+    local zoneCircleStroke = Instance.new("UIStroke")
+    zoneCircleStroke.Color = zoneColor
+    zoneCircleStroke.Thickness = 2
+    zoneCircleStroke.Transparency = 0.3
+    zoneCircleStroke.Parent = zoneCircle
+
+    local zoneTriangle = Instance.new("ImageLabel")
+    zoneTriangle.Name = "Triangle"
+    zoneTriangle.AnchorPoint = Vector2.new(0.5, 1)
+    zoneTriangle.Position = UDim2.new(0.5, 0, 0.5, 0)
+    zoneTriangle.BackgroundTransparency = 1
+    zoneTriangle.Image = "rbxassetid://15458024877" -- Белый клин
+    zoneTriangle.ImageColor3 = zoneColor
+    zoneTriangle.ImageTransparency = 0.7
+    zoneTriangle.Visible = (zoneShape == "triangle")
+    zoneTriangle.ZIndex = 1
+    zoneTriangle.Parent = zoneHolder
+
+    local function updateVisibleZone()
+        zoneHolder.Visible = zoneEnabled
+        zoneCircle.Visible = zoneEnabled and (zoneShape == "circle")
+        zoneTriangle.Visible = zoneEnabled and (zoneShape == "triangle")
+
+        zoneCircle.BackgroundColor3 = zoneColor
+        zoneCircleStroke.Color = zoneColor
+        zoneTriangle.ImageColor3 = zoneColor
+        
+        if zoneShape == "circle" then
+            zoneCircle.Size = UDim2.fromOffset(zoneWidth, zoneWidth)
+        elseif zoneShape == "triangle" then
+            -- Радиус 1:1. Чтобы клин смотрел вверх при rotation = 0, используем ImageLabel
+            zoneTriangle.Size = UDim2.fromOffset(zoneWidth, zoneWidth)
+            zoneTriangle.Rotation = zoneRotation
+        end
+    end
+    updateVisibleZone()
+
+    -- === WorldView UI ===
+    local worldViewContainer = Instance.new("Frame")
+    worldViewContainer.Name = "WorldView"
+    worldViewContainer.BackgroundTransparency = 1
+    worldViewContainer.Size = UDim2.new(1, 0, 1, 0)
+    worldViewContainer.ClipsDescendants = true
+    worldViewContainer.Visible = worldViewEnabled
+    worldViewContainer.ZIndex = 1
+    worldViewContainer.Parent = radar
+    
+    -- Внутренний контейнер для вращения (чтобы не вертеть сам radar)
+    local worldViewInner = Instance.new("Frame")
+    worldViewInner.Name = "Inner"
+    worldViewInner.BackgroundTransparency = 1
+    worldViewInner.Size = UDim2.new(1, 0, 1, 0)
+    worldViewInner.AnchorPoint = Vector2.new(0.5, 0.5)
+    worldViewInner.Position = UDim2.new(0.5, 0, 0.5, 0)
+    worldViewInner.Parent = worldViewContainer
+
+    -- Сетка / Перекрестие (скрываем если WorldView)
+    local gridHolder = Instance.new("Folder")
+    gridHolder.Name = "Grid"
+    gridHolder.Parent = radar
+
     local gridStrokes = {}
     local function createCircle(csize, transparency)
         local circle = Instance.new("Frame")
@@ -2329,7 +2426,8 @@ function createRadar(config)
         circle.Position = UDim2.new(0.5, 0, 0.5, 0)
         circle.AnchorPoint = Vector2.new(0.5, 0.5)
         circle.ZIndex = 2
-        circle.Parent = radar
+        circle.Visible = not worldViewEnabled
+        circle.Parent = gridHolder
         local cr = Instance.new("UICorner")
         cr.CornerRadius = UDim.new(1, 0)
         cr.Parent = circle
@@ -2352,6 +2450,7 @@ function createRadar(config)
         line.BackgroundTransparency = 0.2
         line.BorderSizePixel = 0
         line.ZIndex = 2
+        line.Visible = not worldViewEnabled
         if horizontal then
             line.AnchorPoint = Vector2.new(0, 0.5)
             line.Position = UDim2.new(0, 0, 0.5, 0)
@@ -2361,7 +2460,7 @@ function createRadar(config)
             line.Position = UDim2.new(0.5, 0, 0, 0)
             line.Size = UDim2.new(0, 1, 1, 0)
         end
-        line.Parent = radar
+        line.Parent = gridHolder
         local g = Instance.new("UIGradient")
         g.Rotation = horizontal and 0 or 90
         g.Transparency = NumberSequence.new({
@@ -2380,7 +2479,7 @@ function createRadar(config)
     sweepHolder.BackgroundTransparency = 1
     sweepHolder.Size = UDim2.new(1, 0, 1, 0)
     sweepHolder.ZIndex = 3
-    sweepHolder.Visible = sweepEnabled
+    sweepHolder.Visible = sweepEnabled and not worldViewEnabled
     sweepHolder.Parent = radar
 
     local sweepLines = {}
@@ -2422,6 +2521,113 @@ function createRadar(config)
     cdGlow.Transparency = 0.6
     cdGlow.Parent = centerDot
 
+    -- === Логика отрисовки WorldView ===
+    local materialColors = {
+        [Enum.Material.Asphalt] = Color3.fromRGB(50, 50, 50),
+        [Enum.Material.Concrete] = Color3.fromRGB(120, 120, 120),
+        [Enum.Material.Brick] = Color3.fromRGB(150, 80, 60),
+        [Enum.Material.Wood] = Color3.fromRGB(100, 70, 40),
+        [Enum.Material.WoodPlanks] = Color3.fromRGB(120, 90, 60),
+        [Enum.Material.Grass] = Color3.fromRGB(60, 120, 60),
+        [Enum.Material.Slate] = Color3.fromRGB(40, 40, 60),
+        [Enum.Material.Metal] = Color3.fromRGB(100, 100, 110),
+    }
+
+    local worldPartsCache = {}
+    local worldUIObjects = {}
+
+    local function updateWorldView()
+        if not worldViewEnabled then return end
+        local character = Players.LocalPlayer.Character
+        if not character then return end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+
+        -- 1. Очищаем старые объекты (или переиспользуем)
+        for _, obj in pairs(worldUIObjects) do
+            obj.Visible = false
+        end
+
+        -- 2. Получаем детали вокруг игрока
+        local overlapParams = OverlapParams.new()
+        overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+        overlapParams.FilterDescendantsInstances = {gui, character}
+        
+        local parts = workspace:GetPartBoundsInRadius(hrp.Position, Size, overlapParams)
+        
+        -- 3. Сортируем по высоте (снизу вверх)
+        table.sort(parts, function(a, b)
+            return a.Position.Y < b.Position.Y
+        end)
+
+        local centerPos = hrp.Position
+        local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z).Unit
+        local right = Vector3.new(camera.CFrame.RightVector.X, 0, camera.CFrame.RightVector.Z).Unit
+        
+        local pixelsPerStud = (RADAR_SIZE / 2) / Size
+
+        local index = 1
+        for _, part in ipairs(parts) do
+            if part.Transparency < 1 and part.Size.Magnitude > 0.1 then
+                local offset = part.Position - centerPos
+                local dist = offset.Magnitude
+                if dist <= Size then
+                    local x = offset:Dot(right)
+                    local z = offset:Dot(forward)
+                    
+                    local px = (x * pixelsPerStud) + (RADAR_SIZE / 2)
+                    local py = (RADAR_SIZE / 2) - (z * pixelsPerStud)
+
+                    -- Настройка UI элемента
+                    local uiObj = worldUIObjects[part]
+                    if not uiObj then
+                        uiObj = Instance.new("Frame")
+                        uiObj.Name = "Part"
+                        uiObj.AnchorPoint = Vector2.new(0.5, 0.5)
+                        uiObj.BorderSizePixel = 0
+                        uiObj.Parent = worldViewInner
+                        worldUIObjects[part] = uiObj
+                    end
+
+                    -- Цвет
+                    local color = part.Color
+                    if part.Color.R > 0.9 and part.Color.G > 0.9 and part.Color.B > 0.9 then
+                        color = materialColors[part.Material] or Color3.fromRGB(150, 150, 150)
+                    end
+                    uiObj.BackgroundColor3 = color
+                    uiObj.BackgroundTransparency = 0.2
+                    
+                    -- Размер и позиция (используем масштаб)
+                    local width = math.max(part.Size.X * pixelsPerStud, 2)
+                    local height = math.max(part.Size.Z * pixelsPerStud, 2)
+                    uiObj.Size = UDim2.fromOffset(width, height)
+                    uiObj.Position = UDim2.fromOffset(px, py)
+                    uiObj.Rotation = -math.deg(math.atan2(forward.X, forward.Z)) + 180
+
+                    uiObj.ZIndex = 10 + index
+                    uiObj.Visible = true
+                    
+                    index = index + 1
+                    if index > 300 then break end -- Ограничитель производительности
+                end
+            end
+        end
+    end
+
+    -- Обновление карты раз в 0.1 секунды (а не каждый кадр)
+    local worldViewTick = 0
+    connect(RunService.Heartbeat, function(dt)
+        if not worldViewEnabled then return end
+        worldViewTick = worldViewTick + dt
+        if worldViewTick > 0.1 then
+            worldViewTick = 0
+            updateWorldView()
+        end
+    end)
+
     local targetObjects = {}
 
     local function getRoot(target)
@@ -2458,7 +2664,7 @@ function createRadar(config)
         point.AnchorPoint = Vector2.new(0.5, 0.5)
         point.BackgroundColor3 = data.color or Color3.new(1, 1, 1)
         point.BorderSizePixel = 0
-        point.ZIndex = 10
+        point.ZIndex = 500
         point.Size = UDim2.fromOffset(data.size or 8, data.size or 8)
         point.Parent = radar
         local pc = Instance.new("UICorner")
@@ -2542,7 +2748,7 @@ function createRadar(config)
     local renderName = Name .. "_RadarUpdate"
     RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
         if not enabled then return end
-        if sweepEnabled then
+        if sweepEnabled and not worldViewEnabled then
             sweepHolder.Rotation = (os.clock() * sweepSpeed) % 360
         end
         for id, object in pairs(targetObjects) do updateTarget(id, object) end
@@ -2692,10 +2898,42 @@ function createRadar(config)
         if v ~= nil then EDGE_TEXT_HIDE_THRESHOLD = tonumber(v) or EDGE_TEXT_HIDE_THRESHOLD end
 
         v = pick(tbl, "Animated", "animated", "Sweep", "sweep")
-        if v ~= nil then sweepEnabled = v == true sweepHolder.Visible = sweepEnabled end
+        if v ~= nil then sweepEnabled = v == true sweepHolder.Visible = sweepEnabled and not worldViewEnabled end
 
         v = pick(tbl, "SweepSpeed", "sweepSpeed")
         if v ~= nil then sweepSpeed = tonumber(v) or sweepSpeed end
+
+        -- === Обработка WorldView ===
+        v = pick(tbl, "WorldView", "worldView")
+        if v ~= nil then
+            worldViewEnabled = v == true
+            worldViewContainer.Visible = worldViewEnabled
+            gridHolder.Visible = not worldViewEnabled
+            sweepHolder.Visible = sweepEnabled and not worldViewEnabled
+            if worldViewEnabled then updateWorldView() end
+        end
+
+        -- === Обработка VisibleZone ===
+        v = pick(tbl, "VisibleZone", "visibleZone")
+        if v ~= nil then
+            if type(v) == "table" then
+                local en = pick(v, "enabled", "Enabled")
+                if en ~= nil then zoneEnabled = en == true end
+                local sh = pick(v, "shape", "Shape")
+                if sh ~= nil then zoneShape = tostring(sh):lower() end
+                local w = pick(v, "width", "Width")
+                if w ~= nil then zoneWidth = tonumber(w) or zoneWidth end
+                local rot = pick(v, "rotation", "Rotation")
+                if rot ~= nil then zoneRotation = tonumber(rot) or zoneRotation end
+                local col = pick(v, "color", "Color")
+                if col ~= nil then zoneColor = col end
+                
+                updateVisibleZone()
+            elseif type(v) == "boolean" then
+                zoneEnabled = v
+                updateVisibleZone()
+            end
+        end
     end
 
     function api:SetCustomWindow(tbl)
@@ -2746,7 +2984,7 @@ function createRadar(config)
             local t = pick(n, "transparency", "Transparency")
             if t ~= nil then radarCfg.transparency = t tween(radar, tinfo, { BackgroundTransparency = t }) end
             local sw = pick(n, "sweep", "Sweep")
-            if sw ~= nil then sweepEnabled = sw == true sweepHolder.Visible = sweepEnabled end
+            if sw ~= nil then sweepEnabled = sw == true sweepHolder.Visible = sweepEnabled and not worldViewEnabled end
         end
 
         n = pick(tbl, "Grid", "grid")
@@ -2827,7 +3065,6 @@ function createRadar(config)
 
     return api
 end
-
 
 --====================================================================
 --  Presets: готовые CustomWindow в стиле Blue Oblivion
