@@ -2375,9 +2375,14 @@ function createRadar(config)
     zoneCircleStroke.Transparency = 0.15
     zoneCircleStroke.Parent = zoneCircle
 
-    -- Треугольник/Конус (2 линии, идущие из центра)
-    local fovFolder = Instance.new("Folder")
+    -- ФИКС: Используем Frame вместо Folder, так как у Folder нет Visible
+    local fovFolder = Instance.new("Frame")
     fovFolder.Name = "FOV"
+    fovFolder.BackgroundTransparency = 1
+    fovFolder.Size = UDim2.new(1, 0, 1, 0)
+    fovFolder.AnchorPoint = Vector2.new(0.5, 0.5)
+    fovFolder.Position = UDim2.new(0.5, 0, 0.5, 0)
+    fovFolder.Visible = (zoneShape == "triangle")
     fovFolder.Parent = zoneHolder
 
     local fovLine1 = Instance.new("Frame")
@@ -2386,13 +2391,26 @@ function createRadar(config)
     fovLine1.Size = UDim2.new(0, 2, 0.5, 0)
     fovLine1.BackgroundColor3 = zoneColor
     fovLine1.BorderSizePixel = 0
+    fovLine1.Rotation = -45
     fovLine1.ZIndex = 400
     fovLine1.Parent = fovFolder
-	fovLine1.Visible = (zoneShape == "triangle")
 
     local fovLine2 = fovLine1:Clone()
+    fovLine2.Rotation = 45
     fovLine2.Parent = fovFolder
-	fovLine2.Visible = (zoneShape == "triangle")
+    
+    -- Маленькая точка в основании FOV, чтобы не было зазора
+    local fovApex = Instance.new("Frame")
+    fovApex.AnchorPoint = Vector2.new(0.5, 0.5)
+    fovApex.Position = UDim2.new(0.5, 0, 0.5, 0)
+    fovApex.Size = UDim2.fromOffset(4, 4)
+    fovApex.BackgroundColor3 = zoneColor
+    fovApex.BorderSizePixel = 0
+    fovApex.ZIndex = 400
+    fovApex.Parent = fovFolder
+    local apexCorner = Instance.new("UICorner")
+    apexCorner.CornerRadius = UDim.new(1, 0)
+    apexCorner.Parent = fovApex
 
     local function updateVisibleZone()
         zoneHolder.Visible = zoneEnabled
@@ -2403,13 +2421,10 @@ function createRadar(config)
         zoneCircleStroke.Color = zoneColor
         fovLine1.BackgroundColor3 = zoneColor
         fovLine2.BackgroundColor3 = zoneColor
+        fovApex.BackgroundColor3 = zoneColor
 
         if zoneShape == "circle" then
             zoneCircle.Size = UDim2.fromOffset(zoneWidth, zoneWidth)
-        elseif zoneShape == "triangle" then
-            local fovAngle = 45
-            fovLine1.Rotation = -fovAngle + zoneRotation
-            fovLine2.Rotation = fovAngle + zoneRotation
         end
     end
     updateVisibleZone()
@@ -2428,7 +2443,6 @@ function createRadar(config)
     wvCorner.CornerRadius = UDim.new(1, 0)
     wvCorner.Parent = worldViewContainer
 
-    -- Этот контейнер вращается вместе с камерой, что экономит ресурсы
     local worldViewInner = Instance.new("Frame")
     worldViewInner.Name = "Inner"
     worldViewInner.BackgroundTransparency = 1
@@ -2528,7 +2542,6 @@ function createRadar(config)
 
                 local cell = terrainCells[gx * TERRAIN_GRID + gz + 1]
                 
-                -- Позиция теперь строго по миру (карта вращается контейнером)
                 cell.Position = UDim2.new(0.5, ox * pixelsPerStud, 0.5, oz * pixelsPerStud)
                 cell.Size = UDim2.fromOffset(cellSizePixels, cellSizePixels)
 
@@ -2711,7 +2724,6 @@ function createRadar(config)
                         uiObj.Size = UDim2.fromOffset(math.max(part.Size.X * pixelsPerStud, 2), math.max(part.Size.Z * pixelsPerStud, 2))
                     end
 
-                    -- Позиция по миру, вращается вместе с контейнером
                     uiObj.Position = UDim2.new(0.5, offset.X * pixelsPerStud, 0.5, offset.Z * pixelsPerStud)
 
                     local _, partY, _ = part.CFrame:ToOrientation()
@@ -2721,7 +2733,7 @@ function createRadar(config)
                     uiObj.Visible = true
 
                     index = index + 1
-                    if index > 300 then break end
+                    if index > 200 then break end -- Оптимизация: 200 объектов более чем достаточно
                 end
             end
         end
@@ -2746,21 +2758,20 @@ function createRadar(config)
         if fwd.Magnitude < 0.001 then return end
         fwd = fwd.Unit
         
-        -- ФИКС: Плавное вращение контейнера с картой (без пересчета каждого объекта)
+        -- Оптимизация: Вращение контейнера (1 строчка кода) выполняется каждый кадр без просадок
         local camAngle = math.deg(math.atan2(fwd.X, fwd.Z))
         worldViewInner.Rotation = -camAngle
 
         local now = os.clock()
         local movedDist = (centerPos - lastPos).Magnitude
         
-        -- Обновляем объекты раз в 0.2 сек или при движении
-        if movedDist > 1 or (now - lastPartUpdate > 0.2) then
+        -- Пересчет позиций и цветов происходит реже (раз в 0.15 сек или при движении)
+        if movedDist > 1 or (now - lastPartUpdate > 0.15) then
             lastPos = centerPos
             lastPartUpdate = now
             updateWorldViewParts(centerPos)
             
-            -- Террейн тяжелый, обновляем раз в 0.5 сек
-            if now - lastTerrainUpdate > 0.5 then
+            if now - lastTerrainUpdate > 0.4 then
                 lastTerrainUpdate = now
                 updateTerrainView(centerPos)
             end
@@ -2932,6 +2943,15 @@ function createRadar(config)
         if not zonePositioned then
             zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
         end
+
+        -- ФИКС: Плавное вращение FOV линий (следуют за взглядом камеры)
+        if zoneEnabled and zoneShape == "triangle" and fovFolder then
+            local cam = workspace.CurrentCamera
+            if cam then
+                local look = cam.CFrame.LookVector
+                fovFolder.Rotation = -math.deg(math.atan2(look.X, look.Z)) + zoneRotation
+            end
+        end
     end)
 
     local function playIntro()
@@ -3090,7 +3110,7 @@ function createRadar(config)
             gridHolder.Visible = not worldViewEnabled
             sweepHolder.Visible = sweepEnabled and not worldViewEnabled
             if worldViewEnabled then 
-                lastPartUpdate = 0 -- Force update
+                lastPartUpdate = 0
             end
         end
 
