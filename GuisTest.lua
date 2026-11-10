@@ -2378,7 +2378,6 @@ function createRadar(config)
     -- Треугольник/Конус (2 линии, идущие из центра)
     local fovFolder = Instance.new("Folder")
     fovFolder.Name = "FOV"
-    fovFolder.Visible = (zoneShape == "triangle")
     fovFolder.Parent = zoneHolder
 
     local fovLine1 = Instance.new("Frame")
@@ -2389,9 +2388,11 @@ function createRadar(config)
     fovLine1.BorderSizePixel = 0
     fovLine1.ZIndex = 400
     fovLine1.Parent = fovFolder
+	fovLine1.Visible = (zoneShape == "triangle")
 
     local fovLine2 = fovLine1:Clone()
     fovLine2.Parent = fovFolder
+	fovLine2.Visible = (zoneShape == "triangle")
 
     local function updateVisibleZone()
         zoneHolder.Visible = zoneEnabled
