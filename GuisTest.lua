@@ -143,7 +143,6 @@ function Fx.addDepth(body, strength, z, radius)
     return parts
 end
 
-
 --====================================================================
 --  createInfoGui
 --====================================================================
@@ -1988,7 +1987,7 @@ function createInfoText(config)
             if ce ~= nil then constantEnabled = ce == true end
             local ms = pick(v, "MinScale", "minScale")
             if ms ~= nil then minScale = tonumber(ms) or minScale end
-            local mxs = pick(v, "MaxScale", "maxScale")
+            local mxs = pick(v, "maxScale", "maxScale")
             if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
             local st = pick(v, "studs", "Studs")
             if st ~= nil then studs = tonumber(st) or studs end
@@ -2117,7 +2116,6 @@ end
 --====================================================================
 --  createRadar
 --====================================================================
-
 function createRadar(config)
     config = config or {}
 
@@ -2754,29 +2752,29 @@ function createRadar(config)
     local targetObjects = {}
 
     local function getRoot(target)
-	    if not target or typeof(target) ~= "Instance" then
-	        return nil
-	    end
-	
-	    if target:IsA("Player") then
-	        return target.Character and (
-	            target.Character:FindFirstChild("HumanoidRootPart")
-	            or target.Character.PrimaryPart
-	        )
-	    end
-	
-	    if target:IsA("Model") then
-	        return target:FindFirstChild("HumanoidRootPart")
-	            or target.PrimaryPart
-	            or target:FindFirstChildWhichIsA("BasePart")
-	    end
-	
-	    if target:IsA("BasePart") then
-	        return target
-	    end
-	
-	    return nil
-	end
+        if not target or typeof(target) ~= "Instance" then
+            return nil
+        end
+
+        if target:IsA("Player") then
+            return target.Character and (
+                target.Character:FindFirstChild("HumanoidRootPart")
+                or target.Character.PrimaryPart
+            )
+        end
+
+        if target:IsA("Model") then
+            return target:FindFirstChild("HumanoidRootPart")
+                or target.PrimaryPart
+                or target:FindFirstChildWhichIsA("BasePart")
+        end
+
+        if target:IsA("BasePart") then
+            return target
+        end
+
+        return nil
+    end
 
     local function resolveWorldPosition(target)
         if not target then return nil end
@@ -2891,7 +2889,8 @@ function createRadar(config)
         if object.text then object.text.Visible = normalizedDistance < EDGE_TEXT_HIDE_THRESHOLD end
     end
 
-    local renderName = "CustomRadarUpdate_" .. "тестошибки"
+    -- У каждого радара свой ключ BindToRenderStep, даже при одинаковом Name.
+    local renderName = "CustomRadarUpdate_" .. tostring({})
     RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
         if not enabled then return end
         if sweepEnabled and not worldViewEnabled then
@@ -2928,11 +2927,16 @@ function createRadar(config)
         if not zonePositioned then
             zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
         end
+
+        -- ФИКС: Рисуем идеальные FOV линии через Drawing API строго из центра
         if zoneEnabled and zoneShape == "triangle" and fovLines then
             local cam = workspace.CurrentCamera
             if cam then
+                -- Центр круглой области радара в экранных координатах.
                 local centerScreen = radar.AbsolutePosition + (radar.AbsoluteSize * 0.5)
 
+                -- Направление берём непосредственно из LookVector персонажа.
+                -- В Roblox направление вперёд — -Z, а экранная ось Y направлена вниз.
                 local root = getRoot(zoneTarget)
                 local targetLook = root and root.CFrame.LookVector
 
@@ -2941,6 +2945,9 @@ function createRadar(config)
                     if flatLook.Magnitude > 0.001 then
                         flatLook = flatLook.Unit
                         local angle = math.atan2(flatLook.X, -flatLook.Z)
+
+                        -- WorldView вращает карту относительно камеры, поэтому
+                        -- только в этом режиме переводим угол в систему карты.
                         if worldViewEnabled then
                             local camLook = cam.CFrame.LookVector
                             local flatCamLook = Vector3.new(camLook.X, 0, camLook.Z)
@@ -2977,11 +2984,12 @@ function createRadar(config)
                     fovLines[1].Visible = false
                     fovLines[2].Visible = false
                 end
+            end -- <--- ДОБАВЛЕН ЭТОТ END
         elseif fovLines then
             fovLines[1].Visible = false
             fovLines[2].Visible = false
         end
-    end
+    end)
 
     local function playIntro()
         body.BackgroundTransparency = 1
@@ -3295,8 +3303,12 @@ function createRadar(config)
         for _, c in ipairs(connections) do c:Disconnect() end
         connections = {}
         if fovLines then
-            fovLines[1]:Remove()
-            fovLines[2]:Remove()
+            for _, line in ipairs(fovLines) do
+                if line then
+                    pcall(function() line:Remove() end)
+                    pcall(function() line:Destroy() end)
+                end
+            end
         end
         gui:Destroy()
     end
@@ -3305,7 +3317,7 @@ function createRadar(config)
 end
 
 --====================================================================
---  Presets: готовые CustomWindow в стиле Blue Oblivion
+--  Presets
 --====================================================================
 local Presets = {}
 
@@ -3335,7 +3347,7 @@ end
 Presets.Blue  = Presets.Make(Color3.fromRGB(56, 128, 255), Color3.fromRGB(8, 12, 26))
 Presets.Green = Presets.Make(Color3.fromRGB(46, 230, 130), Color3.fromRGB(6, 20, 15))
 Presets.Red   = Presets.Make(Color3.fromRGB(255, 66, 84),  Color3.fromRGB(24, 8, 12))
--- default color
+
 Presets.Dark = {
 	Background = {color = Color3.fromRGB(14, 17, 26),   transparency = 0.08},
 	Topbar     = {color = Color3.fromRGB(22, 26, 38),   transparency = 0.2},
