@@ -2333,7 +2333,7 @@ function createRadar(config)
 
     local radarDepth = Fx.addDepth(radar, depth * 0.8, 1, 100)
 
-    -- === VisibleZone UI (с повышенной видимостью и ZIndex 400) ===
+    -- === VisibleZone UI ===
     local zoneHolder = Instance.new("Frame")
     zoneHolder.Name = "VisibleZone"
     zoneHolder.BackgroundTransparency = 1
@@ -2365,14 +2365,15 @@ function createRadar(config)
     zoneCircleStroke.Transparency = 0.15
     zoneCircleStroke.Parent = zoneCircle
 
+    -- ИСПОЛЬЗУЕМ ВАЛИДНЫЙ АССЕТ ДЛЯ ТРЕУГОЛЬНИКА
     local zoneTriangle = Instance.new("ImageLabel")
     zoneTriangle.Name = "Triangle"
-    zoneTriangle.AnchorPoint = Vector2.new(0.5, 1)
+    zoneTriangle.AnchorPoint = Vector2.new(0.5, 1) -- Опорная точка снизу по центру (основание конуса)
     zoneTriangle.Position = UDim2.new(0.5, 0, 0.5, 0)
     zoneTriangle.BackgroundTransparency = 1
-    zoneTriangle.Image = "rbxassetid://15458024877"
+    zoneTriangle.Image = "rbxassetid://4576821486" -- Рабочий ID белого треугольника
     zoneTriangle.ImageColor3 = zoneColor
-    zoneTriangle.ImageTransparency = 0.6
+    zoneTriangle.ImageTransparency = 0.5
     zoneTriangle.Visible = (zoneShape == "triangle")
     zoneTriangle.ZIndex = 400
     zoneTriangle.Parent = zoneHolder
@@ -2639,7 +2640,6 @@ function createRadar(config)
         local character = Players.LocalPlayer.Character
         if not character then return end
 
-        -- Очистка/скрытие старых
         local toRemove = nil
         for part, obj in pairs(worldUIObjects) do
             if not part.Parent then
@@ -2662,8 +2662,9 @@ function createRadar(config)
 
         local parts = workspace:GetPartBoundsInRadius(centerPos, Size, overlapParams)
 
+        -- СОРТИРОВКА ПО ВЕРХНЕЙ ТОЧКЕ Y (Чтобы верхушки деревьев были поверх стволов)
         table.sort(parts, function(a, b)
-            return a.Position.Y < b.Position.Y
+            return (a.Position.Y + a.Size.Y / 2) < (b.Position.Y + b.Size.Y / 2)
         end)
 
         local pixelsPerStud = (RADAR_SIZE / 2) / Size
@@ -2682,22 +2683,48 @@ function createRadar(config)
                     local py = (RADAR_SIZE / 2) - (z * pixelsPerStud)
 
                     local uiObj = worldUIObjects[part]
+                    local isNew = false
                     if not uiObj then
+                        isNew = true
                         uiObj = Instance.new("Frame")
                         uiObj.Name = "Part"
                         uiObj.AnchorPoint = Vector2.new(0.5, 0.5)
                         uiObj.BorderSizePixel = 0
                         uiObj.Parent = worldViewInner
+                        
+                        local corner = Instance.new("UICorner")
+                        corner.Name = "Corner"
+                        corner.Parent = uiObj
+                        
                         worldUIObjects[part] = uiObj
                     end
 
-                    -- Цвет берётся напрямую из BasePart.Color (Part/MeshPart/WedgePart и т.д.)
                     uiObj.BackgroundColor3 = part.Color
                     uiObj.BackgroundTransparency = 0.2
 
-                    local width = math.max(part.Size.X * pixelsPerStud, 2)
-                    local height = math.max(part.Size.Z * pixelsPerStud, 2)
-                    uiObj.Size = UDim2.fromOffset(width, height)
+                    -- ПРИВЯЗКА К ФОРМЕ (Block, Ball, Cylinder)
+                    if isNew then
+                        local corner = uiObj:FindFirstChild("Corner")
+                        if part:IsA("Part") then
+                            if part.Shape == Enum.PartType.Ball then
+                                corner.CornerRadius = UDim.new(1, 0) -- Круг для шара
+                            elseif part.Shape == Enum.PartType.Cylinder then
+                                corner.CornerRadius = UDim.new(0.5, 0) -- Овал для цилиндра
+                            else
+                                corner.CornerRadius = UDim.new(0, 0) -- Квадрат для блока
+                            end
+                        else
+                            corner.CornerRadius = UDim.new(0, 0) -- Квадрат для MeshPart
+                        end
+                    end
+
+                    -- Настройка размера с учетом формы
+                    if part:IsA("Part") and (part.Shape == Enum.PartType.Ball or part.Shape == Enum.PartType.Cylinder) then
+                        uiObj.Size = UDim2.fromOffset(part.Size.X * pixelsPerStud, part.Size.X * pixelsPerStud)
+                    else
+                        uiObj.Size = UDim2.fromOffset(math.max(part.Size.X * pixelsPerStud, 2), math.max(part.Size.Z * pixelsPerStud, 2))
+                    end
+
                     uiObj.Position = UDim2.fromOffset(px, py)
                     uiObj.Rotation = invRot
 
@@ -2732,12 +2759,13 @@ function createRadar(config)
         updateWorldViewParts(centerPos, forward, right)
     end
 
-    local worldViewTick = 0
+    -- УСКОРЕННОЕ ОБНОВЛЕНИЕ (30+ FPS)
+    local lastWorldViewUpdate = 0
     connect(RunService.Heartbeat, function(dt)
         if not worldViewEnabled then return end
-        worldViewTick = worldViewTick + dt
-        if worldViewTick > 0.1 then
-            worldViewTick = 0
+        local now = os.clock()
+        if now - lastWorldViewUpdate > 0.03 then
+            lastWorldViewUpdate = now
             updateWorldView()
         end
     end)
