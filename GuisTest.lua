@@ -2124,6 +2124,7 @@ function createRadar(config)
     local RunService       = game:GetService("RunService")
     local CoreGui          = game:GetService("CoreGui")
     local UserInputService = game:GetService("UserInputService")
+    local Terrain          = workspace.Terrain
 
     local cw = pick(config, "CustomWindow", "customWindow") or {}
     local function sub(...) return Fx.copy(pick(cw, ...)) end
@@ -2196,6 +2197,7 @@ function createRadar(config)
     gui.Name = Name
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = (gethui and gethui()) or CoreGui
 
     local scaleObject = Instance.new("UIScale")
@@ -2331,7 +2333,7 @@ function createRadar(config)
 
     local radarDepth = Fx.addDepth(radar, depth * 0.8, 1, 100)
 
-    -- === VisibleZone UI ===
+    -- === VisibleZone UI (с повышенной видимостью и ZIndex 400) ===
     local zoneHolder = Instance.new("Frame")
     zoneHolder.Name = "VisibleZone"
     zoneHolder.BackgroundTransparency = 1
@@ -2339,7 +2341,7 @@ function createRadar(config)
     zoneHolder.AnchorPoint = Vector2.new(0.5, 0.5)
     zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
     zoneHolder.Visible = zoneEnabled
-    zoneHolder.ZIndex = 1
+    zoneHolder.ZIndex = 400
     zoneHolder.Parent = radar
 
     local zoneCircle = Instance.new("Frame")
@@ -2347,10 +2349,10 @@ function createRadar(config)
     zoneCircle.AnchorPoint = Vector2.new(0.5, 0.5)
     zoneCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
     zoneCircle.BackgroundColor3 = zoneColor
-    zoneCircle.BackgroundTransparency = 0.8
+    zoneCircle.BackgroundTransparency = 0.55
     zoneCircle.BorderSizePixel = 0
     zoneCircle.Visible = (zoneShape == "circle")
-    zoneCircle.ZIndex = 1
+    zoneCircle.ZIndex = 400
     zoneCircle.Parent = zoneHolder
 
     local zoneCircleCorner = Instance.new("UICorner")
@@ -2359,8 +2361,8 @@ function createRadar(config)
 
     local zoneCircleStroke = Instance.new("UIStroke")
     zoneCircleStroke.Color = zoneColor
-    zoneCircleStroke.Thickness = 2
-    zoneCircleStroke.Transparency = 0.3
+    zoneCircleStroke.Thickness = 2.5
+    zoneCircleStroke.Transparency = 0.15
     zoneCircleStroke.Parent = zoneCircle
 
     local zoneTriangle = Instance.new("ImageLabel")
@@ -2368,11 +2370,11 @@ function createRadar(config)
     zoneTriangle.AnchorPoint = Vector2.new(0.5, 1)
     zoneTriangle.Position = UDim2.new(0.5, 0, 0.5, 0)
     zoneTriangle.BackgroundTransparency = 1
-    zoneTriangle.Image = "rbxassetid://15458024877" -- Белый клин
+    zoneTriangle.Image = "rbxassetid://15458024877"
     zoneTriangle.ImageColor3 = zoneColor
-    zoneTriangle.ImageTransparency = 0.7
+    zoneTriangle.ImageTransparency = 0.6
     zoneTriangle.Visible = (zoneShape == "triangle")
-    zoneTriangle.ZIndex = 1
+    zoneTriangle.ZIndex = 400
     zoneTriangle.Parent = zoneHolder
 
     local function updateVisibleZone()
@@ -2400,7 +2402,7 @@ function createRadar(config)
     worldViewContainer.Size = UDim2.new(1, 0, 1, 0)
     worldViewContainer.ClipsDescendants = true
     worldViewContainer.Visible = worldViewEnabled
-    worldViewContainer.ZIndex = 1
+    worldViewContainer.ZIndex = 4
     worldViewContainer.Parent = radar
 
     local worldViewInner = Instance.new("Frame")
@@ -2411,7 +2413,118 @@ function createRadar(config)
     worldViewInner.Position = UDim2.new(0.5, 0, 0.5, 0)
     worldViewInner.Parent = worldViewContainer
 
-    -- Сетка / Перекрестие (скрываем если WorldView)
+    -- === Terrain: сетка ячеек + цвета материалов ===
+    local TERRAIN_GRID = 24
+    local TERRAIN_RES = 8
+    local TERRAIN_Y_UP = 40
+    local TERRAIN_Y_DOWN = 40
+    local TERRAIN_MAX_EXTENT = 250
+
+    local TERRAIN_MATERIAL_COLORS = {
+        [Enum.Material.Water]       = Color3.fromRGB(46, 100, 175),
+        [Enum.Material.Grass]       = Color3.fromRGB(90, 130, 50),
+        [Enum.Material.Sand]        = Color3.fromRGB(200, 180, 120),
+        [Enum.Material.Rock]        = Color3.fromRGB(120, 120, 120),
+        [Enum.Material.Snow]        = Color3.fromRGB(240, 240, 250),
+        [Enum.Material.Sandstone]   = Color3.fromRGB(180, 160, 110),
+        [Enum.Material.Mud]         = Color3.fromRGB(80, 60, 40),
+        [Enum.Material.Basalt]      = Color3.fromRGB(60, 60, 70),
+        [Enum.Material.Ground]      = Color3.fromRGB(90, 80, 60),
+        [Enum.Material.CrackedLava] = Color3.fromRGB(140, 50, 20),
+        [Enum.Material.LeafyGrass]  = Color3.fromRGB(70, 120, 40),
+        [Enum.Material.Salt]        = Color3.fromRGB(240, 240, 240),
+        [Enum.Material.Limestone]   = Color3.fromRGB(200, 200, 190),
+        [Enum.Material.Pavement]    = Color3.fromRGB(100, 100, 100),
+        [Enum.Material.Glacier]     = Color3.fromRGB(200, 220, 240),
+        [Enum.Material.Ice]         = Color3.fromRGB(180, 210, 230),
+        [Enum.Material.Asphalt]     = Color3.fromRGB(60, 60, 60),
+        [Enum.Material.Concrete]    = Color3.fromRGB(140, 140, 140),
+    }
+
+    local terrainCells = {}
+    do
+        local scale = 1 / TERRAIN_GRID
+        for gx = 0, TERRAIN_GRID - 1 do
+            for gz = 0, TERRAIN_GRID - 1 do
+                local cell = Instance.new("Frame")
+                cell.Name = "TCell"
+                cell.BackgroundColor3 = Color3.new(0, 0, 0)
+                cell.BackgroundTransparency = 0.15
+                cell.BorderSizePixel = 0
+                cell.ZIndex = 5
+                cell.Visible = false
+                cell.Size = UDim2.fromScale(scale + 0.002, scale + 0.002)
+                cell.Position = UDim2.fromScale(gx * scale, gz * scale)
+                cell.Parent = worldViewInner
+                terrainCells[gx * TERRAIN_GRID + gz + 1] = cell
+            end
+        end
+    end
+
+    local function terrainTint()
+        local tc = Terrain.Color
+        return tc.R, tc.G, tc.B
+    end
+
+    local function updateTerrainView(centerPos, forward, right)
+        local extent = math.min(Size * 1.5, TERRAIN_MAX_EXTENT)
+        local region = Region3.new(
+            Vector3.new(centerPos.X - extent, centerPos.Y - TERRAIN_Y_DOWN, centerPos.Z - extent),
+            Vector3.new(centerPos.X + extent, centerPos.Y + TERRAIN_Y_UP,   centerPos.Z + extent)
+        )
+
+        local ok, materials, occupancies = pcall(function()
+            return Terrain:ReadVoxels(region, TERRAIN_RES)
+        end)
+        if not ok or not materials or not occupancies then
+            for _, cell in ipairs(terrainCells) do cell.Visible = false end
+            return
+        end
+
+        local sx = materials.Size.X
+        local sy = materials.Size.Y
+        local sz = materials.Size.Z
+        local minX = centerPos.X - extent
+        local minZ = centerPos.Z - extent
+
+        local tr, tg, tb = terrainTint()
+
+        for gx = 0, TERRAIN_GRID - 1 do
+            for gz = 0, TERRAIN_GRID - 1 do
+                local ox = (((gx + 0.5) / TERRAIN_GRID) - 0.5) * 2 * Size
+                local oy = -(((gz + 0.5) / TERRAIN_GRID) - 0.5) * 2 * Size
+
+                local wx = centerPos.X + right.X * ox + forward.X * oy
+                local wz = centerPos.Z + right.Z * ox + forward.Z * oy
+
+                local vx = math.floor((wx - minX) / TERRAIN_RES) + 1
+                local vz = math.floor((wz - minZ) / TERRAIN_RES) + 1
+
+                local cell = terrainCells[gx * TERRAIN_GRID + gz + 1]
+
+                if vx >= 1 and vx <= sx and vz >= 1 and vz <= sz then
+                    local col = nil
+                    for vy = sy, 1, -1 do
+                        if occupancies[vx][vy][vz] > 0.1 then
+                            local mat = materials[vx][vy][vz]
+                            col = TERRAIN_MATERIAL_COLORS[mat]
+                            break
+                        end
+                    end
+                    if col then
+                        cell.BackgroundColor3 = Color3.new(col.R * tr, col.G * tg, col.B * tb)
+                        cell.Visible = true
+                    else
+                        cell.Visible = false
+                    end
+                else
+                    cell.Visible = false
+                end
+            end
+        end
+    end
+
+    -- === Grid / Crosshair ===
     local gridHolder = Instance.new("Folder")
     gridHolder.Name = "Grid"
     gridHolder.Parent = radar
@@ -2519,42 +2632,46 @@ function createRadar(config)
     cdGlow.Transparency = 0.6
     cdGlow.Parent = centerDot
 
-    -- === Логика отрисовки WorldView ===
+    -- === WorldView: parts ===
     local worldUIObjects = {}
 
-    local function updateWorldView()
-        if not worldViewEnabled then return end
+    local function updateWorldViewParts(centerPos, forward, right)
         local character = Players.LocalPlayer.Character
         if not character then return end
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
 
-        local camera = workspace.CurrentCamera
-        if not camera then return end
-
-        for _, obj in pairs(worldUIObjects) do
-            obj.Visible = false
+        -- Очистка/скрытие старых
+        local toRemove = nil
+        for part, obj in pairs(worldUIObjects) do
+            if not part.Parent then
+                obj:Destroy()
+                toRemove = toRemove or {}
+                table.insert(toRemove, part)
+            else
+                obj.Visible = false
+            end
+        end
+        if toRemove then
+            for _, part in ipairs(toRemove) do
+                worldUIObjects[part] = nil
+            end
         end
 
         local overlapParams = OverlapParams.new()
         overlapParams.FilterType = Enum.RaycastFilterType.Exclude
         overlapParams.FilterDescendantsInstances = {gui, character}
 
-        local parts = workspace:GetPartBoundsInRadius(hrp.Position, Size, overlapParams)
+        local parts = workspace:GetPartBoundsInRadius(centerPos, Size, overlapParams)
 
         table.sort(parts, function(a, b)
             return a.Position.Y < b.Position.Y
         end)
 
-        local centerPos = hrp.Position
-        local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z).Unit
-        local right = Vector3.new(camera.CFrame.RightVector.X, 0, camera.CFrame.RightVector.Z).Unit
-
         local pixelsPerStud = (RADAR_SIZE / 2) / Size
+        local invRot = -math.deg(math.atan2(forward.X, forward.Z)) + 180
 
         local index = 1
         for _, part in ipairs(parts) do
-            if part ~= workspace.Terrain and part.Transparency < 1 and part.Size.Magnitude > 0.1 then
+            if part ~= Terrain and part.Transparency < 1 and part.Size.Magnitude > 0.1 then
                 local offset = part.Position - centerPos
                 local dist = offset.Magnitude
                 if dist <= Size then
@@ -2574,6 +2691,7 @@ function createRadar(config)
                         worldUIObjects[part] = uiObj
                     end
 
+                    -- Цвет берётся напрямую из BasePart.Color (Part/MeshPart/WedgePart и т.д.)
                     uiObj.BackgroundColor3 = part.Color
                     uiObj.BackgroundTransparency = 0.2
 
@@ -2581,7 +2699,7 @@ function createRadar(config)
                     local height = math.max(part.Size.Z * pixelsPerStud, 2)
                     uiObj.Size = UDim2.fromOffset(width, height)
                     uiObj.Position = UDim2.fromOffset(px, py)
-                    uiObj.Rotation = -math.deg(math.atan2(forward.X, forward.Z)) + 180
+                    uiObj.Rotation = invRot
 
                     uiObj.ZIndex = 10 + index
                     uiObj.Visible = true
@@ -2591,6 +2709,27 @@ function createRadar(config)
                 end
             end
         end
+    end
+
+    local function updateWorldView()
+        if not worldViewEnabled then return end
+        local character = Players.LocalPlayer.Character
+        if not character then return end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+
+        local centerPos = hrp.Position
+        local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+        local right   = Vector3.new(camera.CFrame.RightVector.X, 0, camera.CFrame.RightVector.Z)
+        if forward.Magnitude < 0.001 or right.Magnitude < 0.001 then return end
+        forward = forward.Unit
+        right = right.Unit
+
+        updateTerrainView(centerPos, forward, right)
+        updateWorldViewParts(centerPos, forward, right)
     end
 
     local worldViewTick = 0
@@ -2603,6 +2742,7 @@ function createRadar(config)
         end
     end)
 
+    -- === Helpers ===
     local targetObjects = {}
 
     local function getRoot(target)
@@ -2738,7 +2878,7 @@ function createRadar(config)
         end
         for id, object in pairs(targetObjects) do updateTarget(id, object) end
 
-        -- === VisibleZone: позиционирование по target ===
+        -- VisibleZone positioning
         local zonePositioned = false
         if zoneEnabled and zoneTarget then
             local zonePos   = resolveWorldPosition(zoneTarget)
