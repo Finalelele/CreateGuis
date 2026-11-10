@@ -2375,44 +2375,40 @@ function createRadar(config)
     zoneCircleStroke.Transparency = 0.15
     zoneCircleStroke.Parent = zoneCircle
 
-    local zoneTriangle = Instance.new("ImageLabel")
-    zoneTriangle.Name = "Triangle"
-    zoneTriangle.AnchorPoint = Vector2.new(0.5, 1)
-    zoneTriangle.Position = UDim2.new(0.5, 0, 0.5, 0)
-    zoneTriangle.BackgroundTransparency = 1
-    zoneTriangle.Image = "rbxassetid://1316045217" 
-    zoneTriangle.ImageColor3 = zoneColor
-    zoneTriangle.ImageTransparency = 0.5
-    zoneTriangle.Visible = (zoneShape == "triangle")
-    zoneTriangle.ZIndex = 400
-    zoneTriangle.Parent = zoneHolder
+    -- Треугольник/Конус (2 линии, идущие из центра)
+    local fovFolder = Instance.new("Folder")
+    fovFolder.Name = "FOV"
+    fovFolder.Visible = (zoneShape == "triangle")
+    fovFolder.Parent = zoneHolder
 
-    local hasDrawing = pcall(function() return Drawing.new("Line") end)
-    local fovLines = nil
-    if hasDrawing then
-        fovLines = { Drawing.new("Line"), Drawing.new("Line") }
-        for _, l in ipairs(fovLines) do
-            l.Thickness = 2
-            l.Color = zoneColor
-            l.Transparency = 0.6
-            l.Visible = false
-        end
-    end
+    local fovLine1 = Instance.new("Frame")
+    fovLine1.AnchorPoint = Vector2.new(0.5, 1)
+    fovLine1.Position = UDim2.new(0.5, 0, 0.5, 0)
+    fovLine1.Size = UDim2.new(0, 2, 0.5, 0)
+    fovLine1.BackgroundColor3 = zoneColor
+    fovLine1.BorderSizePixel = 0
+    fovLine1.ZIndex = 400
+    fovLine1.Parent = fovFolder
+
+    local fovLine2 = fovLine1:Clone()
+    fovLine2.Parent = fovFolder
 
     local function updateVisibleZone()
         zoneHolder.Visible = zoneEnabled
         zoneCircle.Visible = zoneEnabled and (zoneShape == "circle")
-        zoneTriangle.Visible = zoneEnabled and (zoneShape == "triangle") and not hasDrawing
+        fovFolder.Visible = zoneEnabled and (zoneShape == "triangle")
 
         zoneCircle.BackgroundColor3 = zoneColor
         zoneCircleStroke.Color = zoneColor
-        zoneTriangle.ImageColor3 = zoneColor
+        fovLine1.BackgroundColor3 = zoneColor
+        fovLine2.BackgroundColor3 = zoneColor
 
         if zoneShape == "circle" then
             zoneCircle.Size = UDim2.fromOffset(zoneWidth, zoneWidth)
         elseif zoneShape == "triangle" then
-            zoneTriangle.Size = UDim2.fromOffset(zoneWidth, zoneWidth)
-            zoneTriangle.Rotation = zoneRotation
+            local fovAngle = 45
+            fovLine1.Rotation = -fovAngle + zoneRotation
+            fovLine2.Rotation = fovAngle + zoneRotation
         end
     end
     updateVisibleZone()
@@ -2431,6 +2427,7 @@ function createRadar(config)
     wvCorner.CornerRadius = UDim.new(1, 0)
     wvCorner.Parent = worldViewContainer
 
+    -- Этот контейнер вращается вместе с камерой, что экономит ресурсы
     local worldViewInner = Instance.new("Frame")
     worldViewInner.Name = "Inner"
     worldViewInner.BackgroundTransparency = 1
@@ -2469,7 +2466,6 @@ function createRadar(config)
 
     local terrainCells = {}
     do
-        local scale = 1 / TERRAIN_GRID
         for gx = 0, TERRAIN_GRID - 1 do
             for gz = 0, TERRAIN_GRID - 1 do
                 local cell = Instance.new("Frame")
@@ -2491,7 +2487,7 @@ function createRadar(config)
         return tc.R, tc.G, tc.B
     end
 
-    local function updateTerrainView(centerPos, fwd, rgt)
+    local function updateTerrainView(centerPos)
         local extent = math.min(Size * 1.5, TERRAIN_MAX_EXTENT)
         local region = Region3.new(
             Vector3.new(centerPos.X - extent, centerPos.Y - TERRAIN_Y_DOWN, centerPos.Z - extent),
@@ -2517,8 +2513,6 @@ function createRadar(config)
         local pixelsPerStud = (RADAR_SIZE / 2) / Size
         local cellSizeStuds = (Size * 2) / TERRAIN_GRID
         local cellSizePixels = cellSizeStuds * pixelsPerStud + 2
-        
-        local camAngle = math.deg(math.atan2(rgt.X, rgt.Z))
 
         for gx = 0, TERRAIN_GRID - 1 do
             for gz = 0, TERRAIN_GRID - 1 do
@@ -2533,16 +2527,9 @@ function createRadar(config)
 
                 local cell = terrainCells[gx * TERRAIN_GRID + gz + 1]
                 
-                local offsetVec = Vector3.new(ox, 0, oz)
-                local localX = offsetVec:Dot(rgt)
-                local localZ = offsetVec:Dot(fwd)
-
-                local px = localX * pixelsPerStud
-                local py = -localZ * pixelsPerStud
-
-                cell.Position = UDim2.new(0.5, px, 0.5, py)
+                -- Позиция теперь строго по миру (карта вращается контейнером)
+                cell.Position = UDim2.new(0.5, ox * pixelsPerStud, 0.5, oz * pixelsPerStud)
                 cell.Size = UDim2.fromOffset(cellSizePixels, cellSizePixels)
-                cell.Rotation = camAngle
 
                 if vx >= 1 and vx <= sx and vz >= 1 and vz <= sz then
                     local col = nil
@@ -2660,25 +2647,9 @@ function createRadar(config)
     -- === WorldView: parts ===
     local worldUIObjects = {}
 
-    local function updateWorldViewParts(centerPos, camera, fwd, rgt)
+    local function updateWorldViewParts(centerPos)
         local character = Players.LocalPlayer.Character
         if not character then return end
-
-        local toRemove = nil
-        for part, obj in pairs(worldUIObjects) do
-            if not part.Parent then
-                obj:Destroy()
-                toRemove = toRemove or {}
-                table.insert(toRemove, part)
-            else
-                obj.Visible = false
-            end
-        end
-        if toRemove then
-            for _, part in ipairs(toRemove) do
-                worldUIObjects[part] = nil
-            end
-        end
 
         local overlapParams = OverlapParams.new()
         overlapParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -2693,15 +2664,17 @@ function createRadar(config)
         local pixelsPerStud = (RADAR_SIZE / 2) / Size
         local index = 1
         
+        for _, uiObj in pairs(worldUIObjects) do
+            uiObj.Visible = false
+        end
+
         for _, part in ipairs(parts) do
             if part ~= Terrain and part.Transparency < 1 and part.Size.Magnitude > 0.1 then
                 local offset = part.Position - centerPos
                 local dist = offset.Magnitude
                 if dist <= Size then
                     local uiObj = worldUIObjects[part]
-                    local isNew = false
                     if not uiObj then
-                        isNew = true
                         uiObj = Instance.new("Frame")
                         uiObj.Name = "Part"
                         uiObj.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -2718,19 +2691,17 @@ function createRadar(config)
                     uiObj.BackgroundColor3 = part.Color
                     uiObj.BackgroundTransparency = 0.2
 
-                    if isNew then
-                        local corner = uiObj:FindFirstChild("Corner")
-                        if part:IsA("Part") then
-                            if part.Shape == Enum.PartType.Ball then
-                                corner.CornerRadius = UDim.new(1, 0)
-                            elseif part.Shape == Enum.PartType.Cylinder then
-                                corner.CornerRadius = UDim.new(0.5, 0)
-                            else
-                                corner.CornerRadius = UDim.new(0, 0)
-                            end
+                    local corner = uiObj:FindFirstChild("Corner")
+                    if part:IsA("Part") then
+                        if part.Shape == Enum.PartType.Ball then
+                            corner.CornerRadius = UDim.new(1, 0)
+                        elseif part.Shape == Enum.PartType.Cylinder then
+                            corner.CornerRadius = UDim.new(0.5, 0)
                         else
                             corner.CornerRadius = UDim.new(0, 0)
                         end
+                    else
+                        corner.CornerRadius = UDim.new(0, 0)
                     end
 
                     if part:IsA("Part") and (part.Shape == Enum.PartType.Ball or part.Shape == Enum.PartType.Cylinder) then
@@ -2739,17 +2710,11 @@ function createRadar(config)
                         uiObj.Size = UDim2.fromOffset(math.max(part.Size.X * pixelsPerStud, 2), math.max(part.Size.Z * pixelsPerStud, 2))
                     end
 
-                    local localX = offset:Dot(rgt)
-                    local localZ = offset:Dot(fwd)
-                    local px = localX * pixelsPerStud
-                    local py = -localZ * pixelsPerStud
-                    
-                    uiObj.Position = UDim2.new(0.5, px, 0.5, py)
+                    -- Позиция по миру, вращается вместе с контейнером
+                    uiObj.Position = UDim2.new(0.5, offset.X * pixelsPerStud, 0.5, offset.Z * pixelsPerStud)
 
-                    local partRight = part.CFrame.RightVector
-                    local screenPartX = partRight:Dot(rgt)
-                    local screenPartY = -partRight:Dot(fwd)
-                    uiObj.Rotation = math.deg(math.atan2(screenPartY, screenPartX))
+                    local _, partY, _ = part.CFrame:ToOrientation()
+                    uiObj.Rotation = math.deg(partY)
 
                     uiObj.ZIndex = 10 + index
                     uiObj.Visible = true
@@ -2761,38 +2726,43 @@ function createRadar(config)
         end
     end
 
-    local function updateWorldView()
+    local lastPos = Vector3.new(0, 0, 0)
+    local lastPartUpdate = 0
+    local lastTerrainUpdate = 0
+
+    connect(RunService.Heartbeat, function(dt)
         if not worldViewEnabled then return end
         local character = Players.LocalPlayer.Character
         if not character then return end
         local hrp = character:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-
         local camera = workspace.CurrentCamera
         if not camera then return end
 
+        local centerPos = hrp.Position
         local look = camera.CFrame.LookVector
         local fwd = Vector3.new(look.X, 0, look.Z)
         if fwd.Magnitude < 0.001 then return end
         fwd = fwd.Unit
         
-        local right = camera.CFrame.RightVector
-        local rgt = Vector3.new(right.X, 0, right.Z)
-        if rgt.Magnitude < 0.001 then return end
-        rgt = rgt.Unit
+        -- ФИКС: Плавное вращение контейнера с картой (без пересчета каждого объекта)
+        local camAngle = math.deg(math.atan2(fwd.X, fwd.Z))
+        worldViewInner.Rotation = -camAngle
 
-        local centerPos = hrp.Position
-        updateTerrainView(centerPos, fwd, rgt)
-        updateWorldViewParts(centerPos, camera, fwd, rgt)
-    end
-
-    local lastWorldViewUpdate = 0
-    connect(RunService.Heartbeat, function(dt)
-        if not worldViewEnabled then return end
         local now = os.clock()
-        if now - lastWorldViewUpdate > 0.03 then
-            lastWorldViewUpdate = now
-            updateWorldView()
+        local movedDist = (centerPos - lastPos).Magnitude
+        
+        -- Обновляем объекты раз в 0.2 сек или при движении
+        if movedDist > 1 or (now - lastPartUpdate > 0.2) then
+            lastPos = centerPos
+            lastPartUpdate = now
+            updateWorldViewParts(centerPos)
+            
+            -- Террейн тяжелый, обновляем раз в 0.5 сек
+            if now - lastTerrainUpdate > 0.5 then
+                lastTerrainUpdate = now
+                updateTerrainView(centerPos)
+            end
         end
     end)
 
@@ -2961,40 +2931,6 @@ function createRadar(config)
         if not zonePositioned then
             zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
         end
-
-        -- ФИКС: Рисуем FOV линии через Drawing API, точно из центра
-        if zoneEnabled and zoneShape == "triangle" and fovLines then
-            local cam = workspace.CurrentCamera
-            if cam then
-                local centerAbs = Vector2.new(
-                    zoneHolder.AbsolutePosition.X + zoneHolder.AbsoluteSize.X / 2,
-                    zoneHolder.AbsolutePosition.Y + zoneHolder.AbsoluteSize.Y / 2
-                )
-                
-                local fov = math.rad(45)
-                local len = RADAR_SIZE / 2
-                local rotRad = math.rad(zoneRotation)
-                
-                local leftAngle = rotRad - fov
-                local rightAngle = rotRad + fov
-                
-                local lDir = Vector2.new(math.sin(leftAngle), -math.cos(leftAngle))
-                local rDir = Vector2.new(math.sin(rightAngle), -math.cos(rightAngle))
-                
-                fovLines[1].From = centerAbs
-                fovLines[1].To = centerAbs + lDir * len
-                fovLines[1].Color = zoneColor
-                fovLines[1].Visible = true
-                
-                fovLines[2].From = centerAbs
-                fovLines[2].To = centerAbs + rDir * len
-                fovLines[2].Color = zoneColor
-                fovLines[2].Visible = true
-            end
-        elseif fovLines then
-            fovLines[1].Visible = false
-            fovLines[2].Visible = false
-        end
     end)
 
     local function playIntro()
@@ -3152,7 +3088,9 @@ function createRadar(config)
             worldViewContainer.Visible = worldViewEnabled
             gridHolder.Visible = not worldViewEnabled
             sweepHolder.Visible = sweepEnabled and not worldViewEnabled
-            if worldViewEnabled then updateWorldView() end
+            if worldViewEnabled then 
+                lastPartUpdate = 0 -- Force update
+            end
         end
 
         v = pick(tbl, "VisibleZone", "visibleZone")
@@ -3167,13 +3105,7 @@ function createRadar(config)
                 local rot = pick(v, "rotation", "Rotation")
                 if rot ~= nil then zoneRotation = tonumber(rot) or zoneRotation end
                 local col = pick(v, "color", "Color")
-                if col ~= nil then 
-                    zoneColor = col 
-                    if fovLines then
-                        fovLines[1].Color = zoneColor
-                        fovLines[2].Color = zoneColor
-                    end
-                end
+                if col ~= nil then zoneColor = col end
                 local tgt = pick(v, "target", "Target")
                 if tgt ~= nil then zoneTarget = tgt end
 
@@ -3306,10 +3238,6 @@ function createRadar(config)
         RunService:UnbindFromRenderStep(renderName)
         for _, c in ipairs(connections) do c:Disconnect() end
         connections = {}
-        if fovLines then
-            fovLines[1]:Remove()
-            fovLines[2]:Remove()
-        end
         gui:Destroy()
     end
 
