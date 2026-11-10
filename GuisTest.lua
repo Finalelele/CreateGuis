@@ -2877,7 +2877,8 @@ function createRadar(config)
         if object.text then object.text.Visible = normalizedDistance < EDGE_TEXT_HIDE_THRESHOLD end
     end
 
-    local renderName = Name .. "_RadarUpdate"
+    -- У каждого радара свой ключ BindToRenderStep, даже при одинаковом Name.
+    local renderName = "CustomRadarUpdate_" .. tostring({})
     RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
         if not enabled then return end
         if sweepEnabled and not worldViewEnabled then
@@ -2919,45 +2920,58 @@ function createRadar(config)
         if zoneEnabled and zoneShape == "triangle" and fovLines then
             local cam = workspace.CurrentCamera
             if cam then
-                -- 1. Берем точный центр маски радара на экране
-                local centerScreen = radarClip.AbsolutePosition + (radarClip.AbsoluteSize / 2)
-                
-                -- 2. Вычисляем угол взгляда камеры
-                local camLook = cam.CFrame.LookVector
-                local camAngle = math.deg(math.atan2(camLook.X, camLook.Z))
+                -- Центр круглой области радара в экранных координатах.
+                local centerScreen = radar.AbsolutePosition + (radar.AbsoluteSize * 0.5)
 
-                -- 3. Вычисляем угол взгляда цели (если это модель/игрок)
-                local targetAngle = camAngle
+                -- Направление берём непосредственно из LookVector персонажа.
+                -- В Roblox направление вперёд — -Z, а экранная ось Y направлена вниз.
                 local root = getRoot(zoneTarget)
-                if root then
-                    local targetLook = root.CFrame.LookVector
-                    targetAngle = math.deg(math.atan2(targetLook.X, targetLook.Z))
-                end
+                local targetLook = root and root.CFrame.LookVector
 
-                -- 4. Вычисляем относительный угол (насколько цель повернута относительно камеры)
-                -- Так как карта вращается на -camAngle, нам нужно вычесть camAngle из targetAngle
-                local relativeAngle = targetAngle - camAngle + zoneRotation
-                
-                local fov = 45 -- Угол раствора конуса
-                local len = RADAR_SIZE / 2
-                
-                local leftAngle = math.rad(relativeAngle - fov)
-                local rightAngle = math.rad(relativeAngle + fov)
-                
-                -- 5. Считаем координаты концов линий (в Drawing API Y идет вниз)
-                local lDir = Vector2.new(math.sin(leftAngle), -math.cos(leftAngle))
-                local rDir = Vector2.new(math.sin(rightAngle), -math.cos(rightAngle))
-                
-                fovLines[1].From = centerScreen
-                fovLines[1].To = centerScreen + lDir * len
-                fovLines[1].Color = zoneColor
-                fovLines[1].Visible = true
-                
-                fovLines[2].From = centerScreen
-                fovLines[2].To = centerScreen + rDir * len
-                fovLines[2].Color = zoneColor
-                fovLines[2].Visible = true
-            end
+                if targetLook then
+                    local flatLook = Vector3.new(targetLook.X, 0, targetLook.Z)
+                    if flatLook.Magnitude > 0.001 then
+                        flatLook = flatLook.Unit
+                        local angle = math.atan2(flatLook.X, -flatLook.Z)
+
+                        -- WorldView вращает карту относительно камеры, поэтому
+                        -- только в этом режиме переводим угол в систему карты.
+                        if worldViewEnabled then
+                            local camLook = cam.CFrame.LookVector
+                            local flatCamLook = Vector3.new(camLook.X, 0, camLook.Z)
+                            if flatCamLook.Magnitude > 0.001 then
+                                flatCamLook = flatCamLook.Unit
+                                angle = angle - math.atan2(flatCamLook.X, -flatCamLook.Z)
+                            end
+                        end
+
+                        angle = angle + math.rad(zoneRotation)
+
+                        local fov = math.rad(45)
+                        local len = math.min(radar.AbsoluteSize.X, radar.AbsoluteSize.Y) * 0.5
+                        local leftAngle = angle - fov
+                        local rightAngle = angle + fov
+
+                        local lDir = Vector2.new(math.sin(leftAngle), -math.cos(leftAngle))
+                        local rDir = Vector2.new(math.sin(rightAngle), -math.cos(rightAngle))
+
+                        fovLines[1].From = centerScreen
+                        fovLines[1].To = centerScreen + lDir * len
+                        fovLines[1].Color = zoneColor
+                        fovLines[1].Visible = true
+
+                        fovLines[2].From = centerScreen
+                        fovLines[2].To = centerScreen + rDir * len
+                        fovLines[2].Color = zoneColor
+                        fovLines[2].Visible = true
+                    else
+                        fovLines[1].Visible = false
+                        fovLines[2].Visible = false
+                    end
+                else
+                    fovLines[1].Visible = false
+                    fovLines[2].Visible = false
+                end
         elseif fovLines then
             fovLines[1].Visible = false
             fovLines[2].Visible = false
