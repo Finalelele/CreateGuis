@@ -2753,16 +2753,29 @@ function createRadar(config)
     local targetObjects = {}
 
     local function getRoot(target)
-        if not target then return nil end
-        if target:IsA("Player") then
-            return target.Character and (target.Character:FindFirstChild("HumanoidRootPart") or target.Character.PrimaryPart)
-        end
-        if target:IsA("Model") then
-            return target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
-        end
-        if target:IsA("BasePart") then return target end
-        return nil
-    end
+	    if not target or typeof(target) ~= "Instance" then
+	        return nil
+	    end
+	
+	    if target:IsA("Player") then
+	        return target.Character and (
+	            target.Character:FindFirstChild("HumanoidRootPart")
+	            or target.Character.PrimaryPart
+	        )
+	    end
+	
+	    if target:IsA("Model") then
+	        return target:FindFirstChild("HumanoidRootPart")
+	            or target.PrimaryPart
+	            or target:FindFirstChildWhichIsA("BasePart")
+	    end
+	
+	    if target:IsA("BasePart") then
+	        return target
+	    end
+	
+	    return nil
+	end
 
     local function resolveWorldPosition(target)
         if not target then return nil end
