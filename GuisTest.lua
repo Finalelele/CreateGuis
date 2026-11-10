@@ -1491,7 +1491,7 @@ function createInfoText(config)
         if ce ~= nil then constantEnabled = ce == true end
         local ms = pick(constantCfg, "MinScale", "minScale")
         if ms ~= nil then minScale = tonumber(ms) or minScale end
-        local mxs = pick(constantCfg, "MaxScale", "maxScale")
+        local mxs = pick(constantCfg, "maxScale", "maxScale")
         if mxs ~= nil then maxScale = tonumber(mxs) or maxScale end
         local st = pick(constantCfg, "studs", "Studs")
         if st ~= nil then studs = tonumber(st) or studs end
@@ -2331,6 +2331,16 @@ function createRadar(config)
     clipCorner.CornerRadius = UDim.new(1, 0)
     clipCorner.Parent = radarClip
 
+    -- НЕВИДИМЫЙ МАРКЕР В ЦЕНТРЕ (для идеального позиционирования Drawing API)
+    local fovOrigin = Instance.new("Frame")
+    fovOrigin.Name = "FovOrigin"
+    fovOrigin.AnchorPoint = Vector2.new(0.5, 0.5)
+    fovOrigin.Position = UDim2.fromScale(0.5, 0.5)
+    fovOrigin.Size = UDim2.fromOffset(2, 2)
+    fovOrigin.BackgroundTransparency = 1
+    fovOrigin.ZIndex = 1
+    fovOrigin.Parent = radarClip
+
     local radarCorner = Instance.new("UICorner")
     radarCorner.CornerRadius = UDim.new(1, 0)
     radarCorner.Parent = radar
@@ -2375,7 +2385,7 @@ function createRadar(config)
     zoneCircleStroke.Transparency = 0.15
     zoneCircleStroke.Parent = zoneCircle
 
-    -- === Возвращаем Drawing API для FOV ===
+    -- === Drawing API для FOV ===
     local hasDrawing = pcall(function() return Drawing.new("Line") end)
     local fovLines = nil
     if hasDrawing then
@@ -2656,57 +2666,55 @@ function createRadar(config)
 
         for _, part in ipairs(parts) do
             if part ~= Terrain and part.Transparency < 1 and part.Size.Magnitude > 0.1 then
+                -- Убрана проверка дистанции, так как GetPartBoundsInRadius уже фильтрует по границам
                 local offset = part.Position - centerPos
-                local dist = offset.Magnitude
-                if dist <= Size then
-                    local uiObj = worldUIObjects[part]
-                    if not uiObj then
-                        uiObj = Instance.new("Frame")
-                        uiObj.Name = "Part"
-                        uiObj.AnchorPoint = Vector2.new(0.5, 0.5)
-                        uiObj.BorderSizePixel = 0
-                        uiObj.Parent = worldViewInner
-                        
-                        local corner = Instance.new("UICorner")
-                        corner.Name = "Corner"
-                        corner.Parent = uiObj
-                        
-                        worldUIObjects[part] = uiObj
-                    end
+                local uiObj = worldUIObjects[part]
+                if not uiObj then
+                    uiObj = Instance.new("Frame")
+                    uiObj.Name = "Part"
+                    uiObj.AnchorPoint = Vector2.new(0.5, 0.5)
+                    uiObj.BorderSizePixel = 0
+                    uiObj.Parent = worldViewInner
+                    
+                    local corner = Instance.new("UICorner")
+                    corner.Name = "Corner"
+                    corner.Parent = uiObj
+                    
+                    worldUIObjects[part] = uiObj
+                end
 
-                    uiObj.BackgroundColor3 = part.Color
-                    uiObj.BackgroundTransparency = 0.2
+                uiObj.BackgroundColor3 = part.Color
+                uiObj.BackgroundTransparency = 0.2
 
-                    local corner = uiObj:FindFirstChild("Corner")
-                    if part:IsA("Part") then
-                        if part.Shape == Enum.PartType.Ball then
-                            corner.CornerRadius = UDim.new(1, 0)
-                        elseif part.Shape == Enum.PartType.Cylinder then
-                            corner.CornerRadius = UDim.new(0.5, 0)
-                        else
-                            corner.CornerRadius = UDim.new(0, 0)
-                        end
+                local corner = uiObj:FindFirstChild("Corner")
+                if part:IsA("Part") then
+                    if part.Shape == Enum.PartType.Ball then
+                        corner.CornerRadius = UDim.new(1, 0)
+                    elseif part.Shape == Enum.PartType.Cylinder then
+                        corner.CornerRadius = UDim.new(0.5, 0)
                     else
                         corner.CornerRadius = UDim.new(0, 0)
                     end
-
-                    if part:IsA("Part") and (part.Shape == Enum.PartType.Ball or part.Shape == Enum.PartType.Cylinder) then
-                        uiObj.Size = UDim2.fromOffset(part.Size.X * pixelsPerStud, part.Size.X * pixelsPerStud)
-                    else
-                        uiObj.Size = UDim2.fromOffset(math.max(part.Size.X * pixelsPerStud, 2), math.max(part.Size.Z * pixelsPerStud, 2))
-                    end
-
-                    uiObj.Position = UDim2.new(0.5, offset.X * pixelsPerStud, 0.5, offset.Z * pixelsPerStud)
-
-                    local _, partY, _ = part.CFrame:ToOrientation()
-                    uiObj.Rotation = math.deg(partY)
-
-                    uiObj.ZIndex = 10 + index
-                    uiObj.Visible = true
-
-                    index = index + 1
-                    if index > 200 then break end
+                else
+                    corner.CornerRadius = UDim.new(0, 0)
                 end
+
+                if part:IsA("Part") and (part.Shape == Enum.PartType.Ball or part.Shape == Enum.PartType.Cylinder) then
+                    uiObj.Size = UDim2.fromOffset(part.Size.X * pixelsPerStud, part.Size.X * pixelsPerStud)
+                else
+                    uiObj.Size = UDim2.fromOffset(math.max(part.Size.X * pixelsPerStud, 2), math.max(part.Size.Z * pixelsPerStud, 2))
+                end
+
+                uiObj.Position = UDim2.new(0.5, offset.X * pixelsPerStud, 0.5, offset.Z * pixelsPerStud)
+
+                local _, partY, _ = part.CFrame:ToOrientation()
+                uiObj.Rotation = math.deg(partY)
+
+                uiObj.ZIndex = 10 + index
+                uiObj.Visible = true
+
+                index = index + 1
+                if index > 200 then break end
             end
         end
     end
@@ -2730,7 +2738,8 @@ function createRadar(config)
         if fwd.Magnitude < 0.001 then return end
         fwd = fwd.Unit
         
-        local camAngle = math.deg(math.atan2(fwd.X, fwd.Z))
+        -- ФИКС ОРИЕНТАЦИИ: теперь Z- отрицательный (вперед) направлен вверх
+        local camAngle = math.deg(math.atan2(fwd.X, -fwd.Z))
         worldViewInner.Rotation = -camAngle
 
         local now = os.clock()
@@ -2928,15 +2937,13 @@ function createRadar(config)
             zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
         end
 
-        -- ФИКС: Рисуем идеальные FOV линии через Drawing API строго из центра
+        -- ФИКС: Рисуем идеальные FOV линии через Drawing API строго из центра маркера
         if zoneEnabled and zoneShape == "triangle" and fovLines then
             local cam = workspace.CurrentCamera
             if cam then
-                -- Центр круглой области радара в экранных координатах.
-                local centerScreen = radar.AbsolutePosition + (radar.AbsoluteSize * 0.5)
+                -- Берем точный центр невидимого маркера
+                local centerScreen = fovOrigin.AbsolutePosition + (fovOrigin.AbsoluteSize * 0.5)
 
-                -- Направление берём непосредственно из LookVector персонажа.
-                -- В Roblox направление вперёд — -Z, а экранная ось Y направлена вниз.
                 local root = getRoot(zoneTarget)
                 local targetLook = root and root.CFrame.LookVector
 
@@ -2946,15 +2953,12 @@ function createRadar(config)
                         flatLook = flatLook.Unit
                         local angle = math.atan2(flatLook.X, -flatLook.Z)
 
-                        -- WorldView вращает карту относительно камеры, поэтому
-                        -- только в этом режиме переводим угол в систему карты.
-                        if worldViewEnabled then
-                            local camLook = cam.CFrame.LookVector
-                            local flatCamLook = Vector3.new(camLook.X, 0, camLook.Z)
-                            if flatCamLook.Magnitude > 0.001 then
-                                flatCamLook = flatCamLook.Unit
-                                angle = angle - math.atan2(flatCamLook.X, -flatCamLook.Z)
-                            end
+                        -- ВСЕГДА вычитаем угол камеры, чтобы треугольник смотрел относительно экрана
+                        local camLook = cam.CFrame.LookVector
+                        local flatCamLook = Vector3.new(camLook.X, 0, camLook.Z)
+                        if flatCamLook.Magnitude > 0.001 then
+                            flatCamLook = flatCamLook.Unit
+                            angle = angle - math.atan2(flatCamLook.X, -flatCamLook.Z)
                         end
 
                         angle = angle + math.rad(zoneRotation)
@@ -2984,7 +2988,7 @@ function createRadar(config)
                     fovLines[1].Visible = false
                     fovLines[2].Visible = false
                 end
-            end -- <--- ДОБАВЛЕН ЭТОТ END
+            end
         elseif fovLines then
             fovLines[1].Visible = false
             fovLines[2].Visible = false
