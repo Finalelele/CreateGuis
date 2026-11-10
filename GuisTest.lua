@@ -2320,7 +2320,6 @@ function createRadar(config)
     radar.ZIndex = 2
     radar.Parent = body
 
-    -- ФИКС: Маска для жесткой обрезки краев
     local radarClip = Instance.new("Frame")
     radarClip.Name = "Clip"
     radarClip.Size = UDim2.new(1, 0, 1, 0)
@@ -2340,11 +2339,9 @@ function createRadar(config)
     radarStroke.Color = WHITE
     radarStroke.Thickness = 2.5
     radarStroke.Transparency = tBorder()
-    radarStroke.ZIndex = 100 -- ФИКС: Рамка всегда сверху объектов
+    radarStroke.ZIndex = 100
     radarStroke.Parent = radar
     local radarBorderGrad = Fx.addBorderGradient(radarStroke, cBorder(), depth)
-
-    local radarDepth = Fx.addDepth(radarClip, depth * 0.8, 1, 100)
 
     -- === VisibleZone UI ===
     local zoneHolder = Instance.new("Frame")
@@ -2383,14 +2380,13 @@ function createRadar(config)
     zoneTriangle.AnchorPoint = Vector2.new(0.5, 1)
     zoneTriangle.Position = UDim2.new(0.5, 0, 0.5, 0)
     zoneTriangle.BackgroundTransparency = 1
-    zoneTriangle.Image = "rbxassetid://1316045217" -- Валидный белый треугольник
+    zoneTriangle.Image = "rbxassetid://1316045217" 
     zoneTriangle.ImageColor3 = zoneColor
     zoneTriangle.ImageTransparency = 0.5
     zoneTriangle.Visible = (zoneShape == "triangle")
     zoneTriangle.ZIndex = 400
     zoneTriangle.Parent = zoneHolder
 
-    -- ФИКС: Использование Drawing API для FOV линий (если доступно)
     local hasDrawing = pcall(function() return Drawing.new("Line") end)
     local fovLines = nil
     if hasDrawing then
@@ -2430,8 +2426,11 @@ function createRadar(config)
     worldViewContainer.Visible = worldViewEnabled
     worldViewContainer.ZIndex = 4
     worldViewContainer.Parent = radarClip
+    
+    local wvCorner = Instance.new("UICorner")
+    wvCorner.CornerRadius = UDim.new(1, 0)
+    wvCorner.Parent = worldViewContainer
 
-    -- ФИКС: Контейнер, который теперь вращается целиком
     local worldViewInner = Instance.new("Frame")
     worldViewInner.Name = "Inner"
     worldViewInner.BackgroundTransparency = 1
@@ -2492,7 +2491,7 @@ function createRadar(config)
         return tc.R, tc.G, tc.B
     end
 
-    local function updateTerrainView(centerPos)
+    local function updateTerrainView(centerPos, fwd, rgt)
         local extent = math.min(Size * 1.5, TERRAIN_MAX_EXTENT)
         local region = Region3.new(
             Vector3.new(centerPos.X - extent, centerPos.Y - TERRAIN_Y_DOWN, centerPos.Z - extent),
@@ -2517,7 +2516,9 @@ function createRadar(config)
         
         local pixelsPerStud = (RADAR_SIZE / 2) / Size
         local cellSizeStuds = (Size * 2) / TERRAIN_GRID
-        local cellSizePixels = cellSizeStuds * pixelsPerStud + 1
+        local cellSizePixels = cellSizeStuds * pixelsPerStud + 2
+        
+        local camAngle = math.deg(math.atan2(rgt.X, rgt.Z))
 
         for gx = 0, TERRAIN_GRID - 1 do
             for gz = 0, TERRAIN_GRID - 1 do
@@ -2532,8 +2533,16 @@ function createRadar(config)
 
                 local cell = terrainCells[gx * TERRAIN_GRID + gz + 1]
                 
-                cell.Position = UDim2.new(0.5, ox * pixelsPerStud, 0.5, oz * pixelsPerStud)
+                local offsetVec = Vector3.new(ox, 0, oz)
+                local localX = offsetVec:Dot(rgt)
+                local localZ = offsetVec:Dot(fwd)
+
+                local px = localX * pixelsPerStud
+                local py = -localZ * pixelsPerStud
+
+                cell.Position = UDim2.new(0.5, px, 0.5, py)
                 cell.Size = UDim2.fromOffset(cellSizePixels, cellSizePixels)
+                cell.Rotation = camAngle
 
                 if vx >= 1 and vx <= sx and vz >= 1 and vz <= sz then
                     local col = nil
@@ -2648,27 +2657,10 @@ function createRadar(config)
         table.insert(sweepLines, line)
     end
 
-    local centerDot = Instance.new("Frame")
-    centerDot.AnchorPoint = Vector2.new(0.5, 0.5)
-    centerDot.Position = UDim2.new(0.5, 0, 0.5, 0)
-    centerDot.Size = UDim2.fromOffset(6, 6)
-    centerDot.BackgroundColor3 = accentColor()
-    centerDot.BorderSizePixel = 0
-    centerDot.ZIndex = 6
-    centerDot.Parent = radarClip
-    local cdCorner = Instance.new("UICorner")
-    cdCorner.CornerRadius = UDim.new(1, 0)
-    cdCorner.Parent = centerDot
-    local cdGlow = Instance.new("UIStroke")
-    cdGlow.Color = accentColor()
-    cdGlow.Thickness = 3
-    cdGlow.Transparency = 0.6
-    cdGlow.Parent = centerDot
-
     -- === WorldView: parts ===
     local worldUIObjects = {}
 
-    local function updateWorldViewParts(centerPos, camera)
+    local function updateWorldViewParts(centerPos, camera, fwd, rgt)
         local character = Players.LocalPlayer.Character
         if not character then return end
 
@@ -2687,11 +2679,6 @@ function createRadar(config)
                 worldUIObjects[part] = nil
             end
         end
-
-        -- ФИКС: Вращаем карту целиком в зависимости от взгляда камеры
-        local lookVec = camera.CFrame.LookVector
-        local camAngle = math.deg(math.atan2(-lookVec.X, -lookVec.Z))
-        worldViewInner.Rotation = camAngle
 
         local overlapParams = OverlapParams.new()
         overlapParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -2752,11 +2739,17 @@ function createRadar(config)
                         uiObj.Size = UDim2.fromOffset(math.max(part.Size.X * pixelsPerStud, 2), math.max(part.Size.Z * pixelsPerStud, 2))
                     end
 
-                    -- ФИКС: Позиция и поворот объекта относительно центра мира
-                    uiObj.Position = UDim2.new(0.5, offset.X * pixelsPerStud, 0.5, offset.Z * pixelsPerStud)
+                    local localX = offset:Dot(rgt)
+                    local localZ = offset:Dot(fwd)
+                    local px = localX * pixelsPerStud
+                    local py = -localZ * pixelsPerStud
                     
-                    local _, partY, _ = part.CFrame:ToOrientation()
-                    uiObj.Rotation = math.deg(partY)
+                    uiObj.Position = UDim2.new(0.5, px, 0.5, py)
+
+                    local partRight = part.CFrame.RightVector
+                    local screenPartX = partRight:Dot(rgt)
+                    local screenPartY = -partRight:Dot(fwd)
+                    uiObj.Rotation = math.deg(math.atan2(screenPartY, screenPartX))
 
                     uiObj.ZIndex = 10 + index
                     uiObj.Visible = true
@@ -2778,9 +2771,19 @@ function createRadar(config)
         local camera = workspace.CurrentCamera
         if not camera then return end
 
+        local look = camera.CFrame.LookVector
+        local fwd = Vector3.new(look.X, 0, look.Z)
+        if fwd.Magnitude < 0.001 then return end
+        fwd = fwd.Unit
+        
+        local right = camera.CFrame.RightVector
+        local rgt = Vector3.new(right.X, 0, right.Z)
+        if rgt.Magnitude < 0.001 then return end
+        rgt = rgt.Unit
+
         local centerPos = hrp.Position
-        updateTerrainView(centerPos)
-        updateWorldViewParts(centerPos, camera)
+        updateTerrainView(centerPos, fwd, rgt)
+        updateWorldViewParts(centerPos, camera, fwd, rgt)
     end
 
     local lastWorldViewUpdate = 0
@@ -2959,7 +2962,7 @@ function createRadar(config)
             zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
         end
 
-        -- ФИКС: Рисуем FOV линии через Drawing API
+        -- ФИКС: Рисуем FOV линии через Drawing API, точно из центра
         if zoneEnabled and zoneShape == "triangle" and fovLines then
             local cam = workspace.CurrentCamera
             if cam then
@@ -2967,29 +2970,26 @@ function createRadar(config)
                     zoneHolder.AbsolutePosition.X + zoneHolder.AbsoluteSize.X / 2,
                     zoneHolder.AbsolutePosition.Y + zoneHolder.AbsoluteSize.Y / 2
                 )
-                local look2D = Vector2.new(cam.CFrame.LookVector.X, cam.CFrame.LookVector.Z)
-                if look2D.Magnitude > 0.01 then
-                    look2D = look2D.Unit
-                    local camAngle2D = math.atan2(look2D.Y, look2D.X)
-                    local fov = math.rad(45)
-                    local len = RADAR_SIZE / 2
-                    
-                    local leftAngle = camAngle2D + fov
-                    local rightAngle = camAngle2D - fov
-                    
-                    local lDir = Vector2.new(math.cos(leftAngle), math.sin(leftAngle))
-                    local rDir = Vector2.new(math.cos(rightAngle), math.sin(rightAngle))
-                    
-                    fovLines[1].From = centerAbs
-                    fovLines[1].To = centerAbs + lDir * len
-                    fovLines[1].Color = zoneColor
-                    fovLines[1].Visible = true
-                    
-                    fovLines[2].From = centerAbs
-                    fovLines[2].To = centerAbs + rDir * len
-                    fovLines[2].Color = zoneColor
-                    fovLines[2].Visible = true
-                end
+                
+                local fov = math.rad(45)
+                local len = RADAR_SIZE / 2
+                local rotRad = math.rad(zoneRotation)
+                
+                local leftAngle = rotRad - fov
+                local rightAngle = rotRad + fov
+                
+                local lDir = Vector2.new(math.sin(leftAngle), -math.cos(leftAngle))
+                local rDir = Vector2.new(math.sin(rightAngle), -math.cos(rightAngle))
+                
+                fovLines[1].From = centerAbs
+                fovLines[1].To = centerAbs + lDir * len
+                fovLines[1].Color = zoneColor
+                fovLines[1].Visible = true
+                
+                fovLines[2].From = centerAbs
+                fovLines[2].To = centerAbs + rDir * len
+                fovLines[2].Color = zoneColor
+                fovLines[2].Visible = true
             end
         elseif fovLines then
             fovLines[1].Visible = false
@@ -3269,8 +3269,6 @@ function createRadar(config)
             local ac = accentColor()
             tween(accentBar, tinfo, { BackgroundColor3 = ac })
             tween(abGlow, tinfo, { Color = ac })
-            tween(centerDot, tinfo, { BackgroundColor3 = ac })
-            tween(cdGlow, tinfo, { Color = ac })
             for _, l in ipairs(sweepLines) do tween(l, tinfo, { BackgroundColor3 = ac }) end
         end
 
@@ -3298,7 +3296,6 @@ function createRadar(config)
         if pick(tbl, "Depth", "depth") ~= nil then
             depth = Fx.depthStrength(tbl)
             depthParts.update(depth)
-            radarDepth.update(depth * 0.8)
             frameBorderGrad.set(cBorder(), depth)
             radarBorderGrad.set(cBorder(), depth)
         end
