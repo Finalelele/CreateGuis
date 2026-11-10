@@ -2320,6 +2320,7 @@ function createRadar(config)
     radar.ZIndex = 2
     radar.Parent = body
 
+    -- Контейнер-маска для идеальной круглой обрезки
     local radarClip = Instance.new("Frame")
     radarClip.Name = "Clip"
     radarClip.Size = UDim2.new(1, 0, 1, 0)
@@ -2375,53 +2376,25 @@ function createRadar(config)
     zoneCircleStroke.Transparency = 0.15
     zoneCircleStroke.Parent = zoneCircle
 
-    -- ФИКС: Используем Frame вместо Folder, так как у Folder нет Visible
-    local fovFolder = Instance.new("Frame")
-    fovFolder.Name = "FOV"
-    fovFolder.BackgroundTransparency = 1
-    fovFolder.Size = UDim2.new(1, 0, 1, 0)
-    fovFolder.AnchorPoint = Vector2.new(0.5, 0.5)
-    fovFolder.Position = UDim2.new(0.5, 0, 0.5, 0)
-    fovFolder.Visible = (zoneShape == "triangle")
-    fovFolder.Parent = zoneHolder
-
-    local fovLine1 = Instance.new("Frame")
-    fovLine1.AnchorPoint = Vector2.new(0.5, 1)
-    fovLine1.Position = UDim2.new(0.5, 0, 0.5, 0)
-    fovLine1.Size = UDim2.new(0, 2, 0.5, 0)
-    fovLine1.BackgroundColor3 = zoneColor
-    fovLine1.BorderSizePixel = 0
-    fovLine1.Rotation = -45
-    fovLine1.ZIndex = 400
-    fovLine1.Parent = fovFolder
-
-    local fovLine2 = fovLine1:Clone()
-    fovLine2.Rotation = 45
-    fovLine2.Parent = fovFolder
-    
-    -- Маленькая точка в основании FOV, чтобы не было зазора
-    local fovApex = Instance.new("Frame")
-    fovApex.AnchorPoint = Vector2.new(0.5, 0.5)
-    fovApex.Position = UDim2.new(0.5, 0, 0.5, 0)
-    fovApex.Size = UDim2.fromOffset(4, 4)
-    fovApex.BackgroundColor3 = zoneColor
-    fovApex.BorderSizePixel = 0
-    fovApex.ZIndex = 400
-    fovApex.Parent = fovFolder
-    local apexCorner = Instance.new("UICorner")
-    apexCorner.CornerRadius = UDim.new(1, 0)
-    apexCorner.Parent = fovApex
+    -- === Возвращаем Drawing API для FOV ===
+    local hasDrawing = pcall(function() return Drawing.new("Line") end)
+    local fovLines = nil
+    if hasDrawing then
+        fovLines = { Drawing.new("Line"), Drawing.new("Line") }
+        for _, l in ipairs(fovLines) do
+            l.Thickness = 2
+            l.Color = zoneColor
+            l.Transparency = 0.5
+            l.Visible = false
+        end
+    end
 
     local function updateVisibleZone()
         zoneHolder.Visible = zoneEnabled
         zoneCircle.Visible = zoneEnabled and (zoneShape == "circle")
-        fovFolder.Visible = zoneEnabled and (zoneShape == "triangle")
 
         zoneCircle.BackgroundColor3 = zoneColor
         zoneCircleStroke.Color = zoneColor
-        fovLine1.BackgroundColor3 = zoneColor
-        fovLine2.BackgroundColor3 = zoneColor
-        fovApex.BackgroundColor3 = zoneColor
 
         if zoneShape == "circle" then
             zoneCircle.Size = UDim2.fromOffset(zoneWidth, zoneWidth)
@@ -2733,7 +2706,7 @@ function createRadar(config)
                     uiObj.Visible = true
 
                     index = index + 1
-                    if index > 200 then break end -- Оптимизация: 200 объектов более чем достаточно
+                    if index > 200 then break end
                 end
             end
         end
@@ -2758,14 +2731,12 @@ function createRadar(config)
         if fwd.Magnitude < 0.001 then return end
         fwd = fwd.Unit
         
-        -- Оптимизация: Вращение контейнера (1 строчка кода) выполняется каждый кадр без просадок
         local camAngle = math.deg(math.atan2(fwd.X, fwd.Z))
         worldViewInner.Rotation = -camAngle
 
         local now = os.clock()
         local movedDist = (centerPos - lastPos).Magnitude
         
-        -- Пересчет позиций и цветов происходит реже (раз в 0.15 сек или при движении)
         if movedDist > 1 or (now - lastPartUpdate > 0.15) then
             lastPos = centerPos
             lastPartUpdate = now
@@ -2944,13 +2915,52 @@ function createRadar(config)
             zoneHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
         end
 
-        -- ФИКС: Плавное вращение FOV линий (следуют за взглядом камеры)
-        if zoneEnabled and zoneShape == "triangle" and fovFolder then
+        -- ФИКС: Рисуем идеальные FOV линии через Drawing API строго из центра
+        if zoneEnabled and zoneShape == "triangle" and fovLines then
             local cam = workspace.CurrentCamera
             if cam then
-                local look = cam.CFrame.LookVector
-                fovFolder.Rotation = -math.deg(math.atan2(look.X, look.Z)) + zoneRotation
+                -- 1. Берем точный центр маски радара на экране
+                local centerScreen = radarClip.AbsolutePosition + (radarClip.AbsoluteSize / 2)
+                
+                -- 2. Вычисляем угол взгляда камеры
+                local camLook = cam.CFrame.LookVector
+                local camAngle = math.deg(math.atan2(camLook.X, camLook.Z))
+
+                -- 3. Вычисляем угол взгляда цели (если это модель/игрок)
+                local targetAngle = camAngle
+                local root = getRoot(zoneTarget)
+                if root then
+                    local targetLook = root.CFrame.LookVector
+                    targetAngle = math.deg(math.atan2(targetLook.X, targetLook.Z))
+                end
+
+                -- 4. Вычисляем относительный угол (насколько цель повернута относительно камеры)
+                -- Так как карта вращается на -camAngle, нам нужно вычесть camAngle из targetAngle
+                local relativeAngle = targetAngle - camAngle + zoneRotation
+                
+                local fov = 45 -- Угол раствора конуса
+                local len = RADAR_SIZE / 2
+                
+                local leftAngle = math.rad(relativeAngle - fov)
+                local rightAngle = math.rad(relativeAngle + fov)
+                
+                -- 5. Считаем координаты концов линий (в Drawing API Y идет вниз)
+                local lDir = Vector2.new(math.sin(leftAngle), -math.cos(leftAngle))
+                local rDir = Vector2.new(math.sin(rightAngle), -math.cos(rightAngle))
+                
+                fovLines[1].From = centerScreen
+                fovLines[1].To = centerScreen + lDir * len
+                fovLines[1].Color = zoneColor
+                fovLines[1].Visible = true
+                
+                fovLines[2].From = centerScreen
+                fovLines[2].To = centerScreen + rDir * len
+                fovLines[2].Color = zoneColor
+                fovLines[2].Visible = true
             end
+        elseif fovLines then
+            fovLines[1].Visible = false
+            fovLines[2].Visible = false
         end
     end)
 
@@ -3126,7 +3136,13 @@ function createRadar(config)
                 local rot = pick(v, "rotation", "Rotation")
                 if rot ~= nil then zoneRotation = tonumber(rot) or zoneRotation end
                 local col = pick(v, "color", "Color")
-                if col ~= nil then zoneColor = col end
+                if col ~= nil then 
+                    zoneColor = col 
+                    if fovLines then
+                        fovLines[1].Color = zoneColor
+                        fovLines[2].Color = zoneColor
+                    end
+                end
                 local tgt = pick(v, "target", "Target")
                 if tgt ~= nil then zoneTarget = tgt end
 
@@ -3259,6 +3275,10 @@ function createRadar(config)
         RunService:UnbindFromRenderStep(renderName)
         for _, c in ipairs(connections) do c:Disconnect() end
         connections = {}
+        if fovLines then
+            fovLines[1]:Remove()
+            fovLines[2]:Remove()
+        end
         gui:Destroy()
     end
 
