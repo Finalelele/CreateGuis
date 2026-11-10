@@ -2981,7 +2981,7 @@ function createRadar(config)
             fovLines[1].Visible = false
             fovLines[2].Visible = false
         end
-    end)
+    end
 
     local function playIntro()
         body.BackgroundTransparency = 1
